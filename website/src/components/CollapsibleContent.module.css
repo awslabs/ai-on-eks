@@ -1,0 +1,41 @@
+.collapsibleContent {
+    border: 2px solid grey;
+    margin-bottom: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+}
+
+.header {
+    cursor: pointer;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.icon {
+    font-size: 2.0rem; /* Increase the font size for a larger emoji */
+    transition: transform 0.3s ease-in-out;
+    line-height: 1;
+    animation: blinkAnimation 1s infinite;
+}
+
+@keyframes blinkAnimation {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0;
+    }
+}
+
+.content {
+    padding: 1rem;
+}
+
+.expanded .icon {
+    transform: scale(1.0);
+    animation: none;
+}

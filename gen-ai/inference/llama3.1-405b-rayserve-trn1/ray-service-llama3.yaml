@@ -1,0 +1,159 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama3
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-token
+#  namespace: llama3
+data:
+  hf-token: aGZfcnFFdGVLbW1YYlVMRVBzR2FmdVpjaFZWWWpXUlhUdGhGRg==
+---
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: llama3
+#  namespace: llama3
+spec:
+  serviceUnhealthySecondThreshold: 900
+  deploymentUnhealthySecondThreshold: 900
+  serveConfigV2: |
+    applications:
+      - name: llama3
+        import_path: vllm_serve:deployment
+        runtime_env:
+          env_vars:
+            MODEL_ID: meta-llama/Meta-Llama-3-8B-Instruct
+  rayClusterConfig:
+    rayVersion: '2.32.0'
+    headGroupSpec:
+      headService:
+        metadata:
+          name: llama3
+          namespace: llama3
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+      template:
+        spec:
+          containers:
+          - name: head
+            image: 975050295866.dkr.ecr.us-east-1.amazonaws.com/ray-serve-llama3-1:latest # Image created using the Dockerfile attached in the folder
+            imagePullPolicy: Always # Ensure the image is always pulled when updated
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "ray stop"]
+            ports:
+            - containerPort: 6379
+              name: gcs
+            - containerPort: 8265
+              name: dashboard
+            - containerPort: 10001
+              name: client
+            - containerPort: 8000
+              name: serve
+            volumeMounts:
+            - mountPath: /tmp/ray
+              name: ray-logs
+            - mountPath: /serve_app
+              name: code
+            resources:
+              limits:
+                cpu: 4
+                memory: 20Gi
+              requests:
+                cpu: 4
+                memory: 20Gi
+            env:
+              - name: HUGGING_FACE_HUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: hf-token
+                    key: hf-token
+              - name: LD_LIBRARY_PATH
+                value: "/home/ray/anaconda3/lib"
+          nodeSelector: # This is using Karpenter Nodes with the provisioner label
+            instanceType: mixed-x86
+            provisionerType: Karpenter
+            workload: rayhead
+          volumes:
+          - name: ray-logs
+            emptyDir: {}
+          - name: code
+            configMap:
+              # Provide the name of the ConfigMap you want to mount.
+              name: vllm-py
+              # An array of keys from the ConfigMap to create as files
+              items:
+                - key: vllm_serve.py
+                  path: vllm_serve.py
+    workerGroupSpecs:
+    - groupName: trn1
+      replicas: 2
+      minReplicas: 2
+      maxReplicas: 2
+      rayStartParams: {}
+      template:
+        spec:
+          containers:
+          - name: worker
+            image: 975050295866.dkr.ecr.us-east-1.amazonaws.com/ray-serve-llama3-1:latest
+            imagePullPolicy: Always # Ensure the image is always pulled when updated
+            lifecycle:
+              preStop:
+                exec:
+                  command: ["/bin/sh", "-c", "ray stop"]
+            resources:
+              limits:
+                aws.amazon.com/neuron: "16"
+              requests:
+                aws.amazon.com/neuron: "16"
+            env:
+              - name: LD_LIBRARY_PATH
+                value: /home/ray/anaconda3/lib
+              - name: VLLM_PORT
+                value: "8004"
+              - name: HUGGING_FACE_HUB_TOKEN
+                valueFrom:
+                  secretKeyRef:
+                    name: hf-token
+                    key: hf-token
+          nodeSelector:
+            instanceType: trainium-trn1
+            provisionerType: Karpenter
+          tolerations:
+          - key: "aws.amazon.com/neuron"
+            operator: "Exists"
+            effect: "NoSchedule"
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: llama3
+#  namespace: llama3
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/$1"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      # Ray Dashboard
+      - path: /dashboard/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: llama3
+            port:
+              number: 8265
+      # Ray Serve
+      - path: /serve/(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: llama3
+            port:
+              number: 8000
