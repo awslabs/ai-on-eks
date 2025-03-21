@@ -1,0 +1,108 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+:root {
+  --ifm-color-primary: #25c2a0; /* #146ee6; */
+  --ifm-menu-color: #525151;
+  --ifm-font-color-base: rgba(30, 32, 34, 1);
+  --ifm-navbar-background-color: white;
+  --ifm-navbar-link-color: #333;
+  --ifm-navbar-height: 3.8rem;
+  --ifm-code-name-highlight: #84488D;
+  --ifm-font-size-base:  95%;
+  --ifm-toc-border-color: #dadde1b8;
+}
+
+html[data-theme="dark"] {
+  --ifm-color-primary: #25c2a0;
+  --ifm-menu-color: #e6e6e6;
+  --ifm-font-color-base: #e6e6e6;
+  --ifm-navbar-background-color: #141520;
+  --ifm-navbar-link-color: #aaa;
+  --ifm-navbar-height: 3.8rem;
+  --ifm-code-name-highlight: #A972B1;
+  --ifm-toc-border-color: #333;
+  --ifm-background-color: #141520;
+}
+
+/*.hero__subtitle::after {*/
+/*  position: fixed;*/
+/*  bottom: 0;*/
+/*  background: rgba(0, 0, 0, 0.5);*/
+/*  color: #f1f1f1;*/
+/*  width: 100%;*/
+/*  padding: 20px;*/
+/*  content: '🚀';*/
+/*  margin-left: 8px; !* Adjust the spacing between the tagline and the rocket *!*/
+/*}*/
+
+/* Highlight navbar items on hover */
+.navbar__link:hover {
+  color: var(--ifm-color-primary); /* Change to your desired color */
+}
+
+.boldTagline {
+  font-weight: bold;
+  /* font-family: 'Roboto Mono for Powerline', sans-serif; */
+}
+
+.button-3d {
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+  transform: translateY(-5px);
+  transition: transform 0.3s ease-in-out;
+}
+
+.button-sparkles {
+  background-image: linear-gradient(to right, #ff3d2b 0%, #ffd941 51%, #ff2bc6 100%);
+  background-size: 200% auto;
+  background-position: right bottom;
+  animation: sparkling 1s ease-out infinite;
+  color: #070707;
+}
+
+@keyframes sparkling {
+  0% {
+    background-position: right bottom;
+  }
+  50% {
+    background-position: left bottom;
+  }
+  100% {
+    background-position: right bottom;
+  }
+}
+
+
+.hero__subtitle {
+  /*animation: float 2s ease-in-out infinite;*/
+  position: relative;
+  left: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1f1f1;
+  width: 100%;
+  padding: 20px;
+}
+
+@keyframes float {
+  0% {
+    transform: translatey(0);
+  }
+  50% {
+    transform: translatey(-10px);
+  }
+  100% {
+    transform: translatey(0);
+  }
+}
+
+/* CSS Hack to style table separator for spark benchmark results table */
+.benchmark-results thead tr th:nth-child(5){
+  background: #141520;
+}
+.benchmark-results tbody tr td:nth-child(5){
+  background: #141520;
+}
