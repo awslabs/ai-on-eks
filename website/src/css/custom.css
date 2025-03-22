@@ -6,10 +6,16 @@
 
 :root {
   --ifm-color-primary: white; /* #146ee6; */
-  --ifm-menu-color: #525151;
+  --ifm-link-color: #25c2a0;
+  --ifm-link-hover-color: #141520;
+  --ifm-menu-color: #25c2a0;
+  --ifm-menu-color-background-active: #141520;
+  --ifm-menu-color-background-hover: #141520;
   --ifm-font-color-base: rgba(30, 32, 34, 1);
   --ifm-navbar-background-color: white;
-  --ifm-navbar-link-color: #333;
+  --ifm-navbar-link-color: #25c2a0;
+  --ifm-navbar-link-hover-color: #141520;
+  --ifm-breadcrumb-color-active: #141520;
   --ifm-navbar-height: 3.8rem;
   --ifm-code-name-highlight: #84488D;
   --ifm-font-size-base:  95%;
@@ -18,10 +24,16 @@
 
 html[data-theme="dark"] {
   --ifm-color-primary: #141520;
-  --ifm-menu-color: #e6e6e6;
+  --ifm-link-color: #25c2a0;
+  --ifm-link-hover-color: white;
+  --ifm-menu-color: #25c2a0;
+  --ifm-menu-color-background-active: white;
+  --ifm-menu-color-background-hover: white;
   --ifm-font-color-base: #e6e6e6;
   --ifm-navbar-background-color: #141520;
-  --ifm-navbar-link-color: #aaa;
+  --ifm-navbar-link-color: #25c2a0;
+  --ifm-navbar-link-hover-color: white;
+  --ifm-breadcrumb-color-active: white;
   --ifm-navbar-height: 3.8rem;
   --ifm-code-name-highlight: #A972B1;
   --ifm-toc-border-color: #333;
@@ -34,8 +46,11 @@ html[data-theme="dark"] {
 }
 
 /* Highlight navbar items on hover */
-.navbar__link:hover {
-  color: var(--ifm-color-primary); /* Change to your desired color */
+.menu__link--sublist {
+  color: var(--ifm-menu-color-background-active); /* Change to your desired color */
+}
+.menu__list-item-collapsible {
+  background-color: var(--ifm-color-primary); /* Change to your desired color */
 }
 
 .boldTagline {
