@@ -12,7 +12,7 @@ function HomepageHeader() {
 
   return (
       <header className={clsx('hero hero--primary', styles.heroBanner)}>
-          <video autoPlay muted loop webkit-playsinline playsinline id="heroVideo">
+          <video playsInline autoPlay muted loop webkit-playsinline  defaultMuted id="heroVideo">
               <source src="vid/background.mp4" type="video/mp4"/>
           </video>
               <p
