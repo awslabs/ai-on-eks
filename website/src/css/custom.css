@@ -20,6 +20,7 @@
   --ifm-code-name-highlight: #84488D;
   --ifm-font-size-base:  95%;
   --ifm-toc-border-color: #dadde1b8;
+  --ifm-toc-link-color: #25c2a0;
 }
 
 html[data-theme="dark"] {
@@ -37,6 +38,7 @@ html[data-theme="dark"] {
   --ifm-navbar-height: 3.8rem;
   --ifm-code-name-highlight: #A972B1;
   --ifm-toc-border-color: #333;
+  --ifm-toc-link-color: #25c2a0;
   --ifm-background-color: #141520;
 }
 
@@ -58,7 +60,9 @@ html[data-theme="dark"] {
 .menu__list-item-collapsible {
   background-color: var(--ifm-color-primary); /* Change to your desired color */
 }
-
+.toc-highlight:hover{
+  color:var(--ifm-menu-color-background-active);
+}
 .boldTagline {
   font-weight: bold;
   /* font-family: 'Roboto Mono for Powerline', sans-serif; */
