@@ -77,10 +77,6 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Get Started',
-            items: [{ label: 'Docs', to: '/docs/introduction/intro' }],
-          },
-          {
             title: 'Get Involved',
             items: [{ label: 'Github', href: 'https://github.com/awslabs/data-on-eks' }],
           },
