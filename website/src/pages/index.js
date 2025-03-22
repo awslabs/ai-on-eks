@@ -11,45 +11,22 @@ function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
 
   return (
-    <header className={clsx('hero hero--primary', styles.heroBanner)}>
-      <div className="container" style={{ textAlign: 'center' }}>
-        <img
-          src="img/light-logo.png"
-          alt="Header image"
-          className={styles.logoImage}
-        />
-        <p
-          className='hero__subtitle'
-          style={{
-            fontSize: 18,
-            fontSmooth: 'auto',
-            animation: 'float 2s ease-in-out infinite'
-          }}>
-          {siteConfig.tagline}
-        </p>
-        <div className={styles.buttons}>
-          <Link
-            className={clsx("button button--lg", styles.buttonSpinUp)}
-            to="/docs/introduction/intro">
-            Let's Spin Up
-          </Link>
-          <Link
-            className={clsx("button button--lg", styles.buttonGenAI)}
-            to="/docs/ai">
-            AI on EKS
-          </Link>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function DataOnEKSHeader() {
-  return (
-    <div className={styles.dataOnEKSHeader}>
-      <h2>In the Spotlight 🎥</h2>
-    </div>
-  );
+      <header className={clsx('hero hero--primary', styles.heroBanner)}>
+          <video autoPlay muted loop id="heroVideo">
+              <source src="vid/background.mp4" type="video/mp4"/>
+          </video>
+              <p
+                  className='hero__subtitle'
+                  style={{
+                      position: "absolute",
+                      fontSize: 18,
+                      fontSmooth: 'auto',
+                      marginBottom: 0,
+                  }}>
+                  {siteConfig.tagline}
+              </p>
+      </header>
+);
 }
 
 export default function Home() {
@@ -62,8 +39,6 @@ export default function Home() {
       <main>
         <div className="container">
           <HomepageFeatures />
-          <DataOnEKSHeader />
-          <VideoGrid />
         </div>
       </main>
     </Layout>

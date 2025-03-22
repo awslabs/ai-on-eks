@@ -11,10 +11,24 @@
 }
 
 .container {
-  max-width: 100%;
-  padding: 0 20px;
+  position: relative;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #f1f1f1;
+  width: 100%;
+  padding: 20px;
 }
-
+video {
+  object-fit: fill;
+  min-width: 100%;
+}
+#heroVideo {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  min-width: 100%;
+  min-height: 100%;
+}
 .heroBanner {
   padding: 4rem 0;
   text-align: center;
