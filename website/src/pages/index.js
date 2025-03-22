@@ -18,8 +18,10 @@ function HomepageHeader() {
               <p
                   className='hero__subtitle'
                   style={{
+                      position: "absolute",
                       fontSize: 18,
                       fontSmooth: 'auto',
+                      marginBottom: 0,
                   }}>
                   {siteConfig.tagline}
               </p>
