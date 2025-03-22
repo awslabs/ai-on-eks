@@ -12,35 +12,42 @@ function HomepageHeader() {
 
   return (
       <header className={clsx('hero hero--primary', styles.heroBanner)}>
-          <video playsInline autoPlay muted loop webkit-playsinline  defaultMuted id="heroVideo">
+          <video playsInline autoPlay muted loop webkit-playsinline defaultMuted id="heroVideo">
               <source src="vid/background.mp4" type="video/mp4"/>
           </video>
-              <p
-                  className='hero__subtitle'
-                  style={{
-                      position: "absolute",
-                      fontSize: 18,
-                      fontSmooth: 'auto',
-                      marginBottom: 0,
-                  }}>
-                  {siteConfig.tagline}
-              </p>
+          <p
+              className='hero__subtitle'
+              style={{
+                  position: "absolute",
+                  fontSize: 18,
+                  fontSmooth: 'auto',
+                  marginBottom: 0,
+              }}>
+              {siteConfig.tagline}
+              <div className={styles.buttons}>
+                  <Link
+                      className={clsx("button button--lg", styles.buttonSpinUp)}
+                      to="/docs/ai">
+                      Let's Spin Up
+                  </Link>
+              </div>
+          </p>
       </header>
-);
+  );
 }
 
 export default function Home() {
-  const { siteConfig } = useDocusaurusContext();
-  return (
-    <Layout
-      title={`Hello from ${siteConfig.title}`}
-      description="Description will go into a meta tag in <head />">
-      <HomepageHeader />
-      <main>
-        <div className="container">
-          <HomepageFeatures />
-        </div>
-      </main>
-    </Layout>
-  );
+    const {siteConfig} = useDocusaurusContext();
+    return (
+        <Layout
+            title={`Hello from ${siteConfig.title}`}
+            description="Description will go into a meta tag in <head />">
+            <HomepageHeader/>
+            <main>
+                <div className="container">
+                    <HomepageFeatures/>
+                </div>
+            </main>
+        </Layout>
+    );
 }
