@@ -178,7 +178,7 @@ module "eks_blueprints_addons" {
     set_sensitive = [
       {
         name  = "grafana.adminPassword"
-        value = data.aws_secretsmanager_secret_version.admin_password_version.secret_string
+        value = var.enable_kube_prometheus_stack ? data.aws_secretsmanager_secret_version.admin_password_version[0].secret_string : null
       }
     ],
   }
@@ -625,11 +625,13 @@ resource "kubectl_manifest" "torchx_etcd" {
 # Login to AWS secrets manager with the same role as Terraform to extract the Grafana admin password with the secret name as "grafana"
 #---------------------------------------------------------------
 data "aws_secretsmanager_secret_version" "admin_password_version" {
-  secret_id  = aws_secretsmanager_secret.grafana.id
+  count     = var.enable_kube_prometheus_stack ? 1 : 0
+  secret_id  = aws_secretsmanager_secret.grafana[count.index].id
   depends_on = [aws_secretsmanager_secret_version.grafana]
 }
 
 resource "random_password" "grafana" {
+  count       = var.enable_kube_prometheus_stack ? 1 : 0
   length           = 16
   special          = true
   override_special = "@_"
@@ -637,13 +639,15 @@ resource "random_password" "grafana" {
 
 #tfsec:ignore:aws-ssm-secret-use-customer-key
 resource "aws_secretsmanager_secret" "grafana" {
+  count       = var.enable_kube_prometheus_stack ? 1 : 0
   name_prefix             = "${local.name}-oss-grafana"
   recovery_window_in_days = 0 # Set to zero for this example to force delete during Terraform destroy
 }
 
 resource "aws_secretsmanager_secret_version" "grafana" {
-  secret_id     = aws_secretsmanager_secret.grafana.id
-  secret_string = random_password.grafana.result
+  count       = var.enable_kube_prometheus_stack ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.grafana[count.index].id
+  secret_string = random_password.grafana[count.index].result
 }
 
 resource "kubectl_manifest" "neuron_monitor" {
