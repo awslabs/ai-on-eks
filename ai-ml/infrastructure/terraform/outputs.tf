@@ -5,5 +5,5 @@ output "configure_kubectl" {
 
 output "grafana_secret_name" {
   description = "The name of the secret containing the Grafana admin password."
-  value       = aws_secretsmanager_secret.grafana.name
+  value       = var.enable_kube_prometheus_stack ? aws_secretsmanager_secret.grafana[0].name : null
 }

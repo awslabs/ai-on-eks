@@ -1,11 +1,13 @@
 #!/bin/bash
 
 TERRAFORM_COMMAND="terraform destroy -auto-approve"
+CLUSTERNAME="ai-stack"
 # Check if blueprint.tfvars exists
 if [ -f "blueprint.tfvars" ]; then
   TERRAFORM_COMMAND="$TERRAFORM_COMMAND -var-file=blueprint.tfvars"
+  CLUSTERNAME="$(echo "var.name" | terraform console -var-file=blueprint.tfvars | tr -d '"')"
 fi
-
+echo "Destroying Terraform $CLUSTERNAME"
 echo "Destroying RayService..."
 
 # Delete the Ingress/SVC before removing the addons
@@ -19,12 +21,11 @@ if [[ ! $(cat $TMPFILE) == *"No outputs found"* ]]; then
 fi
 
 
-# List of Terraform modules to apply in sequence
+# List of Terraform modules to destroy in sequence
 targets=(
   "module.data_addons"
   "module.eks_blueprints_addons"
   "module.eks"
-  "module.vpc"
 )
 
 # Destroy modules in sequence
@@ -44,7 +45,7 @@ echo "Destroying Load Balancers..."
 
 for arn in $(aws resourcegroupstaggingapi get-resources \
   --resource-type-filters elasticloadbalancing:loadbalancer \
-  --tag-filters "Key=elbv2.k8s.aws/cluster,Values=jark-stack" \
+  --tag-filters "Key=elbv2.k8s.aws/cluster,Values=$CLUSTERNAME" \
   --query 'ResourceTagMappingList[].ResourceARN' \
   --output text); do \
     aws elbv2 delete-load-balancer --load-balancer-arn "$arn"; \
@@ -53,7 +54,7 @@ for arn in $(aws resourcegroupstaggingapi get-resources \
 echo "Destroying Target Groups..."
 for arn in $(aws resourcegroupstaggingapi get-resources \
   --resource-type-filters elasticloadbalancing:targetgroup \
-  --tag-filters "Key=elbv2.k8s.aws/cluster,Values=jark-stack" \
+  --tag-filters "Key=elbv2.k8s.aws/cluster,Values=$CLUSTERNAME" \
   --query 'ResourceTagMappingList[].ResourceARN' \
   --output text); do \
     aws elbv2 delete-target-group --target-group-arn "$arn"; \
@@ -61,10 +62,28 @@ for arn in $(aws resourcegroupstaggingapi get-resources \
 
 echo "Destroying Security Groups..."
 for sg in $(aws ec2 describe-security-groups \
-  --filters "Name=tag:elbv2.k8s.aws/cluster,Values=jark-stack" \
+  --filters "Name=tag:elbv2.k8s.aws/cluster,Values=$CLUSTERNAME" \
   --query 'SecurityGroups[].GroupId' --output text); do \
     aws ec2 delete-security-group --group-id "$sg"; \
   done
+
+# List of Terraform modules to destroy in sequence
+targets=(
+  "module.vpc"
+)
+
+# Destroy modules in sequence
+for target in "${targets[@]}"
+do
+  echo "Destroying module $target..."
+  destroy_output=$($TERRAFORM_COMMAND -target="$target" 2>&1 | tee /dev/tty)
+  if [[ ${PIPESTATUS[0]} -eq 0 && $destroy_output == *"Destroy complete"* ]]; then
+    echo "SUCCESS: Terraform destroy of $target completed successfully"
+  else
+    echo "FAILED: Terraform destroy of $target failed"
+    exit 1
+  fi
+done
 
 ## Final destroy to catch any remaining resources
 echo "Destroying remaining resources..."
