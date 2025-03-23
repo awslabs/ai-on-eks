@@ -11,7 +11,7 @@ Deployment of ML models on EKS requires access to GPUs or Neuron instances. If y
 :::
 
 :::info
-These instructions only deploy the JARK cluster as a base. If you are looking to deploy specific models for inference or training, please refer to this [AI](https://awslabs.github.io/data-on-eks/docs/ai) page for end-to-end instructions.
+These instructions only deploy the JARK cluster as a base. If you are looking to deploy specific models for inference or training, please refer to this [AI](https://awslabs.github.io/ai-on-eks/docs/ai) page for end-to-end instructions.
 :::
 
 ### What is JARK?
@@ -67,7 +67,7 @@ Before moving forward with the deployment please make sure you have read the per
 
 <CollapsibleContent header={<h2><span>Deploying the Solution</span></h2>}>
 
-In this [example](https://github.com/awslabs/data-on-eks/tree/main/ai-ml/jark-stack/terraform), you will provision JARK Cluster on Amazon EKS.
+In this [example](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/jark-stack/terraform), you will provision JARK Cluster on Amazon EKS.
 
 ![JARK](img/jark-stack.png)
 
@@ -85,7 +85,7 @@ Ensure that you have installed the following tools on your machine.
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 :::info
 If you are using profile for authentication
@@ -102,7 +102,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 
 
 ```bash
-cd data-on-eks/ai-ml/jark-stack && chmod +x install.sh
+cd ai-on-eks/ai-ml/jark-stack && chmod +x install.sh
 ./install.sh
 ```
 
@@ -158,7 +158,7 @@ nvidia-device-plugin   nvidia-device-plugin-node-feature-discovery-master   1/1 
 
 :::info
 
-Please refer to [AI](https://awslabs.github.io/data-on-eks/docs/ai) page for deploying AI models on EKS.
+Please refer to [AI](https://awslabs.github.io/ai-on-eks/docs/ai) page for deploying AI models on EKS.
 
 :::
 
@@ -173,7 +173,7 @@ To avoid unwanted charges to your AWS account, delete all the AWS resources crea
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/jark-stack/terraform && chmod +x cleanup.sh
+cd ai-on-eks/ai-ml/jark-stack/terraform && chmod +x cleanup.sh
 ```
 
 </CollapsibleContent>

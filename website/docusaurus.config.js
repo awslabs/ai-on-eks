@@ -6,17 +6,17 @@ const darkCodeTheme = require('prism-react-renderer').themes.dracula;
 
 /** @type {{onBrokenLinks: string, organizationName: string, plugins: string[], title: string, url: string, onBrokenMarkdownLinks: string, i18n: {defaultLocale: string, locales: string[]}, trailingSlash: boolean, baseUrl: string, presets: [string,Options][], githubHost: string, tagline: string, themeConfig: ThemeConfig & UserThemeConfig & AlgoliaThemeConfig, projectName: string}} */
 const config = {
-  title: 'Data on EKS',
-  tagline: 'Supercharge your Data and AI/ML Journey with Amazon EKS',
+  title: 'AI on EKS',
+  tagline: 'Supercharge your AI/ML Journey with Amazon EKS',
   url: 'https://awslabs.github.io',
-  baseUrl: '/data-on-eks/',
+  baseUrl: '/ai-on-eks/',
   trailingSlash: false,
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: 'img/header-icon.png',
 
   organizationName: 'awslabs',
-  projectName: 'data-on-eks',
+  projectName: 'ai-on-eks',
   githubHost: 'github.com',
 
   i18n: {
@@ -31,7 +31,7 @@ const config = {
       ({
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
-          editUrl: 'https://github.com/awslabs/data-on-eks/blob/main/website/',
+          editUrl: 'https://github.com/awslabs/ai-on-eks/blob/main/website/',
         },
         theme: {
           customCss: [
@@ -53,13 +53,11 @@ const config = {
           src: 'img/header-icon.png',
         },
         items: [
-          { type: 'doc', docId: 'introduction/intro', position: 'left', label: 'Introduction' },
           { type: 'doc', docId: 'ai/index', position: 'left', label: 'AI' },
-          { type: 'doc', docId: 'blueprints/amazon-emr-on-eks/index', position: 'left', label: 'Blueprints' },
+          { type: 'doc', docId: 'blueprints/ai-ml/index', position: 'left', label: 'Blueprints' },
           { type: 'doc', docId: 'bestpractices/intro', position: 'left', label: 'Best Practices' },
-          { type: 'doc', docId: 'benchmarks/emr-on-eks', position: 'left', label: 'Benchmarks' },
           { type: 'doc', docId: 'resources/intro', position: 'left', label: 'Resources' },
-          { href: 'https://github.com/awslabs/data-on-eks', label: 'GitHub', position: 'right' },
+          { href: 'https://github.com/awslabs/ai-on-eks', label: 'GitHub', position: 'right' },
         ],
       },
       colorMode: {
@@ -77,12 +75,8 @@ const config = {
         style: 'dark',
         links: [
           {
-            title: 'Get Started',
-            items: [{ label: 'Docs', to: '/docs/introduction/intro' }],
-          },
-          {
             title: 'Get Involved',
-            items: [{ label: 'Github', href: 'https://github.com/awslabs/data-on-eks' }],
+            items: [{ label: 'Github', href: 'https://github.com/awslabs/ai-on-eks' }],
           },
         ],
         copyright: `Built with ❤️ at AWS  <br/> © ${new Date().getFullYear()} Amazon.com, Inc. or its affiliates. All Rights Reserved`,

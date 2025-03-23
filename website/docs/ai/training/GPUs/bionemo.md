@@ -51,7 +51,7 @@ Ensure that you have installed the following tools on your local machine or the 
 First, clone the repository containing the necessary files for deploying the blueprint. Use the following command in your terminal:
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 #### Initialize Terraform
@@ -59,7 +59,7 @@ git clone https://github.com/awslabs/data-on-eks.git
 Navigate into the directory specific to the blueprint you want to deploy. In this case, we're interested in the BioNeMo blueprint, so navigate to the appropriate directory using the terminal:
 
 ```bash
-cd data-on-eks/ai-ml/bionemo
+cd ai-on-eks/ai-ml/bionemo
 ```
 
 #### Run the install script

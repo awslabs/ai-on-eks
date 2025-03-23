@@ -86,7 +86,7 @@ Ensure that you have installed the following tools on your machine.
 Clone the repository:
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into the following directory and run `install.sh` script:
@@ -96,7 +96,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region.
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 ./install.sh
 ```
 
@@ -163,7 +163,7 @@ Having deployed the EKS cluster with all the necessary components, we can now pr
 This will apply the RayService configuration and deploy the cluster on your EKS setup.
 
 ```bash
-cd data-on-eks/gen-ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/ai/inference/vllm-rayserve-inf2
 
 kubectl apply -f vllm-rayserve-deployment.yaml
 ```
@@ -258,7 +258,7 @@ kubectl -n vllm port-forward svc/vllm-llama3-inf2-serve-svc 8000:8000
 To run the Python client application in a virtual environment, follow these steps:
 
 ```bash
-cd data-on-eks/gen-ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/ai/inference/vllm-rayserve-inf2
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install openai
@@ -600,7 +600,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 Delete the RayCluster
 
 ```bash
-cd data-on-eks/gen-ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/ai/inference/vllm-rayserve-inf2
 
 kubectl delete -f vllm-rayserve-deployment.yaml
 ```
@@ -608,7 +608,7 @@ kubectl delete -f vllm-rayserve-deployment.yaml
 Destroy the EKS Cluster and resources
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 
 ./cleanup.sh
 ```

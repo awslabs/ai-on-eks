@@ -79,7 +79,7 @@ locals {
 
   tags = {
     Blueprint  = local.name
-    GithubRepo = "github.com/awslabs/data-on-eks"
+    GithubRepo = "github.com/awslabs/ai-on-eks"
   }
 }
 
