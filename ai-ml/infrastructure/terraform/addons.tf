@@ -243,7 +243,7 @@ module "data_addons" {
     values = [
       <<-EOT
       batchScheduler:
-        enabled: true
+        enabled: ${var.enable_volcano}
     EOT
     ]
   }
