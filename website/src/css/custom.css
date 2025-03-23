@@ -63,6 +63,9 @@ html[data-theme="dark"] {
 .toc-highlight:hover{
   color:var(--ifm-menu-color-background-active);
 }
+.table-of-contents__link--active{
+  color:var(--ifm-menu-color-background-active);
+}
 .boldTagline {
   font-weight: bold;
   /* font-family: 'Roboto Mono for Powerline', sans-serif; */
