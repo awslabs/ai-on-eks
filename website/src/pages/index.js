@@ -30,6 +30,11 @@ function HomepageHeader() {
                       to="/docs/ai">
                       Let's Spin Up
                   </Link>
+                  <Link
+                      className={clsx("button button--lg", styles.buttonGenAI)}
+                      to="https://awslabs.github.io/data-on-eks">
+                      Data on EKS
+                  </Link>
               </div>
           </p>
       </header>
@@ -42,7 +47,7 @@ export default function Home() {
         <Layout
             title={`Hello from ${siteConfig.title}`}
             description="Description will go into a meta tag in <head />">
-            <HomepageHeader/>
+        <HomepageHeader/>
             <main>
                 <div className="container">
                     <HomepageFeatures/>
