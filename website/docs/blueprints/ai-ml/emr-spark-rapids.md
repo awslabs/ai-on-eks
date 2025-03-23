@@ -33,7 +33,7 @@ Integration of Amazon EMR with NVIDIA RAPIDS Accelerator for Apache Spark​ Ama
 Before deploying this blueprint, it is important to be cognizant of the costs associated with the utilization of GPU Instances. The blueprint sets up eight g5.2xlarge GPU instances for training the dataset, employing the NVIDIA Spark-RAPIDS accelerator. Be sure to assess and plan for these costs accordingly.
 :::
 
-In this [example](https://github.com/awslabs/data-on-eks/tree/main/ai-ml/emr-spark-rapids), you will provision the following resources required to run XGBoost Spark RAPIDS Accelerator job with [Fannie Mae’s Single-Family Loan Performance Data](https://capitalmarkets.fanniemae.com/credit-risk-transfer/single-family-credit-risk-transfer/fannie-mae-single-family-loan-performance-data).
+In this [example](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/emr-spark-rapids), you will provision the following resources required to run XGBoost Spark RAPIDS Accelerator job with [Fannie Mae’s Single-Family Loan Performance Data](https://capitalmarkets.fanniemae.com/credit-risk-transfer/single-family-credit-risk-transfer/fannie-mae-single-family-loan-performance-data).
 
 This example deploys the following resources
 
@@ -64,13 +64,13 @@ Ensure that you have installed the following tools on your machine.
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into one of the example directories and run `install.sh` script
 
 ```bash
-cd data-on-eks/ai-ml/emr-spark-rapids/ && chmod +x install.sh
+cd ai-on-eks/ai-ml/emr-spark-rapids/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -143,7 +143,7 @@ Please note that the build process may take some time, depending on your network
 
 
 ```bash
-cd ~/data-on-eks/ai-ml/emr-spark-rapids/examples/xgboost
+cd ~/ai-on-eks/ai-ml/emr-spark-rapids/examples/xgboost
 docker build -t emr-6.10.0-spark-rapids-custom:0.10 -f Dockerfile .
 ```
 
@@ -318,7 +318,7 @@ Once logged in, add the AMP datasource to Grafana and import the Open Source GPU
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/emr-spark-rapids/ && chmod +x cleanup.sh
+cd ai-on-eks/ai-ml/emr-spark-rapids/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```
 

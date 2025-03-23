@@ -46,6 +46,6 @@ locals {
   azs    = slice(data.aws_availability_zones.available.names, 0, 2)
   tags = {
     Blueprint  = local.name
-    GithubRepo = "github.com/awslabs/data-on-eks"
+    GithubRepo = "github.com/awslabs/ai-on-eks"
   }
 }

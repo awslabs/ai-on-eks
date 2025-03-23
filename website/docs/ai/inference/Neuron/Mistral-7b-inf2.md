@@ -21,7 +21,7 @@ This pattern outlines the deployment of the [Mistral-7B-Instruct-v0.2](https://h
 Through this pattern, you will accomplish the following:
 
 - Create an [Amazon EKS](https://aws.amazon.com/eks/) cluster with a Karpenter managed AWS Inferentia2 nodepool for dynamic provisioning of Nodes.
-- Install [KubeRay Operator](https://github.com/ray-project/kuberay) and other core EKS add-ons using the [trainium-inferentia](https://github.com/awslabs/data-on-eks/tree/main/ai-ml/trainium-inferentia) Terraform blueprint.
+- Install [KubeRay Operator](https://github.com/ray-project/kuberay) and other core EKS add-ons using the [trainium-inferentia](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/trainium-inferentia) Terraform blueprint.
 - Deploy the `Mistral-7B-Instruct-v0.2` model with RayServe for efficient scaling.
 
 ### What is Mistral-7B-Instruct-v0.2 Model?
@@ -52,7 +52,7 @@ Ensure that you have installed the following tools on your machine.
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into one of the example directories and run `install.sh` script
@@ -62,7 +62,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 ./install.sh
 ```
 
@@ -86,7 +86,7 @@ kubectl get nodes
 
 ## Deploying the Ray Cluster with Mistral 7B Model
 
-Once the `trainium-inferentia` EKS cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-mistral.yaml` from `/data-on-eks/gen-ai/inference/mistral-7b-rayserve-inf2/` path.
+Once the `trainium-inferentia` EKS cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-mistral.yaml` from `/ai-on-eks/ai/inference/mistral-7b-rayserve-inf2/` path.
 
 In this step, we will deploy the Ray Serve cluster, which comprises one `Head Pod` on `x86 CPU` instances using Karpenter autoscaling, as well as `Ray workers` on `inf2.24xlarge` instances, autoscaled by [Karpenter](https://karpenter.sh/).
 
@@ -121,7 +121,7 @@ To deploy the Mistral-7B-Instruct-v0.2 model, it's essential to configure your H
 
 export HUGGING_FACE_HUB_TOKEN=$(echo -n "Your-Hugging-Face-Hub-Token-Value" | base64)
 
-cd data-on-eks/gen-ai/inference/mistral-7b-rayserve-inf2
+cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2
 envsubst < ray-service-mistral.yaml| kubectl apply -f -
 ```
 
@@ -180,17 +180,17 @@ You can monitor Serve deployment and the Ray Cluster deployment including resour
 [Gradio](https://www.gradio.app/) Web UI is used to interact with the Mistral7b inference service deployed on EKS Clusters using inf2 instances.
 The Gradio UI communicates internally with the mistral service(`mistral-serve-svc.mistral.svc.cluster.local:8000`), which is exposed on port `8000`, using its service name and port.
 
-We have created a base Docker(`gen-ai/inference/gradio-ui/Dockerfile-gradio-base`) image for the Gradio app, which can be used with any model inference.
+We have created a base Docker(`ai/inference/gradio-ui/Dockerfile-gradio-base`) image for the Gradio app, which can be used with any model inference.
 This image is published on [Public ECR](https://gallery.ecr.aws/data-on-eks/gradio-web-app-base).
 
 #### Steps to Deploy a Gradio App:
 
-The following YAML script (`gen-ai/inference/mistral-7b-rayserve-inf2/gradio-ui.yaml`) creates a dedicated namespace, deployment, service, and a ConfigMap where your model client script goes.
+The following YAML script (`ai/inference/mistral-7b-rayserve-inf2/gradio-ui.yaml`) creates a dedicated namespace, deployment, service, and a ConfigMap where your model client script goes.
 
 To deploy this, execute:
 
 ```bash
-cd data-on-eks/gen-ai/inference/mistral-7b-rayserve-inf2/
+cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2/
 kubectl apply -f gradio-ui.yaml
 ```
 
@@ -242,7 +242,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and mistral Inference deployment
 
 ```bash
-cd data-on-eks/gen-ai/inference/mistral-7b-rayserve-inf2
+cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-mistral.yaml
 ```
@@ -251,6 +251,6 @@ kubectl delete -f ray-service-mistral.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 ./cleanup.sh
 ```

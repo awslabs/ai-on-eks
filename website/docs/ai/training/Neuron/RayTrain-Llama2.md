@@ -88,19 +88,19 @@ Volcano's gang scheduling ensures that all pods in a job (or "gang") are schedul
     * [kubectl](https://Kubernetes.io/docs/tasks/tools/)
     * [terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
 
-    To install all the pre-reqs on EC2, you can run this [script](https://github.com/awslabs/data-on-eks/blob/main/ai-ml/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
+    To install all the pre-reqs on EC2, you can run this [script](https://github.com/awslabs/ai-on-eks/blob/main/ai-ml/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
 
 
-    **Clone the Data on EKS repository**
+    **Clone the AI on EKS repository**
 
     ```bash
-    git clone https://github.com/awslabs/data-on-eks.git
+    git clone https://github.com/awslabs/ai-on-eks.git
     ```
 
     **Navigate to the trainium-inferentia directory.**
 
     ```bash
-    cd data-on-eks/ai-ml/trainium-inferentia
+    cd ai-on-eks/ai-ml/trainium-inferentia
     ```
 
    Let's run the below export commands to set environment variables.
@@ -157,7 +157,7 @@ If you want to customize the Docker image, you can update the `Dockerfile` and f
 Please note that you will also need to modify the RayCluster YAML file, `llama2-pretrain-trn1-raycluster.yaml`, with the newly created image using your own private ECR.
 
 ```bash
-cd gen-ai/training/raytrain-llama2-pretrain-trn1
+cd ai/training/raytrain-llama2-pretrain-trn1
 ./kuberay-trn1-llama2-pretrain-build-image.sh
 ```
 After running this script, note the Docker image URL and tag that are produced.
@@ -168,7 +168,7 @@ You will need this information for the next step.
 If you skip step 2, you don't need to modify the YAML file.
 You can simply run the `kubectl apply` command on the file, and it will use the public ECR image that we published.
 
-If you built a custom Docker image in **Step 2**, update the `gen-ai/training/raytrain-llama2-pretrain-trn1/llama2-pretrain-trn1-raycluster.yaml` file with the Docker image URL and tag obtained from the previous step.
+If you built a custom Docker image in **Step 2**, update the `ai/training/raytrain-llama2-pretrain-trn1/llama2-pretrain-trn1-raycluster.yaml` file with the Docker image URL and tag obtained from the previous step.
 
 Once you have updated the YAML file (if needed), run the following command to launch the KubeRay cluster pods in your EKS cluster:
 
@@ -327,7 +327,7 @@ kubectl apply -f 1-llama2-pretrain-trn1-rayjob-create-test-data.yaml
 
 **Job Launch:** You'll use kubectl to submit the KubeRay job specification. The Ray head pod in your `kuberay-trn1` cluster receives and executes this job.
 
-**Data Generation:** The job runs the `gen-ai/training/raytrain-llama2-pretrain-trn1/llama2_pretrain/get_dataset.py` script, which harnesses the power of the Hugging Face datasets library to fetch and process the raw English Wikipedia dataset ("wikicorpus").
+**Data Generation:** The job runs the `ai/training/raytrain-llama2-pretrain-trn1/llama2_pretrain/get_dataset.py` script, which harnesses the power of the Hugging Face datasets library to fetch and process the raw English Wikipedia dataset ("wikicorpus").
 
 **Tokenization:** The script tokenizes the text using a pre-trained tokenizer from Hugging Face transformers. Tokenization breaks down the text into smaller units (words or subwords) for the model to understand.
 
@@ -502,10 +502,10 @@ To remove the resources created using this solution, run the cleanup script:
 
 ```bash
 # Delete the RayCluster Resources:
-cd gen-ai/training/raytrain-llama2-pretrain-trn1
+cd ai/training/raytrain-llama2-pretrain-trn1
 kubectl delete -f llama2-pretrain-trn1-raycluster.yaml
 
 # Clean Up the EKS Cluster and Associated Resources:
-cd data-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/ai-ml/trainium-inferentia
 ./cleanup.sh
 ```

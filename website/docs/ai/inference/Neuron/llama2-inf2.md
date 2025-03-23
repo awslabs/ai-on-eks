@@ -100,7 +100,7 @@ nsure that you have installed the following tools on your machine.
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into one of the example directories and run `install.sh` script
@@ -110,7 +110,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/ && chmod +x install.sh
+cd ai-on-eks/ai-ml/trainium-inferentia/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -158,7 +158,7 @@ aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
 **Deploy RayServe Cluster**
 
 ```bash
-cd data-on-eks/gen-ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
 kubectl apply -f ray-service-llama2.yaml
 ```
 
@@ -255,7 +255,7 @@ You will see an output like this in your browser.
 
 **Using the NLB**:
 
-If you prefer to use a Network Load Balancer (NLB), you can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/data-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/ai-ml/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
+If you prefer to use a Network Load Balancer (NLB), you can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/ai-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/ai-ml/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
 
 Then, you can use the following URL with a query added at the end of the URL:
 
@@ -272,17 +272,17 @@ You will see an output like this in your browser:
 [Gradio](https://www.gradio.app/) Web UI is used to interact with the Llama2 inference service deployed on EKS Clusters using inf2 instances.
 The Gradio UI communicates internally with the Llama2 service(`llama2-serve-svc.llama2.svc.cluster.local:8000`), which is exposed on port `8000`, using its service name and port.
 
-We have created a base Docker(`gen-ai/inference/gradio-ui/Dockerfile-gradio-base`) image for the Gradio app, which can be used with any model inference.
+We have created a base Docker(`ai/inference/gradio-ui/Dockerfile-gradio-base`) image for the Gradio app, which can be used with any model inference.
 This image is published on [Public ECR](https://gallery.ecr.aws/data-on-eks/gradio-web-app-base).
 
 #### Steps to Deploy a Gradio App:
 
-The following YAML script (`gen-ai/inference/llama2-13b-chat-rayserve-inf2/gradio-ui.yaml`) creates a dedicated namespace, deployment, service, and a ConfigMap where your model client script goes.
+The following YAML script (`ai/inference/llama2-13b-chat-rayserve-inf2/gradio-ui.yaml`) creates a dedicated namespace, deployment, service, and a ConfigMap where your model client script goes.
 
 To deploy this, execute:
 
 ```bash
-cd data-on-eks/gen-ai/inference/llama2-13b-chat-rayserve-inf2/
+cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2/
 kubectl apply -f gradio-ui.yaml
 ```
 
@@ -330,7 +330,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and Llama2 Inference deployment
 
 ```bash
-cd data-on-eks/gen-ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-llama2.yaml
 ```
@@ -339,6 +339,6 @@ kubectl delete -f ray-service-llama2.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/ai-ml/trainium-inferentia
 ./cleanup.sh
 ```

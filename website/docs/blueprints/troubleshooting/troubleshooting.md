@@ -1,6 +1,6 @@
 # Troubleshooting
 
-You will find troubleshooting info for Data on Amazon EKS(DoEKS) installation issues
+You will find troubleshooting info for AI on Amazon EKS(AIoEKS) installation issues
 
 ## Error: local-exec provisioner error
 
