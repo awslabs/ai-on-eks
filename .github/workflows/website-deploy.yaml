@@ -2,9 +2,8 @@ name: website-deploy-to-github-pages
 
 on:
   push:
-    # temporarily deploy on push
-#    branches:
-#      - main
+    branches:
+      - main
     # Review gh actions docs if you want to further define triggers, paths, etc
     # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on
 
