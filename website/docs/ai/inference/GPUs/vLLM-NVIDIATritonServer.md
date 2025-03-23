@@ -105,7 +105,7 @@ Before we begin, ensure you have all the necessary prerequisites in place to mak
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into one of the example directories and run `install.sh` script
@@ -129,7 +129,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 **Step4**: Run the installation script.
 
 ```bash
-cd data-on-eks/ai-ml/nvidia-triton-server/ && chmod +x install.sh
+cd ai-on-eks/ai-ml/nvidia-triton-server/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -278,7 +278,7 @@ model-repository/
 </details>
 
 
-For vLLM enabled Triton model, the model_repository can be found at `gen-ai/inference/vllm-nvidia-triton-server-gpu/model_repository` location. During the deployment, the blueprint creates an S3 bucket and syncs the local `model_repository` contents to the S3 bucket.
+For vLLM enabled Triton model, the model_repository can be found at `ai/inference/vllm-nvidia-triton-server-gpu/model_repository` location. During the deployment, the blueprint creates an S3 bucket and syncs the local `model_repository` contents to the S3 bucket.
 
 **model.py**: This script uses vLLM library as Triton backend framework and initializes a `TritonPythonModel` class by loading the model configuration and configuring vLLM engine. The `huggingface_hub` library's login function is used to establish access to the hugging face repository for model access. It then starts an asyncio event loop to process the received requests asynchronously. The script has several functions that processes the inference requests, issues the requests to vLLM backend and return the response.
 
@@ -333,7 +333,7 @@ kubectl -n triton-vllm port-forward svc/nvidia-triton-server-triton-inference-se
 Next, run the Triton client for each model using the same prompts:
 
 ```bash
-cd data-on-eks/gen-ai/inference/vllm-nvidia-triton-server-gpu/triton-client
+cd ai-on-eks/ai/inference/vllm-nvidia-triton-server-gpu/triton-client
 python3 -m venv .venv
 source .venv/bin/activate
 pip install tritonclient[all]
@@ -548,6 +548,6 @@ This script will cleanup the environment using `-target` option to ensure all th
 
 ```bash
 export AWS_DEAFULT_REGION="DEPLOYED_EKS_CLUSTER_REGION>"
-cd data-on-eks/ai-ml/nvidia-triton-server/ && chmod +x cleanup.sh
+cd ai-on-eks/ai-ml/nvidia-triton-server/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```

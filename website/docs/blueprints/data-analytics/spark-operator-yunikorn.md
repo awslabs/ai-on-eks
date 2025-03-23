@@ -16,7 +16,7 @@ import CodeBlock from '@theme/CodeBlock';
 
 ## Introduction
 
-The EKS Cluster design for the Data on EKS blueprint is optimized for running Spark applications with Spark Operator and Apache YuniKorn as the batch scheduler. This blueprint leverage Karpenter to scale the worker nodes, AWS for FluentBit is employed for logging, and a combination of Prometheus, Amazon Managed Prometheus, and open source Grafana are used for observability. Additionally, the Spark History Server Live UI is configured for monitoring running Spark jobs through an NLB and NGINX ingress controller.
+The EKS Cluster design for the AI on EKS blueprint is optimized for running Spark applications with Spark Operator and Apache YuniKorn as the batch scheduler. This blueprint leverage Karpenter to scale the worker nodes, AWS for FluentBit is employed for logging, and a combination of Prometheus, Amazon Managed Prometheus, and open source Grafana are used for observability. Additionally, the Spark History Server Live UI is configured for monitoring running Spark jobs through an NLB and NGINX ingress controller.
 
 <CollapsibleContent header={<h2><span>Spark workloads with Karpenter</span></h2>}>
 

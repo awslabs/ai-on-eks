@@ -84,16 +84,16 @@ Ensure that you have installed the following tools on your EC2 or Cloud9 instanc
 To install all the pre-reqs on EC2, you can run this [script](https://github.com/sanjeevrg89/data-on-eks/blob/main/ai-ml/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
 
 
-Clone the Data on EKS repository
+Clone the AI on EKS repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate to the trainium-inferentia directory.
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/ai-ml/trainium-inferentia
 ```
 
 By default **MPI operator** is not installed and its set to false. We will run the below export commands to set environment variables.
@@ -359,6 +359,6 @@ You can then run `kubectl get pods` to confirm that the launcher/worker pods hav
 To remove the resources created using this solution, run the cleanup script:
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/ai-ml/trainium-inferentia
 ./cleanup.sh
 ```

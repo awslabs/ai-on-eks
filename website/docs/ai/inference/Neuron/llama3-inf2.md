@@ -85,7 +85,7 @@ nsure that you have installed the following tools on your machine.
 Clone the repository
 
 ```bash
-git clone https://github.com/awslabs/data-on-eks.git
+git clone https://github.com/awslabs/ai-on-eks.git
 ```
 
 Navigate into one of the example directories and run `install.sh` script
@@ -95,7 +95,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 ./install.sh
 ```
 
@@ -158,7 +158,7 @@ To deploy the llama3-8B-Instruct model, it's essential to configure your Hugging
 
 export  HUGGING_FACE_HUB_TOKEN=<Your-Hugging-Face-Hub-Token-Value>
 
-cd data-on-eks/gen-ai/inference/llama3-8b-rayserve-inf2
+cd ai-on-eks/ai/inference/llama3-8b-rayserve-inf2
 envsubst < ray-service-llama3.yaml| kubectl apply -f -
 ```
 
@@ -244,7 +244,7 @@ Let's move forward with setting up the Gradio app as a Docker container running 
 First, lets build the docker container for the client app.
 
 ```bash
-cd data-on-eks/gen-ai/inference/gradio-ui
+cd ai-on-eks/ai/inference/gradio-ui
 docker build --platform=linux/amd64 \
     -t gradio-app:llama \
     --build-arg GRADIO_APP="gradio-app-llama.py" \
@@ -298,7 +298,7 @@ docker rmi gradio-app:llama
 **Step2:** Delete Ray Cluster
 
 ```bash
-cd data-on-eks/gen-ai/inference/llama3-8b-instruct-rayserve-inf2
+cd ai-on-eks/ai/inference/llama3-8b-instruct-rayserve-inf2
 kubectl delete -f ray-service-llama3.yaml
 ```
 
@@ -306,6 +306,6 @@ kubectl delete -f ray-service-llama3.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/ai-ml/trainium-inferentia/
 ./cleanup.sh
 ```

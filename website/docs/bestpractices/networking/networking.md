@@ -1,9 +1,9 @@
 ---
 sidebar_position: 4
-sidebar_label: Networking for Data
+sidebar_label: Networking for AI
 ---
 
-# Networking for Data
+# Networking for AI
 
 ## VPC and IP Considerations
 
