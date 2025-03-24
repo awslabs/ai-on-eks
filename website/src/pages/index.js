@@ -12,7 +12,7 @@ function HomepageHeader() {
   const { siteConfig } = useDocusaurusContext();
     const OGMeta = () => (
         <Head>
-            <meta name="og:image" content="img/aioeks-logo-green.png" />
+            <meta name="og:image" content="https://awslabs.github.io/ai-on-eks/img/aioeks-logo-green.png" />
         </Head>
     );
   return (
