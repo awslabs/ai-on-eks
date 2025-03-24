@@ -47,9 +47,9 @@ const config = {
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       navbar: {
-        // title: 'DoEKS',
+        // title: 'AIoEKS',
         logo: {
-          alt: 'DoEKS Logo',
+          alt: 'AIoEKS Logo',
           src: 'img/header-icon.png',
         },
         items: [

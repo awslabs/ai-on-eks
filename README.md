@@ -1,4 +1,4 @@
-![AI on EKS](website/static/img/aieks-logo-green.png)
+![AI on EKS](website/static/img/aioeks-logo-green.png)
 # [AI on Amazon EKS (AIoEKS)](https://awslabs.github.io/ai-on-eks/)
 *(Pronounced: "AI on EKS")*
 > 💡 **Optimized Solutions for AI and ML on EKS**
