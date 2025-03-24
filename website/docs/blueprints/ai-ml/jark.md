@@ -1,5 +1,4 @@
 ---
-sidebar_position: 2
 sidebar_label: JARK on EKS
 ---
 import CollapsibleContent from '../../../src/components/CollapsibleContent';
