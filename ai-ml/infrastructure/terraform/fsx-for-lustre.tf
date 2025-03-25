@@ -93,7 +93,7 @@ module "fsx_s3_bucket" {
 # Storage Class - FSx for Lustre
 #---------------------------------------------------------------
 resource "kubectl_manifest" "storage_class" {
-  count               = var.deploy_fsx_volume ? 1 : 0
+  count = var.deploy_fsx_volume ? 1 : 0
   yaml_body = templatefile("${path.module}/fsx-for-lustre/fsxlustre-storage-class.yaml", {
     subnet_id         = module.vpc.private_subnets[0],
     security_group_id = aws_security_group.fsx[0].id
@@ -108,7 +108,7 @@ resource "kubectl_manifest" "storage_class" {
 # FSx for Lustre Persistent Volume - Static provisioning
 #---------------------------------------------------------------
 resource "kubectl_manifest" "static_pv" {
-  count           = var.deploy_fsx_volume ? 1 : 0
+  count = var.deploy_fsx_volume ? 1 : 0
   yaml_body = templatefile("${path.module}/fsx-for-lustre/fsxlustre-static-pv.yaml", {
     filesystem_id = aws_fsx_lustre_file_system.this[0].id,
     dns_name      = aws_fsx_lustre_file_system.this[0].dns_name
@@ -126,7 +126,7 @@ resource "kubectl_manifest" "static_pv" {
 # FSx for Lustre Persistent Volume Claim
 #---------------------------------------------------------------
 resource "kubectl_manifest" "static_pvc" {
-  count = var.deploy_fsx_volume ? 1 : 0
+  count     = var.deploy_fsx_volume ? 1 : 0
   yaml_body = templatefile("${path.module}/fsx-for-lustre/fsxlustre-static-pvc.yaml", {})
 
   depends_on = [
