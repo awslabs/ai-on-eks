@@ -66,7 +66,7 @@ Before moving forward with the deployment please make sure you have read the per
 
 <CollapsibleContent header={<h2><span>Deploying the Solution</span></h2>}>
 
-In this [example](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/jark-stack/terraform), you will provision JARK Cluster on Amazon EKS.
+In this [example](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/terraform), you will provision JARK Cluster on Amazon EKS.
 
 ![JARK](img/jark-stack.png)
 
@@ -101,7 +101,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack && chmod +x install.sh
 ./install.sh
 ```
 
@@ -172,7 +172,7 @@ To avoid unwanted charges to your AWS account, delete all the AWS resources crea
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform && chmod +x cleanup.sh
+cd ai-on-eks/infra/jark-stack/terraform && chmod +x cleanup.sh
 ```
 
 </CollapsibleContent>

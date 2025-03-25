@@ -59,7 +59,7 @@ git clone https://github.com/awslabs/ai-on-eks.git
 Navigate into the directory specific to the blueprint you want to deploy. In this case, we're interested in the BioNeMo blueprint, so navigate to the appropriate directory using the terminal:
 
 ```bash
-cd ai-on-eks/ai-ml/bionemo
+cd ai-on-eks/infra/bionemo
 ```
 
 #### Run the install script

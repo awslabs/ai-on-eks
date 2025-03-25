@@ -129,7 +129,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 **Step4**: Run the installation script.
 
 ```bash
-cd ai-on-eks/ai-ml/nvidia-triton-server/ && chmod +x install.sh
+cd ai-on-eks/infra/nvidia-triton-server/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -333,7 +333,7 @@ kubectl -n triton-vllm port-forward svc/nvidia-triton-server-triton-inference-se
 Next, run the Triton client for each model using the same prompts:
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-nvidia-triton-server-gpu/triton-client
+cd ai-on-eks/blueprints/inference/vllm-nvidia-triton-server-gpu/triton-client
 python3 -m venv .venv
 source .venv/bin/activate
 pip install tritonclient[all]
@@ -548,6 +548,6 @@ This script will cleanup the environment using `-target` option to ensure all th
 
 ```bash
 export AWS_DEAFULT_REGION="DEPLOYED_EKS_CLUSTER_REGION>"
-cd ai-on-eks/ai-ml/nvidia-triton-server/ && chmod +x cleanup.sh
+cd ai-on-eks/infra/nvidia-triton-server/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```

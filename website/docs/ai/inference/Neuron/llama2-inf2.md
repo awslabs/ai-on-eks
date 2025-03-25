@@ -110,7 +110,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/ && chmod +x install.sh
+cd ai-on-eks/infra/trainium-inferentia/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -158,7 +158,7 @@ aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
 **Deploy RayServe Cluster**
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2
 kubectl apply -f ray-service-llama2.yaml
 ```
 
@@ -208,7 +208,7 @@ llama2   nginx   *       k8s-ingressn-ingressn-aca7f16a80-1223456666.elb.us-west
 :::caution
 
 This blueprint deploys an internal load balancer for security reasons, so you may not be able to access it from the browser unless you are in the same vpc.
-You can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/data-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/ai-ml/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
+You can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/data-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/infra/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
 
 Alternatively, you can use port-forwarding to test the service without using a load balancer.
 
@@ -255,7 +255,7 @@ You will see an output like this in your browser.
 
 **Using the NLB**:
 
-If you prefer to use a Network Load Balancer (NLB), you can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/ai-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/ai-ml/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
+If you prefer to use a Network Load Balancer (NLB), you can modify the blueprint to make the NLB public by following the instructions [here](https://github.com/awslabs/ai-on-eks/blob/5a2d1dfb39c89f3fd961beb350d6f1df07c2b31c/infra/trainium-inferentia/helm-values/ingress-nginx-values.yaml#L8).
 
 Then, you can use the following URL with a query added at the end of the URL:
 
@@ -282,7 +282,7 @@ The following YAML script (`ai/inference/llama2-13b-chat-rayserve-inf2/gradio-ui
 To deploy this, execute:
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2/
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2/
 kubectl apply -f gradio-ui.yaml
 ```
 
@@ -330,7 +330,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and Llama2 Inference deployment
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-llama2.yaml
 ```
@@ -339,6 +339,6 @@ kubectl delete -f ray-service-llama2.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/infra/trainium-inferentia
 ./cleanup.sh
 ```
