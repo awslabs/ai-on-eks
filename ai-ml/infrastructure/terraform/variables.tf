@@ -131,6 +131,12 @@ variable "enable_torchx_etcd" {
   default     = false
 }
 
+variable "enable_mpi_operator" {
+  description = "Flag to enable the MPI Operator deployment"
+  type        = bool
+  default     = false
+}
+
 # Jupyterhub Specific Variables
 
 # NOTE: You need to use private domain or public domain name with ACM certificate

@@ -684,3 +684,19 @@ data "aws_iam_policy_document" "karpenter_controller_policy" {
     sid       = "KarpenterControllerAdditionalPolicy"
   }
 }
+#---------------------------------------------------------------
+# MPI Operator for distributed training on Trainium
+#---------------------------------------------------------------
+data "http" "mpi_operator_yaml" {
+  url = "https://raw.githubusercontent.com/kubeflow/mpi-operator/v0.4.0/deploy/v2beta1/mpi-operator.yaml"
+}
+
+data "kubectl_file_documents" "mpi_operator_yaml" {
+  content = data.http.mpi_operator_yaml.response_body
+}
+
+resource "kubectl_manifest" "mpi_operator" {
+  for_each   = var.enable_mpi_operator ? data.kubectl_file_documents.mpi_operator_yaml.manifests : {}
+  yaml_body  = each.value
+  depends_on = [module.eks.eks_cluster_id]
+}
