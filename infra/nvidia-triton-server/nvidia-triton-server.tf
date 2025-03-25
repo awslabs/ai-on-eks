@@ -132,7 +132,7 @@ resource "null_resource" "sync_local_to_s3" {
   }
 
   provisioner "local-exec" {
-    command = "aws s3 sync ../../gen-ai/inference/vllm-nvidia-triton-server-gpu/ s3://${module.s3_bucket[count.index].s3_bucket_id}"
+    command = "aws s3 sync ../../blueprints/inference/vllm-nvidia-triton-server-gpu/ s3://${module.s3_bucket[count.index].s3_bucket_id}"
   }
 }
 

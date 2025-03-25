@@ -86,7 +86,7 @@ kubectl get nodes
 
 ## Deploying the Ray Cluster with Mistral 7B Model
 
-Once the `trainium-inferentia` EKS cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-mistral.yaml` from `/ai-on-eks/ai/inference/mistral-7b-rayserve-inf2/` path.
+Once the `trainium-inferentia` EKS cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-mistral.yaml` from `/ai-on-eks/blueprints/inference/mistral-7b-rayserve-inf2/` path.
 
 In this step, we will deploy the Ray Serve cluster, which comprises one `Head Pod` on `x86 CPU` instances using Karpenter autoscaling, as well as `Ray workers` on `inf2.24xlarge` instances, autoscaled by [Karpenter](https://karpenter.sh/).
 
@@ -121,7 +121,7 @@ To deploy the Mistral-7B-Instruct-v0.2 model, it's essential to configure your H
 
 export HUGGING_FACE_HUB_TOKEN=$(echo -n "Your-Hugging-Face-Hub-Token-Value" | base64)
 
-cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2
+cd ai-on-eks/blueprints/inference/mistral-7b-rayserve-inf2
 envsubst < ray-service-mistral.yaml| kubectl apply -f -
 ```
 
@@ -190,7 +190,7 @@ The following YAML script (`ai/inference/mistral-7b-rayserve-inf2/gradio-ui.yaml
 To deploy this, execute:
 
 ```bash
-cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2/
+cd ai-on-eks/blueprints/inference/mistral-7b-rayserve-inf2/
 kubectl apply -f gradio-ui.yaml
 ```
 
@@ -242,7 +242,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and mistral Inference deployment
 
 ```bash
-cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2
+cd ai-on-eks/blueprints/inference/mistral-7b-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-mistral.yaml
 ```

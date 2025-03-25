@@ -207,7 +207,7 @@ RayServe cluster is defined in a YAML configuration file that includes multiple 
 Navigate to the directory containing the RayServe configuration and Apply the configuration using kubectl
 
 ```sh
-cd cd ai-on-eks/gen-ai/inference/vllm-ray-gpu-deepseek/
+cd cd ai-on-eks/blueprints/inference/vllm-ray-gpu-deepseek/
 envsubst < ray-vllm-deepseek.yml | kubectl apply -f -
 ```
 
@@ -394,7 +394,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 Delete the RayCluster
 
 ```bash
-cd ai-on-eks/gen-ai/inference/vllm-rayserve-gpu
+cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 
 kubectl delete -f open-webui.yaml
 

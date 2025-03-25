@@ -163,12 +163,12 @@ Replace `Your-Hugging-Face-Hub-Token-Value` with your actual Hugging Face Hub To
 export HUGGING_FACE_HUB_TOKEN=$(echo -n "Your-Hugging-Face-Hub-Token-Value" | base64)
 ```
 
-**Step3:** To deploy the RayService cluster, navigate to the directory containing the ray-service-vllm.yaml file and execute the deployment command. For more information about the RayService YAML configuration, you can refer to the file located at `ai-on-eks/ai/inference/vllm-rayserve-gpu/ray-service-vllm.yaml`.
+**Step3:** To deploy the RayService cluster, navigate to the directory containing the ray-service-vllm.yaml file and execute the deployment command. For more information about the RayService YAML configuration, you can refer to the file located at `ai-on-eks/blueprints/inference/vllm-rayserve-gpu/ray-service-vllm.yaml`.
 
 Execute the following commands in your terminal. This will apply the RayService configuration and deploy the cluster on your EKS setup.
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-gpu
+cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 
 envsubst < ray-service-vllm.yaml| kubectl apply -f -
 ```
@@ -238,7 +238,7 @@ You can test with your custom prompts by adding them to the `prompts.txt` file.
 To run the Python client application in a virtual environment, follow these steps:
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-gpu
+cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 python3 -m venv .venv
 source .venv/bin/activate
 pip install requests
@@ -495,7 +495,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 Delete the RayCluster
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-gpu
+cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 
 kubectl delete -f ray-service-vllm.yaml
 ```

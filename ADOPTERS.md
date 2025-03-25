@@ -12,4 +12,3 @@ If you are open to others contacting you about your use of AI on EKS on Slack, a
 | Organization | Description | Contacts |
 | --- | --- | --- |
 | Your Company Name | Description goes here | `githubhandle` |
-

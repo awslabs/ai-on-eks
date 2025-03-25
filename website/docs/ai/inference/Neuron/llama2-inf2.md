@@ -158,7 +158,7 @@ aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
 **Deploy RayServe Cluster**
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2
 kubectl apply -f ray-service-llama2.yaml
 ```
 
@@ -282,7 +282,7 @@ The following YAML script (`ai/inference/llama2-13b-chat-rayserve-inf2/gradio-ui
 To deploy this, execute:
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2/
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2/
 kubectl apply -f gradio-ui.yaml
 ```
 
@@ -330,7 +330,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and Llama2 Inference deployment
 
 ```bash
-cd ai-on-eks/ai/inference/llama2-13b-chat-rayserve-inf2
+cd ai-on-eks/blueprints/inference/llama2-13b-chat-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-llama2.yaml
 ```

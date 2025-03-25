@@ -135,7 +135,7 @@ aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
 **Deploy RayServe Cluster**
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-xl-base-rayserve-inf2
+cd ai-on-eks/blueprints/inference/stable-diffusion-xl-base-rayserve-inf2
 kubectl apply -f ray-service-stablediffusion.yaml
 ```
 
@@ -217,7 +217,7 @@ Let's move forward with setting up the Gradio app as a Docker container running 
 First, lets build the docker container for the client app.
 
 ```bash
-cd ai-on-eks/ai/inference/gradio-ui
+cd ai-on-eks/blueprints/inference/gradio-ui
 docker build --platform=linux/amd64 \
     -t gradio-app:sd \
     --build-arg GRADIO_APP="gradio-app-stable-diffusion.py" \
@@ -276,7 +276,7 @@ docker rmi gradio-app:sd
 **Step2:** Delete Ray Cluster
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-xl-base-rayserve-inf2
+cd ai-on-eks/blueprints/inference/stable-diffusion-xl-base-rayserve-inf2
 kubectl delete -f ray-service-stablediffusion.yaml
 ```
 

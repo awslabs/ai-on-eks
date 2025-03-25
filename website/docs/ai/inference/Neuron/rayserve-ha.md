@@ -135,7 +135,7 @@ With the above `RayService` configuration, we have enabled GCS fault tolerance f
 Let's apply the above `RayService` configuration and check the behavior.
 
 ```bash
-cd ai-on-eks/ai/inference/
+cd ai-on-eks/blueprints/inference/
 envsubst < mistral-7b-rayserve-inf2/ray-service-mistral-ft.yaml| kubectl apply -f -
 ```
 
@@ -202,7 +202,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 **Step1:** Delete Gradio App and mistral Inference deployment
 
 ```bash
-cd ai-on-eks/ai/inference/mistral-7b-rayserve-inf2
+cd ai-on-eks/blueprints/inference/mistral-7b-rayserve-inf2
 kubectl delete -f gradio-ui.yaml
 kubectl delete -f ray-service-mistral-ft.yaml
 ```

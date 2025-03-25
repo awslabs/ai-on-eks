@@ -163,7 +163,7 @@ Having deployed the EKS cluster with all the necessary components, we can now pr
 This will apply the RayService configuration and deploy the cluster on your EKS setup.
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/blueprints/inference/vllm-rayserve-inf2
 
 kubectl apply -f vllm-rayserve-deployment.yaml
 ```
@@ -258,7 +258,7 @@ kubectl -n vllm port-forward svc/vllm-llama3-inf2-serve-svc 8000:8000
 To run the Python client application in a virtual environment, follow these steps:
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/blueprints/inference/vllm-rayserve-inf2
 python3 -m venv .venv
 source .venv/bin/activate
 pip3 install openai
@@ -600,7 +600,7 @@ Finally, we'll provide instructions for cleaning up and deprovisioning the resou
 Delete the RayCluster
 
 ```bash
-cd ai-on-eks/ai/inference/vllm-rayserve-inf2
+cd ai-on-eks/blueprints/inference/vllm-rayserve-inf2
 
 kubectl delete -f vllm-rayserve-deployment.yaml
 ```

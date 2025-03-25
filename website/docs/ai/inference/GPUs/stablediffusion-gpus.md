@@ -97,7 +97,7 @@ kubectl get nodes
 
 ## Deploying the Ray Cluster with Stable Diffusion Model
 
-Once the `jark-stack` cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-stablediffusion.yaml` from `/ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu/` path.
+Once the `jark-stack` cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-stablediffusion.yaml` from `/ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu/` path.
 
 In this step, we will deploy the Ray Serve cluster, which comprises one `Head Pod` on `x86 CPU` instances using Karpenter autoscaling, as well as `Ray workers` on `g5.2xlarge` instances, autoscaled by [Karpenter](https://karpenter.sh/).
 
@@ -121,7 +121,7 @@ aws eks --region us-west-2 update-kubeconfig --name jark-stack
 **Deploy RayServe Cluster**
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu
+cd ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu
 kubectl apply -f ray-service-stablediffusion.yaml
 ```
 
@@ -198,7 +198,7 @@ Let's move forward with setting up the Gradio app as a Docker container running 
 First, lets build the docker container for the client app.
 
 ```bash
-cd ai-on-eks/ai/inference/gradio-ui
+cd ai-on-eks/blueprints/inference/gradio-ui
 docker build --platform=linux/amd64 \
     -t gradio-app:sd \
     --build-arg GRADIO_APP="gradio-app-stable-diffusion.py" \
@@ -263,7 +263,7 @@ docker rmi gradio-app:sd
 **Step2:** Delete Ray Cluster
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu
+cd ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu
 kubectl delete -f ray-service-stablediffusion.yaml
 ```
 
