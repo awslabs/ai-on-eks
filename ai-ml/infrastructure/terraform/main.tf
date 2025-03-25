@@ -44,11 +44,11 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  name   = var.name
-  region = var.region
-  azs    = slice(data.aws_availability_zones.available.names, 0, 2)
-  partition  = data.aws_partition.current.partition
-  account_id = data.aws_caller_identity.current.account_id
+  name                   = var.name
+  region                 = var.region
+  azs                    = slice(data.aws_availability_zones.available.names, 0, 2)
+  partition              = data.aws_partition.current.partition
+  account_id             = data.aws_caller_identity.current.account_id
   mlflow_name            = "mlflow"
   mlflow_namespace       = "mlflow"
   mlflow_service_account = "mlflow"

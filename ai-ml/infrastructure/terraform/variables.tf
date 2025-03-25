@@ -52,7 +52,7 @@ variable "enable_aws_efa_k8s_device_plugin" {
   type        = bool
   default     = false
 }
-variable "enable_aws_fsx_csi_driver"{
+variable "enable_aws_fsx_csi_driver" {
   description = "Whether or not to deploy the Fsx Driver"
   type        = bool
   default     = false

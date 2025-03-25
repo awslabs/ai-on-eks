@@ -23,9 +23,9 @@ spec:
             - containerPort: 8000
           command:
              - "/opt/bin/entrypoint.sh"
-          args: 
+          args:
             - "--port"
-            - "8000"  
+            - "8000"
           resources:
             limits:
               cpu: 500m
