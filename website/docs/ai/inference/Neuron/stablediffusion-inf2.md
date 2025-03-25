@@ -85,7 +85,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./install.sh
 ```
 
@@ -284,6 +284,6 @@ kubectl delete -f ray-service-stablediffusion.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./cleanup.sh
 ```

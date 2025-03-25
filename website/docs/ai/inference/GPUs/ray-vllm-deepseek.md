@@ -74,7 +74,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 **Step2**: Run the installation script.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/terraform && chmod +x install.sh
 ```
 
 ```bash
@@ -402,7 +402,7 @@ kubectl delete -f ray-vllm-deepseek.yml
 ```
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform/monitoring
+cd ai-on-eks/infra/jark-stack/terraform/monitoring
 
 kubectl delete -f serviceMonitor.yaml
 kubectl delete -f podMonitor.yaml
@@ -413,6 +413,6 @@ Destroy the EKS Cluster and resources
 ```bash
 export AWS_DEAFULT_REGION="DEPLOYED_EKS_CLUSTER_REGION>"
 
-cd ai-on-eks/ai-ml/jark-stack/terraform/ && chmod +x cleanup.sh
+cd ai-on-eks/infra/jark-stack/terraform/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```

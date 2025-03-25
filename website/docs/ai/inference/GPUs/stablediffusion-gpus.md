@@ -21,7 +21,7 @@ This pattern demonstrates how to deploy the [Stable Diffusion V2](https://huggin
 Through this pattern, you will accomplish the following:
 
 - Create an Amazon EKS cluster with a Karpenter managed GPU nodepool for dynamic scaling of Nodes.
-- Install KubeRay Operator and other core EKS add-ons using the [jark-stack](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/jark-stack/terraform) Terraform blueprint.
+- Install KubeRay Operator and other core EKS add-ons using the [jark-stack](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/terraform) Terraform blueprint.
 - Deploy the Stable Diffusion model using RayServe for efficient scaling across your GPU resources
 
 ### What is Stable Diffusion?
@@ -62,7 +62,7 @@ git clone https://github.com/awslabs/ai-on-eks.git
 
 
 ```
-cd ai-on-eks/ai-ml/jark-stack/ && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -73,7 +73,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/ && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -271,6 +271,6 @@ kubectl delete -f ray-service-stablediffusion.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/
+cd ai-on-eks/infra/jark-stack/
 ./cleanup.sh
 ```

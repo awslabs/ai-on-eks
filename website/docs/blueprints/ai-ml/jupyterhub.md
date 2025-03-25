@@ -20,7 +20,7 @@ To get started with JupyterHub on EKS, follow the instructions in this guide to 
 
 <CollapsibleContent header={<h3><span>Deploying the Solution</span></h3>}>
 
-This [blueprint](https://github.com/awslabs/data-on-eks/tree/main/ai-ml/jupyterhub)  deploys the following components:
+This [blueprint](https://github.com/awslabs/data-on-eks/tree/main/infra/jupyterhub)  deploys the following components:
 
 - Creates a new sample VPC, 2 Private Subnets, and 2 Public Subnets. Link to VPC documentation
 - Sets up an Internet gateway for Public Subnets and NAT Gateway for Private Subnets.
@@ -114,7 +114,7 @@ git clone https://github.com/awslabs/data-on-eks.git
 Navigate into one of the blueprint directory
 
 ```bash
-cd data-on-eks/ai-ml/jupyterhub && chmod +x install.sh
+cd data-on-eks/infra/jupyterhub && chmod +x install.sh
 ```
 
 :::info
@@ -304,7 +304,7 @@ To avoid unwanted charges to your AWS account, delete all the AWS resources crea
 This script will cleanup the environment using -target option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd data-on-eks/ai-ml/jupyterhub/ && chmod +x cleanup.sh
+cd data-on-eks/infra/jupyterhub/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```
 

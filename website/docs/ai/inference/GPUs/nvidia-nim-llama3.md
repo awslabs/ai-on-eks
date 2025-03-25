@@ -139,7 +139,7 @@ This pattern uses Karpenter to scale GPU nodes, restricted to G5 instances by de
 
 
 ```bash
-cd ai-on-eks/ai-ml/nvidia-triton-server
+cd ai-on-eks/infra/nvidia-triton-server
 export TF_VAR_enable_nvidia_nim=true
 export TF_VAR_enable_nvidia_triton_server=false
 ./install.sh

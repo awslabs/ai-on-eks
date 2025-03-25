@@ -18,7 +18,7 @@ In this repository, you'll find a variety of deployment blueprints for creating 
 
 ### 🧠 AI
 
-🚀 [JARK-Stack on EKS](https://awslabs.github.io/ai-on-eks/docs/blueprints/ai-ml/jark) 👈 This blueprint deploys JARK stack for AI workloads with NVIDIA GPUs.
+🚀 [JARK-Stack on EKS](https://awslabs.github.io/ai-on-eks/docs/blueprints/infra/jark-stack) 👈 This blueprint deploys JARK stack for AI workloads with NVIDIA GPUs.
 
 🚀 [Generative AI on EKS](https://github.com/awslabs/ai-on-eks/tree/main/gen-ai) 👈 Collection of Generative AI Training and Inference LLM deployment patterns
 

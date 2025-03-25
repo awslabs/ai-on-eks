@@ -66,7 +66,7 @@ export TF_VAR_enable_rayserve_ha_elastic_cache_redis=true
 Then, run the `install.sh` script to install the EKS cluster with KubeRay operator and other add-ons.
 
 ```bash
-cd ai-on-eks/ai-ml/trainimum-inferentia
+cd ai-on-eks/infra/trainimum-inferentia
 ./install.sh
 ```
 
@@ -211,6 +211,6 @@ kubectl delete -f ray-service-mistral-ft.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./cleanup.sh
 ```

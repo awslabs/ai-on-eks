@@ -96,7 +96,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region.
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./install.sh
 ```
 
@@ -608,7 +608,7 @@ kubectl delete -f vllm-rayserve-deployment.yaml
 Destroy the EKS Cluster and resources
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 
 ./cleanup.sh
 ```

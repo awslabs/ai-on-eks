@@ -88,7 +88,7 @@ Volcano's gang scheduling ensures that all pods in a job (or "gang") are schedul
     * [kubectl](https://Kubernetes.io/docs/tasks/tools/)
     * [terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
 
-    To install all the pre-reqs on EC2, you can run this [script](https://github.com/awslabs/ai-on-eks/blob/main/ai-ml/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
+    To install all the pre-reqs on EC2, you can run this [script](https://github.com/awslabs/ai-on-eks/blob/main/infra/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
 
 
     **Clone the AI on EKS repository**
@@ -100,7 +100,7 @@ Volcano's gang scheduling ensures that all pods in a job (or "gang") are schedul
     **Navigate to the trainium-inferentia directory.**
 
     ```bash
-    cd ai-on-eks/ai-ml/trainium-inferentia
+    cd ai-on-eks/infra/trainium-inferentia
     ```
 
    Let's run the below export commands to set environment variables.
@@ -506,6 +506,6 @@ cd ai/training/raytrain-llama2-pretrain-trn1
 kubectl delete -f llama2-pretrain-trn1-raycluster.yaml
 
 # Clean Up the EKS Cluster and Associated Resources:
-cd ai-on-eks/ai-ml/trainium-inferentia
+cd ai-on-eks/infra/trainium-inferentia
 ./cleanup.sh
 ```

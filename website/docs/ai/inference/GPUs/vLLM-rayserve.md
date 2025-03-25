@@ -76,7 +76,7 @@ For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired regi
 **Step2**: Run the installation script.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/terraform && chmod +x install.sh
 ```
 
 ```bash
@@ -409,7 +409,7 @@ This requires deploying both ServiceMonitor and PodMonitor resources:
  - **PodMonitor** is necessary because KubeRay operator does not create a Kubernetes service for the Ray worker Pods. Therefore, we cannot use a ServiceMonitor to scrape metrics from worker Pods and must use PodMonitors CRD instead.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform/monitoring
+cd ai-on-eks/infra/jark-stack/terraform/monitoring
 ```
 ```bash
 kubectl apply -f serviceMonitor.yaml
@@ -470,7 +470,7 @@ aws secretsmanager get-secret-value --secret-id <grafana_secret_name_output> --r
 - Create new dashboard by importing JSON file via Dashboards menu.
 - Click 'Dashboards' icon in left panel, 'New', 'Import', then 'Upload JSON file'.
 - Choose a JSON file.
-   - `Case 1:` If you are using Ray 2.24.0, you can use the sample config files in [GitHub repository](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/jark-stack/terraform/monitoring/ray-dashboards). The file names have a pattern of xxx_grafana_dashboard.json.
+   - `Case 1:` If you are using Ray 2.24.0, you can use the sample config files in [GitHub repository](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/terraform/monitoring/ray-dashboards). The file names have a pattern of xxx_grafana_dashboard.json.
    - `Case 2:` Otherwise, you should import the JSON files from `/tmp/ray/session_latest/metrics/grafana/dashboards/` in the head Pod. You can use `kubectl cp` to copy the files from the head Pod to your local machine.
 - Click “Import”.
 ```text
@@ -500,7 +500,7 @@ cd ai-on-eks/ai/inference/vllm-rayserve-gpu
 kubectl delete -f ray-service-vllm.yaml
 ```
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/terraform/monitoring
+cd ai-on-eks/infra/jark-stack/terraform/monitoring
 
 kubectl delete -f serviceMonitor.yaml
 kubectl delete -f podMonitor.yaml
@@ -511,6 +511,6 @@ Destroy the EKS Cluster and resources
 ```bash
 export AWS_DEAFULT_REGION="DEPLOYED_EKS_CLUSTER_REGION>"
 
-cd ai-on-eks/ai-ml/jark-stack/terraform/ && chmod +x cleanup.sh
+cd ai-on-eks/infra/jark-stack/terraform/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```

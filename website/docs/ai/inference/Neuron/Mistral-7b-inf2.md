@@ -21,7 +21,7 @@ This pattern outlines the deployment of the [Mistral-7B-Instruct-v0.2](https://h
 Through this pattern, you will accomplish the following:
 
 - Create an [Amazon EKS](https://aws.amazon.com/eks/) cluster with a Karpenter managed AWS Inferentia2 nodepool for dynamic provisioning of Nodes.
-- Install [KubeRay Operator](https://github.com/ray-project/kuberay) and other core EKS add-ons using the [trainium-inferentia](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/trainium-inferentia) Terraform blueprint.
+- Install [KubeRay Operator](https://github.com/ray-project/kuberay) and other core EKS add-ons using the [trainium-inferentia](https://github.com/awslabs/ai-on-eks/tree/main/infra/trainium-inferentia) Terraform blueprint.
 - Deploy the `Mistral-7B-Instruct-v0.2` model with RayServe for efficient scaling.
 
 ### What is Mistral-7B-Instruct-v0.2 Model?
@@ -62,7 +62,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./install.sh
 ```
 
@@ -251,6 +251,6 @@ kubectl delete -f ray-service-mistral.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/trainium-inferentia/
+cd ai-on-eks/infra/trainium-inferentia/
 ./cleanup.sh
 ```
