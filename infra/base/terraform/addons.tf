@@ -69,7 +69,7 @@ module "ebs_csi_driver_irsa" {
 #---------------------------------------------------------------
 module "eks_blueprints_addons" {
   source  = "aws-ia/eks-blueprints-addons/aws"
-  version = "~> 1.2"
+  version = "~> 1.20"
 
   cluster_name      = module.eks.cluster_name
   cluster_endpoint  = module.eks.cluster_endpoint
@@ -128,7 +128,7 @@ module "eks_blueprints_addons" {
     }
   }
   karpenter = {
-    chart_version       = "0.37.0"
+    chart_version       = "1.2.1"
     repository_username = data.aws_ecrpublic_authorization_token.token.user_name
     repository_password = data.aws_ecrpublic_authorization_token.token.password
     source_policy_documents = [
@@ -207,7 +207,7 @@ module "eks_blueprints_addons" {
 
 module "data_addons" {
   source  = "aws-ia/eks-data-addons/aws"
-  version = "1.33.0"
+  version = "1.36.0"
 
   oidc_provider_arn = module.eks.oidc_provider_arn
 
@@ -249,6 +249,28 @@ module "data_addons" {
     ]
   }
 
+  #---------------------------------------------------------------
+  # MLflow Tracking Add-on
+  #---------------------------------------------------------------
+  enable_mlflow_tracking = var.enable_mlflow_tracking
+
+  mlflow_tracking_helm_config = {
+    mlflow_namespace = try(kubernetes_namespace_v1.mlflow[0].metadata[0].name, local.mlflow_namespace)
+
+    values = [
+      templatefile("${path.module}/helm-values/mlflow-tracking-values.yaml", {
+        mlflow_sa   = local.mlflow_service_account
+        mlflow_irsa = try(module.mlflow_irsa[0].iam_role_arn, "")
+        # MLflow Postgres RDS Config
+        mlflow_db_username = local.mlflow_name
+        mlflow_db_password = try(sensitive(aws_secretsmanager_secret_version.postgres[0].secret_string), "")
+        mlflow_db_name     = try(module.db[0].db_instance_name, "")
+        mlflow_db_host     = try(element(split(":", module.db[0].db_instance_endpoint), 0), "")
+        # S3 bucket config for artifacts
+        s3_bucket_name = try(module.mlflow_s3_bucket[0].s3_bucket_id, "")
+      })
+    ]
+  }
   #---------------------------------------------------------------
   # NVIDIA Device Plugin Add-on
   #---------------------------------------------------------------
@@ -573,35 +595,6 @@ module "data_addons" {
     kubernetes_secret_v1.huggingface_token,
     kubernetes_config_map_v1.notebook
   ]
-}
-
-#---------------------------------------------------------------
-# MLflow Tracking Add-on
-#---------------------------------------------------------------
-module "eks_data_addons" {
-  source  = "aws-ia/eks-data-addons/aws"
-  version = "1.33.0" # ensure to update this to the latest/desired version
-
-  oidc_provider_arn      = module.eks.oidc_provider_arn
-  enable_mlflow_tracking = var.enable_mlflow_tracking
-
-  mlflow_tracking_helm_config = {
-    mlflow_namespace = try(kubernetes_namespace_v1.mlflow[0].metadata[0].name, local.mlflow_namespace)
-
-    values = [
-      templatefile("${path.module}/helm-values/mlflow-tracking-values.yaml", {
-        mlflow_sa   = local.mlflow_service_account
-        mlflow_irsa = try(module.mlflow_irsa[0].iam_role_arn, "")
-        # MLflow Postgres RDS Config
-        mlflow_db_username = local.mlflow_name
-        mlflow_db_password = try(sensitive(aws_secretsmanager_secret_version.postgres[0].secret_string), "")
-        mlflow_db_name     = try(module.db[0].db_instance_name, "")
-        mlflow_db_host     = try(element(split(":", module.db[0].db_instance_endpoint), 0), "")
-        # S3 bucket config for artifacts
-        s3_bucket_name = try(module.mlflow_s3_bucket[0].s3_bucket_id, "")
-      })
-    ]
-  }
 }
 
 #---------------------------------------------------------------
