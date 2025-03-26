@@ -34,7 +34,7 @@ function HomepageHeader() {
                   <Link
                       className={clsx("button button--lg", styles.buttonSpinUp)}
                       to="/docs/ai">
-                      Let's Spin Up
+                      AI on EKS
                   </Link>
                   <Link
                       className={clsx("button button--lg", styles.buttonGenAI)}
