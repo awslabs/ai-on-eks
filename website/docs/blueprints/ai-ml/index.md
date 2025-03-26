@@ -34,6 +34,6 @@ By choosing Amazon EKS, you gain access to a robust infrastructure that can hand
 
 Deploying an AI stack on EKS starts with infrastructure.
 
-- **Reference AI Stack**: [JARK stack blueprint](https://awslabs.github.io/ai-on-eks/docs/blueprints/ai-ml/jark). This blueprint provides a customizable environment on which to build an AI platform.
-- **NVIDIA Spark RAPIDS**: For Spark on GPU workloads, refer to the [NVIDIA Spark RAPIDS blueprint](https://awslabs.github.io/ai-on-eks/docs/blueprints/ai-ml/emr-spark-rapids).
+- **Reference AI Stack**: [JARK stack blueprint](https://awslabs.github.io/ai-on-eks/docs/blueprints/infra/jark). This blueprint provides a customizable environment on which to build an AI platform.
+- **NVIDIA Spark RAPIDS**: For Spark on GPU workloads, refer to the [NVIDIA Spark RAPIDS blueprint](https://awslabs.github.io/ai-on-eks/docs/blueprints/infra/emr-spark-rapids).
 - **Additional Patterns**: For other patterns using NVIDIA Triton server, NVIDIA NGC, and more, refer to the [AI page](https://awslabs.github.io/ai-on-eks/docs/ai).

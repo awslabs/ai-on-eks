@@ -13,7 +13,7 @@ Before we dive in, let's take a look at the tools available in the environment:
 
 ![OSS ML Platforms on EKS](ml-platforms-eks.png)
 
-## [Infrastructure](https://awslabs.github.io/ai-on-eks/docs/category/infrastructure)
+## [Base Infrastructure](https://awslabs.github.io/ai-on-eks/docs/category/infrastructure)
 At its core, AIoEKS is a set of modules that can be composed to create the environment in which you want to work. We have some blueprints that will enable you to quickly start using the environment for either experimentation, training or inference. We intend to add more as they come up, but we also enable you to compose the environment however you would like. This allows you to build the environment you want to use on EKS.
 
 If you're ready to deploy your EKS cluster, check out the infrastructure section.

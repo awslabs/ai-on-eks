@@ -21,7 +21,7 @@ This pattern demonstrates how to deploy the [Stable Diffusion V2](https://huggin
 Through this pattern, you will accomplish the following:
 
 - Create an Amazon EKS cluster with a Karpenter managed GPU nodepool for dynamic scaling of Nodes.
-- Install KubeRay Operator and other core EKS add-ons using the [jark-stack](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/jark-stack/terraform) Terraform blueprint.
+- Install KubeRay Operator and other core EKS add-ons using the [jark-stack](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/terraform) Terraform blueprint.
 - Deploy the Stable Diffusion model using RayServe for efficient scaling across your GPU resources
 
 ### What is Stable Diffusion?
@@ -62,7 +62,7 @@ git clone https://github.com/awslabs/ai-on-eks.git
 
 
 ```
-cd ai-on-eks/ai-ml/jark-stack/ && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -73,7 +73,7 @@ Additionally, confirm that your local region setting matches the specified regio
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/ && chmod +x install.sh
+cd ai-on-eks/infra/jark-stack/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -97,7 +97,7 @@ kubectl get nodes
 
 ## Deploying the Ray Cluster with Stable Diffusion Model
 
-Once the `jark-stack` cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-stablediffusion.yaml` from `/ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu/` path.
+Once the `jark-stack` cluster is deployed, you can proceed to use `kubectl` to deploy the `ray-service-stablediffusion.yaml` from `/ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu/` path.
 
 In this step, we will deploy the Ray Serve cluster, which comprises one `Head Pod` on `x86 CPU` instances using Karpenter autoscaling, as well as `Ray workers` on `g5.2xlarge` instances, autoscaled by [Karpenter](https://karpenter.sh/).
 
@@ -121,7 +121,7 @@ aws eks --region us-west-2 update-kubeconfig --name jark-stack
 **Deploy RayServe Cluster**
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu
+cd ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu
 kubectl apply -f ray-service-stablediffusion.yaml
 ```
 
@@ -198,7 +198,7 @@ Let's move forward with setting up the Gradio app as a Docker container running 
 First, lets build the docker container for the client app.
 
 ```bash
-cd ai-on-eks/ai/inference/gradio-ui
+cd ai-on-eks/blueprints/inference/gradio-ui
 docker build --platform=linux/amd64 \
     -t gradio-app:sd \
     --build-arg GRADIO_APP="gradio-app-stable-diffusion.py" \
@@ -263,7 +263,7 @@ docker rmi gradio-app:sd
 **Step2:** Delete Ray Cluster
 
 ```bash
-cd ai-on-eks/ai/inference/stable-diffusion-rayserve-gpu
+cd ai-on-eks/blueprints/inference/stable-diffusion-rayserve-gpu
 kubectl delete -f ray-service-stablediffusion.yaml
 ```
 
@@ -271,6 +271,6 @@ kubectl delete -f ray-service-stablediffusion.yaml
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/ai-ml/jark-stack/
+cd ai-on-eks/infra/jark-stack/
 ./cleanup.sh
 ```
