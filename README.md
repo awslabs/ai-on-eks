@@ -31,7 +31,7 @@ For instructions on how to deploy AI on EKS patterns and run sample tests, visit
 At [AWS](https://aws.amazon.com/), we understand the challenges users encounter when deploying and scaling AI/ML workloads on Kubernetes. To simplify the process and enable users to quickly conduct proof-of-concepts and build production-ready clusters, we have developed AI on EKS (AIoEKS). AIoEKS offers opinionated open-source blueprints that provide end-to-end logging and observability, making it easier for users to deploy and manage Ray, vLLM, Kubeflow, MLFlow, Jupyter and other AI/ML workloads. With AIoEKS, users can confidently leverage the power of Kubernetes for their AI and machine learning needs without getting overwhelmed by its complexity.
 
 ## 🤝 Support & Feedback
-AIoEKS is maintained by AWS Solution Architects and is not an AWS service. Support is provided on a best effort basis by the AI on EKS Blueprints community. If you have feedback, feature ideas, or wish to report bugs, please use the [Issues](https://github.com/awslabs/ai-on-eks/issues) section of this GitHub.
+AIoEKS is maintained by AWS Solution Architects and is not an AWS service. Support is provided on a best effort basis by the AI on EKS community. If you have feedback, feature ideas, or wish to report bugs, please use the [Issues](https://github.com/awslabs/ai-on-eks/issues) section of this GitHub.
 
 ## 🔐 Security
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
@@ -40,6 +40,6 @@ See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more inform
 This library is licensed under the Apache 2.0 License.
 
 ## 🙌 Community
-We welcome all individuals who are enthusiastic about ai on Kubernetes to become a part of this open source community. Your contributions and participation are invaluable to the success of this project.
+We welcome all individuals who are enthusiastic about AI on Kubernetes to become a part of this open source community. Your contributions and participation are invaluable to the success of this project.
 
 Built with ❤️ at AWS.
