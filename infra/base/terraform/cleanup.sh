@@ -17,7 +17,8 @@ terraform output -raw configure_kubectl > "$TMPFILE"
 if [[ ! $(cat $TMPFILE) == *"No outputs found"* ]]; then
   echo "No outputs found, skipping kubectl delete"
   source "$TMPFILE"
-  kubectl delete -f src/service/ray-service.yaml
+  kubectl delete rayjob -A --all
+  kubectl delete rayservice -A --all
 fi
 
 
