@@ -59,7 +59,7 @@ git clone https://github.com/awslabs/ai-on-eks.git
 Navigate into the directory specific to the blueprint you want to deploy. In this case, we're interested in the BioNeMo blueprint, so navigate to the appropriate directory using the terminal:
 
 ```bash
-cd ai-on-eks/ai-ml/bionemo
+cd ai-on-eks/infra/bionemo
 ```
 
 #### Run the install script
@@ -246,7 +246,7 @@ Additionally, get a snapshot of the GPU status for a specific worker node by run
 
 ```bash
 kubectl exec esm1nv-pretraining-worker-0 -- nvidia-smi
-Mon Feb 24 18:51:35 2025       
+Mon Feb 24 18:51:35 2025
 +---------------------------------------------------------------------------------------+
 | NVIDIA-SMI 535.230.02             Driver Version: 535.230.02   CUDA Version: 12.2     |
 |-----------------------------------------+----------------------+----------------------+
@@ -258,7 +258,7 @@ Mon Feb 24 18:51:35 2025
 |  0%   33C    P0             112W / 300W |   3032MiB / 23028MiB |     95%      Default |
 |                                         |                      |                  N/A |
 +-----------------------------------------+----------------------+----------------------+
-                                                                                         
+
 +---------------------------------------------------------------------------------------+
 | Processes:                                                                            |
 |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |

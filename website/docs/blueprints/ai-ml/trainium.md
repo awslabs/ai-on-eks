@@ -55,7 +55,7 @@ TorchX can seamlessly integrate with Airflow and Kubeflow Pipelines. In this blu
 Before deploying this blueprint, it is important to be cognizant of the costs associated with the utilization of AWS Trainium Instances. The blueprint sets up two `Trn1.32xlarge` instances for pre-training the dataset. Be sure to assess and plan for these costs accordingly.
 :::
 
-In this [example](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/trainium), you will provision the following resources.
+In this [example](https://github.com/awslabs/ai-on-eks/tree/main/infra/trainium), you will provision the following resources.
 
  - Create a new sample VPC, including 2 Private Subnets and 2 Public Subnets.
  - Set up an Internet gateway for the Public Subnets and a NAT Gateway for the Private Subnets.
@@ -69,7 +69,7 @@ In this [example](https://github.com/awslabs/ai-on-eks/tree/main/ai-ml/trainium)
  - Create a test queue within Volcano to enable TorchX job submission to this specific queue.
 
 :::info
-**Important**: In this setup, Karpenter is utilized exclusively for `inferentia-inf2` instances, due to its current limitations in custom networking interfaces configuration. For Trainium instances, managed node groups and the Cluster Autoscaler are employed for scaling purposes. For users working with an older version of Karpenter (specifically, the `v1alpha5` APIs), please note that the configuration for Trainium with `LaunchTemplates` is still accessible. It can be found in the `data-on-eks/ai-ml/trainium-inferentia/addons.tf` file, although it is commented out at the file's end.
+**Important**: In this setup, Karpenter is utilized exclusively for `inferentia-inf2` instances, due to its current limitations in custom networking interfaces configuration. For Trainium instances, managed node groups and the Cluster Autoscaler are employed for scaling purposes. For users working with an older version of Karpenter (specifically, the `v1alpha5` APIs), please note that the configuration for Trainium with `LaunchTemplates` is still accessible. It can be found in the `data-on-eks/infra/trainium-inferentia/addons.tf` file, although it is commented out at the file's end.
 :::
 
 ### Prerequisites
@@ -95,7 +95,7 @@ export TF_VAR_enable_fsx_for_lustre=true
 export TF_VAR_enable_torchx_etcd=true
 export TF_VAR_enable_volcano=true
 
-cd ai-on-eks/ai-ml/trainium-inferentia/ && chmod +x install.sh
+cd ai-on-eks/infra/trainium-inferentia/ && chmod +x install.sh
 ./install.sh
 ```
 
@@ -148,7 +148,7 @@ chmod +x 1-bert-pretrain-build-image.sh
 ```
 
 ```
-Admin:~/environment/data-on-eks/ai-ml/trainium-inferentia/examples/dp-bert-large-pretrain (trainium-part2) $ ./1-bert-pretrain-build-image.sh
+Admin:~/environment/data-on-eks/infra/trainium-inferentia/examples/dp-bert-large-pretrain (trainium-part2) $ ./1-bert-pretrain-build-image.sh
 Did you install docker on AMD64(x86-64) machine (y/n): y
 Enter the ECR region: us-west-2
 ECR repository 'eks_torchx_test' already exists.
@@ -283,7 +283,7 @@ kubectl delete <ENTER_JOB_NAME>
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-ai-on-eks/ai-ml/trainium/terraform && chmod +x cleanup.sh
+ai-on-eks/infra/trainium/terraform && chmod +x cleanup.sh
 ./cleanup.sh
 ```
 
