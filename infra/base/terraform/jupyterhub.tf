@@ -1,13 +1,15 @@
 #-----------------------------------------------------------------------------------------
-# JupyterHub Sinlgle User IRSA, maybe that block could be incorporated in add-on registry
+# JupyterHub Single User IRSA, maybe that block could be incorporated in add-on registry
 #-----------------------------------------------------------------------------------------
 resource "kubernetes_namespace" "jupyterhub" {
+  count = var.enable_jupyterhub ? 1 : 0
   metadata {
     name = "jupyterhub"
   }
 }
 
 module "jupyterhub_single_user_irsa" {
+  count = var.enable_jupyterhub ? 1 : 0
   source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
 
   role_name = "${module.eks.cluster_name}-jupyterhub-single-user-sa"
@@ -19,28 +21,30 @@ module "jupyterhub_single_user_irsa" {
   oidc_providers = {
     main = {
       provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["${kubernetes_namespace.jupyterhub.metadata[0].name}:jupyterhub-single-user"]
+      namespace_service_accounts = ["${kubernetes_namespace.jupyterhub[count.index].metadata[0].name}:jupyterhub-single-user"]
     }
   }
 }
 
 resource "kubernetes_service_account_v1" "jupyterhub_single_user_sa" {
+  count = var.enable_jupyterhub ? 1 : 0
   metadata {
     name        = "${module.eks.cluster_name}-jupyterhub-single-user"
-    namespace   = kubernetes_namespace.jupyterhub.metadata[0].name
-    annotations = { "eks.amazonaws.com/role-arn" : module.jupyterhub_single_user_irsa.iam_role_arn }
+    namespace   = kubernetes_namespace.jupyterhub[count.index].metadata[0].name
+    annotations = { "eks.amazonaws.com/role-arn" : module.jupyterhub_single_user_irsa[0].iam_role_arn }
   }
 
   automount_service_account_token = true
 }
 
 resource "kubernetes_secret_v1" "jupyterhub_single_user" {
+  count = var.enable_jupyterhub ? 1 : 0
   metadata {
     name      = "${module.eks.cluster_name}-jupyterhub-single-user-secret"
-    namespace = kubernetes_namespace.jupyterhub.metadata[0].name
+    namespace = kubernetes_namespace.jupyterhub[count.index].metadata[0].name
     annotations = {
-      "kubernetes.io/service-account.name"      = kubernetes_service_account_v1.jupyterhub_single_user_sa.metadata[0].name
-      "kubernetes.io/service-account.namespace" = kubernetes_namespace.jupyterhub.metadata[0].name
+      "kubernetes.io/service-account.name"      = kubernetes_service_account_v1.jupyterhub_single_user_sa[count.index].metadata[0].name
+      "kubernetes.io/service-account.namespace" = kubernetes_namespace.jupyterhub[count.index].metadata[0].name
     }
   }
 
@@ -52,6 +56,7 @@ resource "kubernetes_secret_v1" "jupyterhub_single_user" {
 # This will be replaced with Dynamic EFS provision using EFS CSI Driver
 #---------------------------------------------------------------
 resource "aws_efs_file_system" "efs" {
+  count = var.enable_jupyterhub ? 1 : 0
   encrypted = true
 
   tags = local.tags
@@ -62,19 +67,22 @@ resource "aws_efs_file_system" "efs" {
 # We use index 2 and 3 to select the subnet in AZ1 with the 100.x CIDR:
 # Create EFS mount targets for the 3rd  subnet
 resource "aws_efs_mount_target" "efs_mt_1" {
-  file_system_id  = aws_efs_file_system.efs.id
+  count = var.enable_jupyterhub ? 1 : 0
+  file_system_id  = aws_efs_file_system.efs[count.index].id
   subnet_id       = module.vpc.private_subnets[2]
-  security_groups = [aws_security_group.efs.id]
+  security_groups = [aws_security_group.efs[count.index].id]
 }
 
 # Create EFS mount target for the 4th subnet
 resource "aws_efs_mount_target" "efs_mt_2" {
-  file_system_id  = aws_efs_file_system.efs.id
+  count = var.enable_jupyterhub ? 1 : 0
+  file_system_id  = aws_efs_file_system.efs[count.index].id
   subnet_id       = module.vpc.private_subnets[3]
-  security_groups = [aws_security_group.efs.id]
+  security_groups = [aws_security_group.efs[count.index].id]
 }
 
 resource "aws_security_group" "efs" {
+  count = var.enable_jupyterhub ? 1 : 0
   name        = "${local.name}-efs"
   description = "Allow inbound NFS traffic from private subnets of the VPC"
   vpc_id      = module.vpc.vpc_id
@@ -93,9 +101,45 @@ resource "aws_security_group" "efs" {
 #---------------------------------------
 # EFS Configuration
 #---------------------------------------
+resource "aws_efs_access_point" "efs_persist_ap" {
+  count = var.enable_jupyterhub ? 1 : 0
+  file_system_id = aws_efs_file_system.efs[count.index].id
+  posix_user {
+    gid = 0
+    uid = 0
+    secondary_gids = [100]
+  }
+  root_directory {
+    path = "/home"
+    creation_info {
+      owner_gid   = 0
+      owner_uid   = 0
+      permissions = 700
+    }
+  }
+}
+resource "aws_efs_access_point" "efs_shared_ap" {
+  count = var.enable_jupyterhub ? 1 : 0
+  file_system_id = aws_efs_file_system.efs[count.index].id
+  posix_user {
+    gid = 0
+    uid = 0
+    secondary_gids = [100]
+  }
+  root_directory {
+    path = "/shared"
+    creation_info {
+      owner_gid   = 0
+      owner_uid   = 0
+      permissions = 700
+    }
+  }
+}
+
 module "efs_config" {
+  count = var.enable_jupyterhub ? 1 : 0
   source  = "aws-ia/eks-blueprints-addons/aws"
-  version = "~> 1.2"
+  version = "~> 1.20"
 
   cluster_name      = module.eks.cluster_name
   cluster_endpoint  = module.eks.cluster_endpoint
@@ -114,7 +158,7 @@ module "efs_config" {
         <<-EOT
           pv:
             name: efs-persist
-            volumeHandle: ${aws_efs_file_system.efs.id}:/home
+            volumeHandle: ${aws_efs_file_system.efs[count.index].id}::${aws_efs_access_point.efs_persist_ap[count.index].id}
           pvc:
             name: efs-persist
         EOT
@@ -131,7 +175,7 @@ module "efs_config" {
         <<-EOT
           pv:
             name: efs-persist-shared
-            volumeHandle: ${aws_efs_file_system.efs.id}:/shared
+            volumeHandle: ${aws_efs_file_system.efs[count.index].id}::${aws_efs_access_point.efs_shared_ap[count.index].id}
           pvc:
             name: efs-persist-shared
         EOT
@@ -145,9 +189,10 @@ module "efs_config" {
 # Additional Resources
 #---------------------------------------------------------------
 resource "kubernetes_secret_v1" "huggingface_token" {
+  count = var.enable_jupyterhub ? 1 : 0
   metadata {
     name      = "hf-token"
-    namespace = kubernetes_namespace.jupyterhub.metadata[0].name
+    namespace = kubernetes_namespace.jupyterhub[count.index].metadata[0].name
   }
 
   data = {
@@ -156,8 +201,9 @@ resource "kubernetes_secret_v1" "huggingface_token" {
 }
 
 resource "kubernetes_config_map_v1" "notebook" {
+  count = var.enable_jupyterhub ? 1 : 0
   metadata {
     name      = "notebook"
-    namespace = kubernetes_namespace.jupyterhub.metadata[0].name
+    namespace = kubernetes_namespace.jupyterhub[count.index].metadata[0].name
   }
 }
