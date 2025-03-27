@@ -9,7 +9,7 @@ resource "kubernetes_namespace" "jupyterhub" {
 }
 
 module "jupyterhub_single_user_irsa" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count  = var.enable_jupyterhub ? 1 : 0
   source = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
 
   role_name = "${module.eks.cluster_name}-jupyterhub-single-user-sa"
@@ -56,7 +56,7 @@ resource "kubernetes_secret_v1" "jupyterhub_single_user" {
 # This will be replaced with Dynamic EFS provision using EFS CSI Driver
 #---------------------------------------------------------------
 resource "aws_efs_file_system" "efs" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count     = var.enable_jupyterhub ? 1 : 0
   encrypted = true
 
   tags = local.tags
@@ -67,7 +67,7 @@ resource "aws_efs_file_system" "efs" {
 # We use index 2 and 3 to select the subnet in AZ1 with the 100.x CIDR:
 # Create EFS mount targets for the 3rd  subnet
 resource "aws_efs_mount_target" "efs_mt_1" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count           = var.enable_jupyterhub ? 1 : 0
   file_system_id  = aws_efs_file_system.efs[count.index].id
   subnet_id       = module.vpc.private_subnets[2]
   security_groups = [aws_security_group.efs[count.index].id]
@@ -75,14 +75,14 @@ resource "aws_efs_mount_target" "efs_mt_1" {
 
 # Create EFS mount target for the 4th subnet
 resource "aws_efs_mount_target" "efs_mt_2" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count           = var.enable_jupyterhub ? 1 : 0
   file_system_id  = aws_efs_file_system.efs[count.index].id
   subnet_id       = module.vpc.private_subnets[3]
   security_groups = [aws_security_group.efs[count.index].id]
 }
 
 resource "aws_security_group" "efs" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count       = var.enable_jupyterhub ? 1 : 0
   name        = "${local.name}-efs"
   description = "Allow inbound NFS traffic from private subnets of the VPC"
   vpc_id      = module.vpc.vpc_id
@@ -102,11 +102,11 @@ resource "aws_security_group" "efs" {
 # EFS Configuration
 #---------------------------------------
 resource "aws_efs_access_point" "efs_persist_ap" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count          = var.enable_jupyterhub ? 1 : 0
   file_system_id = aws_efs_file_system.efs[count.index].id
   posix_user {
-    gid = 0
-    uid = 0
+    gid            = 0
+    uid            = 0
     secondary_gids = [100]
   }
   root_directory {
@@ -119,11 +119,11 @@ resource "aws_efs_access_point" "efs_persist_ap" {
   }
 }
 resource "aws_efs_access_point" "efs_shared_ap" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count          = var.enable_jupyterhub ? 1 : 0
   file_system_id = aws_efs_file_system.efs[count.index].id
   posix_user {
-    gid = 0
-    uid = 0
+    gid            = 0
+    uid            = 0
     secondary_gids = [100]
   }
   root_directory {
@@ -137,7 +137,7 @@ resource "aws_efs_access_point" "efs_shared_ap" {
 }
 
 module "efs_config" {
-  count = var.enable_jupyterhub ? 1 : 0
+  count   = var.enable_jupyterhub ? 1 : 0
   source  = "aws-ia/eks-blueprints-addons/aws"
   version = "~> 1.20"
 
