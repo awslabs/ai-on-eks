@@ -215,7 +215,7 @@ module "data_addons" {
   # JupyterHub Add-on
   #---------------------------------------------------------------
   enable_jupyterhub = var.enable_jupyterhub
-  jupyterhub_helm_config = {
+  jupyterhub_helm_config = var.enable_jupyterhub ? {
     values = [templatefile("${path.module}/helm-values/jupyterhub-values-${var.jupyter_hub_auth_mechanism}.yaml", {
       ssl_cert_arn                = try(data.aws_acm_certificate.issued[0].arn, "")
       jupyterdomain               = try("https://${var.jupyterhub_domain}/hub/oauth_callback", "")
@@ -227,11 +227,11 @@ module "data_addons" {
       client_secret               = var.oauth_jupyter_client_secret != "" ? var.oauth_jupyter_client_secret : try(aws_cognito_user_pool_client.user_pool_client[0].client_secret, "")
       user_pool_id                = try(aws_cognito_user_pool.pool[0].id, "")
       identity_pool_id            = try(aws_cognito_identity_pool.identity_pool[0].id, "")
-      jupyter_single_user_sa_name = kubernetes_service_account_v1.jupyterhub_single_user_sa.metadata[0].name
+      jupyter_single_user_sa_name = kubernetes_service_account_v1.jupyterhub_single_user_sa[0].metadata[0].name
       region                      = var.region
     })]
     version = "3.2.1"
-  }
+  } : null
 
   enable_volcano = var.enable_volcano
   #---------------------------------------
@@ -480,7 +480,7 @@ module "data_addons" {
       clusterName: ${module.eks.cluster_name}
       ec2NodeClass:
         amiSelectorTerms:
-          - alias: al2023@v20241024
+          - alias: al2023@latest
         karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
         subnetSelectorTerms:
           id: ${module.vpc.private_subnets[2]}
@@ -539,7 +539,7 @@ module "data_addons" {
       clusterName: ${module.eks.cluster_name}
       ec2NodeClass:
         amiSelectorTerms:
-          - alias: al2023@v20241024
+          - alias: al2023@latest
         karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
         subnetSelectorTerms:
           id: ${module.vpc.private_subnets[2]}
@@ -664,6 +664,8 @@ resource "kubectl_manifest" "efs_sc" {
     metadata:
       name: efs-sc
     provisioner: efs.csi.aws.com
+    mountOptions:
+      - iam
   YAML
 }
 
