@@ -3,6 +3,8 @@
 *(Pronounced: "AI on EKS")*
 > 💡 **Optimized Solutions for AI and ML on EKS**
 
+> ⚠️ **This repository is under active development as we support the new infrastructure format. Please raise any issues you may encounter**
+
 ### Build, Scale, and Optimize AI/ML Platforms on [Amazon EKS](https://aws.amazon.com/eks/) 🚀
 
 Welcome to **AI on EKS**, your gateway to scaling **AI and ML** workloads on Amazon EKS. Unlock the potential of [AI](https://aws.amazon.com/generative-ai/) with a rich collection of Terraform Blueprints featuring best practices for deploying robust solutions with advanced logging and observability.
