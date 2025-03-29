@@ -1,0 +1,48 @@
+# ------------------------------------------------------------------------------------
+# NIMService Deployment for Meta Llama 3.1 8B Instruct with NIMCache and EFS-backed PVC
+# ------------------------------------------------------------------------------------
+# This manifest deploys a NVIDIA Inference Microservice (NIMService) for the
+# `meta/llama-3.1-8b-instruct` model using the TensorRT-LLM engine.
+#
+# Key Features:
+# - Pulls optimized model container from NGC using `ngc-secret`.
+# - Uses `ngc-api-secret` for NGC API authentication.
+# - Attaches to a prebuilt NIMCache to enable warm starts and reduce cold boot time.
+# - NIMCache uses an EFS-backed PersistentVolumeClaim (PVC) for shared model storage.
+# - Allocates 2 GPUs (e.g., A10G), and 40 vCPUs.
+# - Exposes OpenAI-compatible endpoints via ClusterIP service on port 8000.
+#
+# Notes:
+# - Ensure the NIMCache is deployed and backed by a PVC with ReadWriteMany support (e.g., EFS).
+# - Adjust nodeSelector, replicas, and resources according to your instance type and workload.
+# ------------------------------------------------------------------------------------
+
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: meta-llama3-8b-instruct
+  namespace: nim-service
+spec:
+  image:
+    repository: nvcr.io/nim/meta/llama-3.1-8b-instruct
+    tag: 1.3.3
+    pullPolicy: IfNotPresent
+    pullSecrets:
+      - ngc-secret
+  authSecret: ngc-api-secret
+  storage:
+    nimCache:
+      name: meta-llama3-8b-instruct
+      profile: ''
+  replicas: 1
+  nodeSelector:
+    instanceType: "g5-gpu-karpenter"
+  resources:
+    limits:
+      cpu: 40
+      nvidia.com/gpu: 2
+  expose:
+    service:
+      type: ClusterIP
+      port: 8000
