@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------------
 # NIMService Deployment for Meta Llama 3.1 8B Instruct with NIMCache and EFS-backed PVC
 # ------------------------------------------------------------------------------------
-# This manifest deploys a NVIDIA Inference Microservice (NIMService) for the 
+# This manifest deploys a NVIDIA Inference Microservice (NIMService) for the
 # `meta/llama-3.1-8b-instruct` model using the TensorRT-LLM engine.
 #
 # Key Features:
@@ -46,5 +46,3 @@ spec:
     service:
       type: ClusterIP
       port: 8000
-
-

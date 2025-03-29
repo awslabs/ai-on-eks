@@ -249,6 +249,8 @@ NGC_API_KEY="your-real-ngc-key" ./deploy-nim-auth.sh
 The `NIMCache` custom resource will pull the model and cache optimized engine profiles to EFS. This dramatically reduces startup time when launching the model later via `NIMService`.
 
 ```bash
+cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
+
 kubectl apply -f nim-cache-llama3-8b-instruct.yaml
 ```
 
@@ -295,6 +297,8 @@ Sample output:
 Now launch the model service using the cached engine profiles.
 
 ```bash
+cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
+
 kubectl apply -f nim-service-llama3-8b-instruct.yaml
 ```
 
@@ -377,7 +381,7 @@ curl -X POST \
 ```
 {"id":"chat-061a9dba9179437fa24cab7f7c767f19","object":"chat.completion","created":1743215809,"model":"meta/llama-3.1-8b-instruct","choices":[{"index":0,"message":{"role":"assistant","content":"Cape Hatteras National Seashore is a beautiful coastal destination with a rich history, pristine beaches,
 ...
-exploration of the area's natural beauty and history. Feel free to modify it to suit your interests and preferences. Safe travels!"},"logprobs":null,"finish_reason":"stop","stop_reason":null}],"usage":{"prompt_tokens":30,"total_tokens":773,"completion_tokens":743},"prompt_logprobs":null}%  
+exploration of the area's natural beauty and history. Feel free to modify it to suit your interests and preferences. Safe travels!"},"logprobs":null,"finish_reason":"stop","stop_reason":null}],"usage":{"prompt_tokens":30,"total_tokens":773,"completion_tokens":743},"prompt_logprobs":null}%
 
 ```
 
@@ -408,6 +412,8 @@ To tear down the deployed model and associated infrastructure:
 Delete the deployed `NIMService` and `NIMCache` objects from your cluster:
 
 ```bash
+cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
+
 kubectl delete -f nim-service-llama3-8b-instruct.yaml
 kubectl delete -f nim-cache-llama3-8b-instruct.yaml
 ```
@@ -427,5 +433,3 @@ Navigate back to the root Terraform module and run the cleanup script. This will
 cd ai-on-eks/infra/nvidia-nim
 ./cleanup.sh
 ```
-
-
