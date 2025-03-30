@@ -388,6 +388,156 @@ exploration of the area's natural beauty and history. Feel free to modify it to 
 
 >🧠 The model is now running with Tensor Parallelism = 2 across two A10G GPUs, each utilizing approximately 21.4 GiB of memory. Thanks to NIMCache backed by EFS, the model loaded quickly and is ready for low-latency inference.
 
+## Open WebUI Deployment
+
+:::info
+
+[Open WebUI](https://github.com/open-webui/open-webui) is compatible only with models that work with the OpenAI API server and Ollama.
+
+:::
+
+**1. Deploy the WebUI**
+
+Deploy the [Open WebUI](https://github.com/open-webui/open-webui) by running the following command:
+
+```sh
+kubectl apply -f ai-on-eks/blueprints/inference/gpu/nvidia-nim-operator-llama3-8b/openai-webui-deployment.yaml
+```
+
+**2. Port Forward to Access WebUI**
+
+Use kubectl port-forward to access the WebUI locally:
+
+```sh
+kubectl port-forward svc/open-webui 8081:80 -n openai-webui
+```
+
+**3. Access the WebUI**
+
+Open your browser and go to http://localhost:8081
+
+**4. Sign Up**
+
+Sign up using your name, email, and a dummy password.
+
+**5. Start a New Chat**
+
+Click on New Chat and select the model from the dropdown menu, as shown in the screenshot below:
+
+![alt text](../img/openweb-ui-nim-1.png)
+
+**6. Enter Test Prompt**
+
+Enter your prompt, and you will see the streaming results, as shown below:
+
+![alt text](../img/openweb-ui-nim-2.png)
+
+## Performance Testing with NVIDIA GenAI-Perf Tool
+
+[GenAI-Perf](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/client/src/c%2B%2B/perf_analyzer/genai-perf/README.html) is a command line tool for measuring the throughput and latency of generative AI models as served through an inference server.
+
+GenAI-Perf can be used as standard tool to benchmark with other models deployed with inference server. But this tool requires a GPU. To make it easier, we provide you a pre-configured manifest `genaiperf-deploy.yaml` to run the tool.
+
+```bash
+cd ai-on-eks/blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
+kubectl apply -f genaiperf-deploy.yaml
+```
+
+Once the pod is ready with running status `1/1`, can execute into the pod.
+
+```bash
+export POD_NAME=$(kubectl get po -l app=genai-perf -ojsonpath='{.items[0].metadata.name}')
+kubectl exec -it $POD_NAME -- bash
+```
+
+Run the testing to the deployed NIM Llama3 model
+
+```bash
+genai-perf profile -m meta/llama-3.1-8b-instruct \
+  --url meta-llama3-8b-instruct.nim-service:8000 \
+  --service-kind openai \
+  --endpoint-type chat \
+  --num-prompts 100 \
+  --synthetic-input-tokens-mean 200 \
+  --synthetic-input-tokens-stddev 0 \
+  --output-tokens-mean 100 \
+  --output-tokens-stddev 0 \
+  --concurrency 20 \
+  --streaming \
+  --tokenizer hf-internal-testing/llama-tokenizer
+```
+
+You should see similar output like the following
+
+![NIM Operator genai-perf result](../img/nim-operator-genaiperf.png)
+
+You should be able to see the [metrics](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html#metrics) that genai-perf collects, including Request latency, Out token throughput, Request throughput.
+
+To understand the command line options, please refer to [this documentation](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html#command-line-options).
+
+
+
+### Grafana Dashboard
+
+NVIDIA provided a Grafana [dashboard](https://docs.nvidia.com/nim/large-language-models/latest/_downloads/66e67782ce543dcccec574b1483f0ea0/nim-dashboard-example.json) to better visualize NIM status. In the Grafana dashboard, it contains several important metrics:
+
+- **Time to First Token (TTFT)**: The latency between the initial inference request to the model and the return of the first token.
+- **Inter-Token Latency (ITL)**: The latency between each token after the first.
+- **Total Throughput**: The total number of tokens generated per second by the NIM.
+
+You can find more metrics description from this [document](https://docs.nvidia.com/nim/large-language-models/latest/observability.html).
+
+![NVIDIA LLM Server](../img/nim-dashboard.png)
+
+You can monitor metrics such as Time-to-First-Token, Inter-Token-Latency, KV Cache Utilization metrics.
+
+![NVIDIA NIM Metrics](../img/nim-dashboard-2.png)
+
+To view the Grafana dashboard to monitor these metrics, follow the steps below:
+
+<details>
+<summary>Click to expand details</summary>
+
+**1. Retrieve the Grafana password.**
+
+The password is saved in the AWS Secret Manager. Below Terraform command will show you the secret name.
+
+```bash
+terraform output grafana_secret_name
+```
+
+Then use the output secret name to run below command,
+
+```bash
+aws secretsmanager get-secret-value --secret-id <grafana_secret_name_output> --region $AWS_REGION --query "SecretString" --output text
+```
+
+**2. Expose the Grafana Service**
+
+Use port-forward to expose the Grafana service.
+
+```bash
+kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
+```
+
+**3. Login to Grafana:**
+
+- Open your web browser and navigate to [http://localhost:3000](http://localhost:3000).
+- Login with the username `admin` and the password retrieved from AWS Secrets Manager.
+
+**4. Open the NIM Monitoring Dashboard:**
+
+- Once logged in, click "Dashboards" on the left sidebar and search "nim"
+- You can find the Dashboard `NVIDIA NIM Monitoring` from the list
+- Click and entering to the dashboard.
+
+You should now see the metrics displayed on the Grafana dashboard, allowing you to monitor the performance your NVIDIA NIM service deployment.
+</details>
+
+:::info
+As of writing this guide, NVIDIA also provides an example Grafana dashboard. You can check it from [here](https://docs.nvidia.com/nim/large-language-models/latest/observability.html#grafana).
+:::
+
 ## Conclusion
 
 This blueprint showcases how to deploy and scale **large language models like Meta’s Llama 3.1 8B Instruct** efficiently on **Amazon EKS** using the **NVIDIA NIM Operator**.

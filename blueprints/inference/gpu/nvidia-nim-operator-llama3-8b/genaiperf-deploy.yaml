@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-perf
+spec:
+  selector:
+    matchLabels:
+      app: genai-perf
+  template:
+    metadata:
+      labels:
+        app: genai-perf
+    spec:
+      containers:
+      - name: triton
+        image: nvcr.io/nvidia/tritonserver:24.12-py3-sdk
+        command:
+        - sleep
+        - infinity
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
