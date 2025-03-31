@@ -4,13 +4,6 @@ sidebar_position: 4
 ---
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
-:::warning
-
-Note: Before implementing NVIDIA NIM, please be aware it is part of [NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/), which may introduce potential cost and licensing for production use.
-
-For evaluation, NVIDIA also offers a free evaluation license to try NVIDIA AI Enterprise for 90 days, and you can [register](https://enterpriseproductregistration.nvidia.com/?LicType=EVAL&ProductFamily=NVAIEnterprise) it with your corporate email.
-:::
-
 
 # NVIDIA NIM Operator on Amazon EKS
 
@@ -22,9 +15,13 @@ For evaluation, NVIDIA also offers a free evaluation license to try NVIDIA AI En
 
 The **NVIDIA NIM Operator** is a Kubernetes operator that automates the deployment, scaling, and management of NVIDIA NIM microservices on a Kubernetes cluster.
 
-Instead of manually pulling containers, provisioning GPU nodes, or writing YAML for every model, the NIM Operator introduces two primary [Custom Resource Definitions (CRDs)](https://docs.nvidia.com/nim-operator/latest/crds.html):
+![NVIDIA NIM Operator Architecture](../img/NIMOperatorArchitecture.png)
+
+Instead of manually pulling containers, provisioning GPU nodes, or writing YAML for every model, the NIM Operator introduces three primary [Custom Resource Definitions (CRDs)](https://docs.nvidia.com/nim-operator/latest/crds.html):
+
 - [`NIMCache`](https://docs.nvidia.com/nim-operator/latest/cache.html)
 - [`NIMService`](https://docs.nvidia.com/nim-operator/latest/service.html)
+- [`NIMPipeline`] (https://docs.nvidia.com/nim-operator/latest/pipelines.html)
 
 These CRDs allow you to declaratively define model deployments using native Kubernetes syntax.
 
@@ -34,9 +31,7 @@ The Operator handles:
 - Launching model-serving pods with GPU allocation
 - Exposing inference endpoints via Kubernetes Services
 - Integrating with autoscaling (e.g., HPA + Karpenter)
-
-This blueprint focuses on **inference**, and the two key CRDs we use are explained below:
-
+- Chaining multiple models together into inference pipelines using NIMPipeline
 
 ### [NIMCache – Model Caching for Faster Load Times](https://docs.nvidia.com/nim-operator/latest/cache.html)
 
@@ -81,6 +76,8 @@ If `NIMCache` is not used, the model will be downloaded each time a pod starts, 
 
 This deployment blueprint demonstrates how to run the **Meta Llama 3.1 8B Instruct** model on **Amazon EKS** using the **NVIDIA NIM Operator** with multi-GPU support and optimized model caching for fast startup times.
 
+![NVIDIA NIM Operator Architecture](../img/NIMOperatoronEKS.png)
+
 The model is served using:
 - **G5 instances (g5.12xlarge)**: These instances come with **4 NVIDIA A10G GPUs**
 - **Tensor Parallelism (TP)**: Set to `2`, meaning the model will run in parallel across **2 GPUs**
@@ -92,6 +89,15 @@ By combining these components, the model is deployed as a scalable Kubernetes wo
 - Scalable serving endpoint via [`NIMService`](https://docs.nvidia.com/nim-operator/latest/service.html)
 
 > 📌 Note: You can modify the `tensorParallelism` setting or select a different instance type (e.g., G6 with L4 GPUs) based on your performance and cost requirements.
+
+
+:::warning
+
+Note: Before implementing NVIDIA NIM, please be aware it is part of [NVIDIA AI Enterprise](https://www.nvidia.com/en-us/data-center/products/ai-enterprise/), which may introduce potential cost and licensing for production use.
+
+For evaluation, NVIDIA also offers a free evaluation license to try NVIDIA AI Enterprise for 90 days, and you can [register](https://enterpriseproductregistration.nvidia.com/?LicType=EVAL&ProductFamily=NVAIEnterprise) it with your corporate email.
+:::
+
 
 ## Deploying the Solution
 
