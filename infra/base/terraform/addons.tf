@@ -750,27 +750,3 @@ resource "kubectl_manifest" "mpi_operator" {
   yaml_body  = each.value
   depends_on = [module.eks.eks_cluster_id]
 }
-
-#---------------------------------------------------------------
-# ArgoCD Deployment
-#---------------------------------------------------------------
-resource "kubernetes_namespace" "argo_cd_namespace" {
-  metadata {
-    name = "argocd"
-  }
-}
-
-data "http" "argo_cd_yaml" {
-  url = "https://raw.githubusercontent.com/argoproj/argo-cd/refs/tags/v2.14.8/manifests/install.yaml"
-}
-
-data "kubectl_file_documents" "argo_cd_yaml" {
-  content = data.http.argo_cd_yaml.response_body
-}
-
-resource "kubectl_manifest" "argocd" {
-  for_each           = var.enable_argocd ? data.kubectl_file_documents.argo_cd_yaml.manifests : {}
-  override_namespace = "argocd"
-  yaml_body          = each.value
-  depends_on         = [module.eks.eks_cluster_id]
-}
