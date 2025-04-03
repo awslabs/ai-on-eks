@@ -35,7 +35,7 @@ Each stack inherits the `base` stack's components. These components include:
 |------------------------------------------|-----------------------------------------------------|--------------------------|
 | `name`                                   | The name of the Kubernetes cluster                  | `ai-stack`               |
 | `region`                                 | The region for the cluster                          | us-east-1                |
-| `eks_cluster_version`                    | The version of EKS to use                           | 1.3.2                    |
+| `eks_cluster_version`                    | The version of EKS to use                           | 1.32                     |
 | `vpc_cidr`                               | The CIDR used for the VPC                           | `10.1.0.0/21`            |
 | `secondary_cidr_blocks`                  | Secondary CIDR for the VPC                          | `100.64.0.0/16`          |
 | `enable_aws_cloudwatch_metrics`          | Enable the AWS Cloudwatch Metrics addon             | `false`                  |
