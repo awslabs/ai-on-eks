@@ -37,8 +37,8 @@ module "vpc" {
   # ------------------------------
   # Private Subnets for MLflow backend store
   database_subnets                   = local.database_private_subnets
-  create_database_subnet_group       = true
-  create_database_subnet_route_table = true
+  create_database_subnet_group       = var.enable_mlflow_tracking
+  create_database_subnet_route_table = var.enable_mlflow_tracking
 
   # ------------------------------
   # Optional Public Subnets for NAT and IGW for PoC/Dev/Test environments
