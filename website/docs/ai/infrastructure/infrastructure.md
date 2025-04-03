@@ -18,7 +18,9 @@ Other blueprints use the same base infrastructure and selectively enable other c
 blueprint.
 
 ## Resources
-Each stack inherits the `base` stack's components. These components include: 
+
+Each stack inherits the `base` stack's components. These components include:
+
 - VPC with subnets in 2 availability zones
 - EKS cluster with 1 core nodegroup with 2 nodes to run the minimum infrastructure
 - Karpenter for autoscaling with CPU, GPU, and AWS Neuron NodePools
@@ -48,7 +50,7 @@ Each stack inherits the `base` stack's components. These components include:
 | `enable_kubecost`                        | Enable Kubecost                                     | `false`                  |
 | `enable_argo_workflows`                  | Enable Argo Workflow                                | `false`                  |
 | `enable_argo_events`                     | Enable Argo Events                                  | `false`                  |
-| `enable_mlflow_tracking`                 | Enable MLFlow Tracking `false`                      |
+| `enable_mlflow_tracking`                 | Enable MLFlow Tracking                              | `false`                  |
 | `enable_jupyterhub`                      | Enable JupyterHub                                   | `false`                  |
 | `enable_volcano`                         | Enable Volcano                                      | `false`                  |
 | `enable_kuberay_operator`                | Enable KubeRay                                      | `false`                  |
