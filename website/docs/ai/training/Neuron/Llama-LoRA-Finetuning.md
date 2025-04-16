@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-sidebar_label: Llama-3 finetuning with LoRA
+sidebar_label: Llama 3 finetuning with LoRA
 ---
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
@@ -10,7 +10,7 @@ Deployment of ML models on EKS requires access to GPUs or Neuron instances. If y
 
 :::danger
 
-Note: Use of this Llama-3 model is governed by the Meta license.
+Note: Use of this Llama 3 model is governed by the Meta license.
 In order to download the model weights and tokenizer, please visit the [website](https://ai.meta.com/) and accept the license before requesting access.
 
 :::
@@ -21,22 +21,22 @@ We are actively enhancing this blueprint to incorporate improvements in observab
 
 :::
 
-# Llama3 fine-tuning on Trn1 with HuggingFace Optimum Neuron
+# Llama 3 fine-tuning on Trn1 with HuggingFace Optimum Neuron
 
 This comprehensive guide walks you through the steps for fine-tuning the `Llama3-8B` language model using AWS Trainium (Trn1) EC2 instances. The fine-tuning process is facilitated by HuggingFace Optimum Neuron, a powerful library that simplifies the integration of Neuron into your training pipeline.
 
-### What is Llama-3?
+### What is Llama 3?
 
-Llama-3 is a state-of-the-art large language model (LLM) designed for various natural language processing (NLP) tasks, including text generation, summarization, translation, question answering, and more. It's a powerful tool that can be fine-tuned for specific use cases.
+Llama 3 is a state-of-the-art large language model (LLM) designed for various natural language processing (NLP) tasks, including text generation, summarization, translation, question answering, and more. It's a powerful tool that can be fine-tuned for specific use cases.
 
 #### AWS Trainium:
-- **Optimized for Deep Learning**: AWS Trainium-based Trn1 instances are specifically designed for deep learning workloads. They offer high throughput and low latency, making them ideal for training large-scale models like Llama-3. Trainium chips provide significant performance improvements over traditional processors, accelerating training times.
+- **Optimized for Deep Learning**: AWS Trainium-based Trn1 instances are specifically designed for deep learning workloads. They offer high throughput and low latency, making them ideal for training large-scale models like Llama 3. Trainium chips provide significant performance improvements over traditional processors, accelerating training times.
 - **Neuron SDK**: The AWS Neuron SDK is tailored to optimize your deep learning models for Trainium. It includes features like advanced compiler optimizations and support for mixed precision training, which can further accelerate your training workloads while maintaining accuracy.
 
 ## 1. Deploying the Solution
 
 <CollapsibleContent header={<h2><span>Prerequisites</span></h2>}>
-Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama-3 finetuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
+Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama 3 finetuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
 
 Ensure that you have installed the following tools on this EC2 instance:
 
@@ -91,7 +91,7 @@ kubectl get nodes # Output shows the EKS Managed Node group nodes
 
 ## 2. Build the Docker Image
 
-We'll build the docker image that will be used by the container to run Llama3 fine-tuning. Execute the below commands after ensuring you are in the root folder of the ai-on-eks repository. 
+We'll build the docker image that will be used by the container to run Llama 3 fine-tuning. Execute the below commands after ensuring you are in the root folder of the ai-on-eks repository. 
 
 **NOTE:** Before running the docker image builder script, make sure the AWS user or principal used to run the script has proper access to the ECR repository in the specific region you selected earlier. The script will create a repo and push the image into it.
 
