@@ -5,7 +5,7 @@ sidebar_label: Llama 3 finetuning with LoRA
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
 :::warning
-Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
+Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue. 
 :::
 
 :::danger
@@ -111,6 +111,8 @@ Utilize kubectl cli to launch the `lora-finetune-app` in your EKS cluster:
 kubectl apply -f lora-finetune-pod.yaml
 ```
 
+## 4. Launch LoRA fine-tuning
+
 **Verify the Pod Status:**
 
 ```bash
@@ -118,9 +120,9 @@ kubectl get pods
 
 ```
 
-## 4. Launch LoRA fine-tuning
+**NOTE:** If the pod fails to get scheduled, check the Karpenter logs for errors. Besides hitting resource limits or other common reasons, it's also possible that the infrastructure that was setup in the initial step through terraform ended up choosing a subnet whose AZ doesn't have trn1.32xlarge compute capacity. In such cases, you will need to update the `trainium-trn1` EC2NodeClass's subnet to one that is associated with an AZ that has capacity. You can find this EC2NodeClass definition in the `addons.tf` that gets copied under `infra/trainium-inferentia/terraform` folder. You'll need to re-run the `install.sh` script in that folder after making this update and then see if the pod gets scheduled in the new AZ/subnet by Karpenter.
 
-Once the pod is ‘Running’, connect to it using an interactive bash command shell:
+Once the pod is in ‘Running’ state, connect to it using an interactive bash command shell:
 
 ```bash
 kubectl exec -it lora-finetune-app -- /bin/bash
