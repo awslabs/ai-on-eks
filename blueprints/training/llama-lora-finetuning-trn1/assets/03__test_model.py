@@ -1,71 +1,80 @@
 from datasets import load_dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-)
+from transformers import AutoModelForCausalLM, AutoTokenizer
 import subprocess
-from argparse import ArgumentParser
+import argparse
 
-parser = ArgumentParser()
-parser.add_argument(
-    "-m",
-    "--model",
-    help="path to the fine-tuned model that includes merged LoRA adapters",
-    required=True,
-)
-
-args = parser.parse_args()
-MODEL_ORIG_PATH = "meta-llama/Meta-Llama-3-8B"
+# Set these as constants
 TOKENIZER_PATH = "meta-llama/Meta-Llama-3-8B-Instruct"
+BASE_MODEL = "meta-llama/Meta-Llama-3-8B"
+SAMPLE_INDICES = [94, 99, 123]
 
-dataset = load_dataset("b-mc2/sql-create-context", split="train")
-dataset = dataset.shuffle(seed=23)
-eval_dataset = dataset.select(range(50000,50500))
+def main():
+    parser = argparse.ArgumentParser(description='Evaluate SQL translation models')
+    parser.add_argument('--tuned-model', required=True, help='Path to tuned model')
+    args = parser.parse_args()
+
+    # Initialize components
+    tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
+    tokenizer.pad_token = tokenizer.eos_token
+    
+    base_model = AutoModelForCausalLM.from_pretrained(BASE_MODEL)
+    tuned_model = AutoModelForCausalLM.from_pretrained(args.tuned_model)
+    
+    # Prepare dataset
+    dataset = load_dataset("b-mc2/sql-create-context", split="train").shuffle(seed=23)
+    eval_dataset = dataset.select(range(50000, 50500)).map(
+        create_conversation, 
+        remove_columns=dataset.features, 
+        batched=False
+    )
+    
+    # Run evaluation
+    evaluate_models(eval_dataset, tokenizer, base_model, tuned_model, SAMPLE_INDICES)
 
 def create_conversation(sample):
-    # Convert dataset to OAI messages
-    system_message = (
-        "You are an text to SQL query translator. Users will ask you questions in English and you will generate a "
-        "SQL query based on the provided SCHEMA.\nSCHEMA:\n{schema}"
-    )
+    system_msg = "You are a text-to-SQL translator. Generate SQL queries based on:\nSCHEMA:\n{schema}"
     return {
         "messages": [
-            {"role": "system", "content": system_message.format(schema=sample["context"])},
+            {"role": "system", "content": system_msg.format(schema=sample["context"])},
             {"role": "user", "content": sample["question"]},
             {"role": "assistant", "content": sample["answer"]},
         ]
     }
 
-eval_dataset = eval_dataset.map(create_conversation, remove_columns=eval_dataset
-                            .features, batched=False)
+def evaluate_models(dataset, tokenizer, base_model, tuned_model, indices):
+    for idx in indices:
+        messages = dataset[idx]['messages'][:-1]
+        
+        # Tokenize input
+        example = tokenizer.apply_chat_template(
+            messages, 
+            tokenize=False, 
+            add_generation_prompt=True
+        )
+        tokenized = tokenizer.apply_chat_template(
+            messages,
+            tokenize=True,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            return_dict=True
+        )
+        prompt_len = tokenized["input_ids"].size(1)
+        
+        # Clear screen and display
+        subprocess.run("clear", shell=True)
+        print(f"Evaluating sample {idx}")
+        print(f"PROMPT:\n{example}\n")
+        print("Generating output for the prompt using the base model and the new fine-tuned model. Please wait...\n\n")
+        
+        # Generate outputs
+        base_output = base_model.generate(**tokenized, max_new_tokens=50, pad_token_id=128001)
+        tuned_output = tuned_model.generate(**tokenized, max_new_tokens=50, pad_token_id=128001)
+        
+        # Display results
+        print("BASE MODEL:\n", tokenizer.decode(base_output[0][prompt_len:]), "\n")
+        print("FINE-TUNED MODEL:\n", tokenizer.decode(tuned_output[0][prompt_len:]), "\n")
 
-tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
-tokenizer.pad_token = tokenizer.eos_token
+        _ = input("Press <ENTER> to continue")
 
-model_orig = AutoModelForCausalLM.from_pretrained(MODEL_ORIG_PATH)
-tuned_model = AutoModelForCausalLM.from_pretrained(args.model)
-
-for n in [94, 99, 123]:
-    example = tokenizer.apply_chat_template(eval_dataset
-                                        [n]['messages'][0:-1], tokenize=False, add_generation_prompt=True, return_tensors="pt")
-    example_tokenized = tokenizer.apply_chat_template(eval_dataset
-                                                    [n]['messages'][0:-1], tokenize=True, add_generation_prompt=True, return_tensors="pt")
-    prompt_len = len(example_tokenized[0])
-
-    subprocess.run("clear")
-    print(f"######### PROMPT:\n\n{example}")
-    print()
-    print()
-    print("Generating output for the prompt using the base model and the new fine-tuned model. Please wait...")
-    print()
-    print()
-
-    outputs = tuned_model.generate(example_tokenized, max_new_tokens=50, pad_token_id=128001)
-    outputs_orig = model_orig.generate(example_tokenized, max_new_tokens=50, pad_token_id=128001)
-
-    print(f"######### BASE MODEL OUTPUT:\n\n{tokenizer.decode(outputs_orig[0][prompt_len:])}")
-    print()
-    print()
-    print(f"######### FINETUNED MODEL OUTPUT:\n\n{tokenizer.decode(outputs[0][prompt_len:])}")
-    print()
-    _ = input("Press <ENTER> to continue")
+if __name__ == "__main__":
+    main()

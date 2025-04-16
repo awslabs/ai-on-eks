@@ -94,7 +94,6 @@ def training_function(script_args, training_args):
 @dataclass
 class ScriptArguments:
     model_id: str = field(
-        # default="meta-llama/Meta-Llama-3-8B",
         default="meta-llama/Meta-Llama-3-8B",
         metadata={
             "help": "The model that you want to train from the Hugging Face hub."

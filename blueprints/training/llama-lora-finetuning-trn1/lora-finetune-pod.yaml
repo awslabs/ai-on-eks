@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: app
-      image: <account-id>.dkr.ecr.<region>.amazonaws.com/llm-finetune/llama-finetuning-trn:latest
+      image: <account-id>.dkr.ecr.<region>.amazonaws.com/llm-finetune/llama-finetuning-trn:feature-lora
       command: ["/bin/sh", "-c"]
       args: ["while true; do sleep 30; done"]
       volumeMounts:
@@ -16,10 +16,8 @@ spec:
       resources:
         limits:
           aws.amazon.com/neuron: "16"
-          vpc.amazonaws.com/efa: "8"
         requests:
           aws.amazon.com/neuron: "16"
-          vpc.amazonaws.com/efa: "8"
   volumes:
     - name: persistent-storage
       persistentVolumeClaim:
@@ -29,7 +27,6 @@ spec:
         medium: Memory
   restartPolicy: Never
   nodeSelector:
-    #provisioner: cluster-autoscaler # To be used with Managed nodegroups with Cluster Autoscaler
     type: karpenter
     instanceType: trainium-trn1
   tolerations:
