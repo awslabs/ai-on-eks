@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-sidebar_label: Llama-3 with RayTrain on Trn1
+sidebar_label: Llama-3 finetuning with LoRA
 ---
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
@@ -36,102 +36,76 @@ Llama-3 is a state-of-the-art large language model (LLM) designed for various na
 ## 1. Deploying the Solution
 
 <CollapsibleContent header={<h2><span>Prerequisites</span></h2>}>
-    Before we begin, ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free.
-    Ensure that you have installed the following tools on your EC2 instance.
+Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama-3 finetuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
 
-:::info
+Ensure that you have installed the following tools on this EC2 instance:
 
-    * [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html) → Ensure you have 100GB+ of storage for both options. This is crucial for creating a Docker image with x86 architecture and having the right amount of storage.
+* [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
+* [kubectl](https://Kubernetes.io/docs/tasks/tools/)
+* [terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
+* Git(Only for EC2 instance)
+* Docker
+* Python, pip, jq, unzip
 
-    If you are using a local Windows machine or Mac, ensure you have Docker installed locally with builder storage above 100GB and the image is created with x86 architecture.
-
-:::
-
-
-    * [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
-    * [kubectl](https://Kubernetes.io/docs/tasks/tools/)
-    * [terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli)
-
-    To install all the pre-reqs on EC2, you can run this [script](https://github.com/awslabs/data-on-eks/blob/main/ai-ml/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
+To install all the pre-reqs on EC2, you can run this [script](https://github.com/VijoyChoyi/ai-on-eks/blob/main/infra/trainium-inferentia/examples/llama2/install-pre-requsites-for-ec2.sh) which is compatible with Amazon Linux 2023.
 
 
-    **Clone the Data on EKS repository**
+**Clone the Data on EKS repository**
 
-    ```bash
-    git clone https://github.com/awslabs/data-on-eks.git
-    ```
+```bash
+git clone https://github.com/awslabs/ai-on-eks.git
+```
 
-    **Navigate to the trainium-inferentia directory.**
+**Navigate to the trainium-inferentia directory.**
 
-    ```bash
-    cd data-on-eks/ai-ml/trainium-inferentia
-    ```
+```bash
+cd ai-on-eks/infra/trainium-inferentia
+```
 
-   Let's run the below export commands to set environment variables.
-
-:::info
-
-    **NOTE:** Trainium instances are available in select regions, and the user can determine this list of regions using the commands outlined [here](https://repost.aws/articles/ARmXIF-XS3RO27p0Pd1dVZXQ/what-regions-have-aws-inferentia-and-trainium-instances) on re:Post.
-
-:::
+Set the region value within the `blueprint.tfvars` variables file under the `terraform` sub-folder to match your preference.
+**NOTE:** Trainium instances are available in select regions, and the user can determine this list of regions using the commands outlined [here](https://repost.aws/articles/ARmXIF-XS3RO27p0Pd1dVZXQ/what-regions-have-aws-inferentia-and-trainium-instances) on re:Post.
 
 
-    ```bash
-    # Enable FSx for Lustre, which will mount pre-training data to all pods across multiple nodes
-    export TF_VAR_enable_fsx_for_lustre=true
+Run the installation script to provision an EKS cluster with all the add-ons needed for the solution.
 
-    # Set the region according to your requirements. Check Trn1 instance availability in the specified region.
-    export TF_VAR_region=us-west-2
+```bash
+./install.sh
+```
 
-    # Note: This configuration will create two new Trn1 32xl instances. Ensure you validate the associated costs before proceeding.
-    export TF_VAR_trn1_32xl_min_size=1
-    export TF_VAR_trn1_32xl_desired_size=1
-    ```
+### Verify the resources
 
-    Run the installation script to provision an EKS cluster with all the add-ons needed for the solution.
+Verify the Amazon EKS Cluster
 
-    ```bash
-    ./install.sh
-    ```
+```bash
+aws eks --region us-west-2 describe-cluster --name trainium-inferentia
+```
 
-    ### Verify the resources
+```bash
+# Creates k8s config file to authenticate with EKS
+aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
 
-    Verify the Amazon EKS Cluster
-
-    ```bash
-    aws eks --region us-west-2 describe-cluster --name trainium-inferentia
-    ```
-
-    ```bash
-    # Creates k8s config file to authenticate with EKS
-    aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
-
-    kubectl get nodes # Output shows the EKS Managed Node group nodes
-    ```
+kubectl get nodes # Output shows the EKS Managed Node group nodes
+```
 
 </CollapsibleContent>
 
-## 2. Build the Docker Image (Optional Step)
+## 2. Build the Docker Image
 
-To simplify the blueprint deployment, we have already built the Docker image and made it available under the public ECR. If you want to customize the Docker image, you can update the `Dockerfile` and follow the optional step to build the Docker image. Please note that you will also need to modify the YAML file, `lora-finetune-pod.yaml`, with the newly created image using your own private ECR.
+We'll build the docker image that will be used by the container to run Llama3 fine-tuning. Execute the below commands after ensuring you are in the root folder of the ai-on-eks repository. 
 
-Execute the below commands after ensuring you are in the root folder of the data-on-eks repository.
+**NOTE:** Before running the docker image builder script, make sure the AWS user or principal used to run the script has proper access to the ECR repository in the specific region you selected earlier. The script will create a repo and push the image into it.
 
 ```bash
-cd gen-ai/training/llama-lora-finetuning-trn1
+cd blueprints/training/llama-lora-finetuning-trn1
 ./build-container-image.sh
 ```
-After running this script, note the Docker image URL and tag that are produced.
-You will need this information for the next step.
+After running this script, note the Docker image URL and tag that gets displayed at the end of the run. You will need this information for the next step.
 
 ## 3. Launch the Llama training pod
 
-If you skip step 2, you don't need to modify the YAML file.
-You can simply run the `kubectl apply` command on the file, and it will use the public ECR image that we published.
+Update the container image value in the `lora-finetune-pod.yaml` file with the Docker image URL and tag obtained from the previous step.
 
-If you built a custom Docker image in **Step 2**, update the `gen-ai/training/llama-lora-finetuning-trn1/lora-finetune-pod.yaml` file with the Docker image URL and tag obtained from the previous step.
-
-Once you have updated the YAML file (if needed), run the following command to launch the pod in your EKS cluster:
+Utilize kubectl cli to launch the `lora-finetune-app` in your EKS cluster:
 
 ```bash
 kubectl apply -f lora-finetune-pod.yaml
@@ -146,13 +120,13 @@ kubectl get pods
 
 ## 4. Launch LoRA fine-tuning
 
-Once the pod is ‘Running’, connect to it using the following command:
+Once the pod is ‘Running’, connect to it using an interactive bash command shell:
 
 ```bash
 kubectl exec -it lora-finetune-app -- /bin/bash
 ```
 
-Before running the launch script `01__launch_training.sh`, you need to set an environment variable with your HuggingFace token. The access token is found under Settings → Access Tokens on the Hugging Face website.
+Before launching the fine-tuning script `01__launch_training.sh`, you need to set an environment variable with your HuggingFace token. The access token is found under Settings → Access Tokens on the Hugging Face website after you login to the HuggingFace website.
 
 ```bash
 export HF_TOKEN=<your-huggingface-token>
@@ -169,7 +143,7 @@ python3 ./02__consolidate_adapter_shards_and_merge_model.py -i /shared/finetuned
 
 Once the script is complete, we can test the fine-tuned model by running the `03__test_model.py` by passing in the location of the tuned model using the '-m' parameter.
 ```bash
-./03__test_model.py -m /shared/tuned_model/20250220_170215
+python3 ./03__test_model.py --tuned-model /shared/tuned_model/20250220_170215
 ```
 
 You can exit from the interactive terminal of the pod once you are done testing the model.
@@ -180,10 +154,10 @@ To remove the resources created using this solution, execute the below commands 
 
 ```bash
 # Delete the Kubernetes Resources:
-cd gen-ai/training/llama-lora-finetuning-trn1
+cd blueprints/training/llama-lora-finetuning-trn1
 kubectl delete -f lora-finetune-pod.yaml
 
 # Clean Up the EKS Cluster and Associated Resources:
-cd ../../../ai-ml/trainium-inferentia
+cd ../../../infra/base/terraform
 ./cleanup.sh
 ```
