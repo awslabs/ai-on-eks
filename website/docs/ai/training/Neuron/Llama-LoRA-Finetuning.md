@@ -1,6 +1,6 @@
 ---
 sidebar_position: 1
-sidebar_label: Llama 3 finetuning with LoRA
+sidebar_label: Llama 3 Fine-tuning with LoRA
 ---
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
@@ -36,7 +36,7 @@ Llama 3 is a state-of-the-art large language model (LLM) designed for various na
 ## 1. Deploying the Solution
 
 <CollapsibleContent header={<h2><span>Prerequisites</span></h2>}>
-Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama 3 finetuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
+Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama 3 fine-tuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
 
 Ensure that you have installed the following tools on this EC2 instance:
 
@@ -51,6 +51,8 @@ To install all the pre-reqs on EC2, you can run this [script](https://github.com
 
 
 **Clone the Data on EKS repository**
+
+After tackling the pre-requisites, we can get started by cloning the ai-on-eks github repository.
 
 ```bash
 git clone https://github.com/awslabs/ai-on-eks.git
@@ -143,7 +145,7 @@ Next, we need to consolidate the adapter shards and merge the model. For this we
 python3 ./02__consolidate_adapter_shards_and_merge_model.py -i /shared/finetuned_models/20250220_170215/checkpoint-250/ -o /shared/tuned_model/20250220_170215
 ```
 
-Once the script is complete, we can test the fine-tuned model by running the `03__test_model.py` by passing in the location of the tuned model using the '-m' parameter.
+Once the script is complete, we can test the fine-tuned model by running the `03__test_model.py` by passing in the location of the tuned model using the '--tuned-model' parameter.
 ```bash
 python3 ./03__test_model.py --tuned-model /shared/tuned_model/20250220_170215
 ```
@@ -152,7 +154,7 @@ You can exit from the interactive terminal of the pod once you are done testing 
 
 ### Cleaning up
 
-To remove the resources created using this solution, execute the below commands after ensuring you are in the root folder of the data-on-eks repository.:
+To remove the resources created using this solution, execute the below commands after ensuring you are in the root folder of the ai-on-eks repository.
 
 ```bash
 # Delete the Kubernetes Resources:
