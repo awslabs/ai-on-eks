@@ -65,6 +65,7 @@ cd ai-on-eks/infra/trainium-inferentia
 ```
 
 Set the region value within the `blueprint.tfvars` variables file under the `terraform` sub-folder to match your preference.
+
 **NOTE:** Trainium instances are available in select regions, and the user can determine this list of regions using the commands outlined [here](https://repost.aws/articles/ARmXIF-XS3RO27p0Pd1dVZXQ/what-regions-have-aws-inferentia-and-trainium-instances) on re:Post.
 
 
