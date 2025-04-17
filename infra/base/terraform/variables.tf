@@ -31,6 +31,12 @@ variable "secondary_cidr_blocks" {
   type        = list(string)
 }
 
+variable "enable_database_subnets" {
+  description = "Whether or not to enable the database subnets"
+  type        = bool
+  default     = false
+}
+
 # Infrastructure Variables
 variable "enable_aws_cloudwatch_metrics" {
   description = "Enable AWS Cloudwatch Metrics addon"
