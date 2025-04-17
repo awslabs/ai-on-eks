@@ -15,6 +15,8 @@ from optimum.neuron.distributed import lazy_load_for_parallelism
 def training_function(script_args, training_args):
     dataset = load_dataset("b-mc2/sql-create-context", split="train")
     dataset = dataset.shuffle(seed=23)
+
+    # split dataset into train and eval
     train_dataset = dataset.select(range(50000))
     eval_dataset = dataset.select(range(50000, 50500))
 
