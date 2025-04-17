@@ -5,7 +5,7 @@ sidebar_label: Llama 3 Fine-tuning with LoRA
 import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
 :::warning
-Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue. 
+Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
 :::
 
 :::danger
@@ -36,7 +36,7 @@ Llama 3 is a state-of-the-art large language model (LLM) designed for various na
 ## 1. Deploying the Solution
 
 <CollapsibleContent header={<h2><span>Prerequisites</span></h2>}>
-Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama 3 fine-tuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise. 
+Before we begin, you will need to ensure you have all the prerequisites in place to make the deployment process smooth and hassle-free. You will need a machine from where you will be driving this solution deployment and interacting with the container that will run the Llama 3 fine-tuning code. You can use a [EC2 Instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EC2_GetStarted.html), a local Mac machine, or Windows machine. Ensure that you have Docker installed locally with storage above 100GB and that the image is created with x86 architecture. We'll assume that it is a EC2 instance for the rest of this exercise.
 
 Ensure that you have installed the following tools on this EC2 instance:
 
@@ -94,7 +94,7 @@ kubectl get nodes # Output shows the EKS Managed Node group nodes
 
 ## 2. Build the Docker Image
 
-We'll build the docker image that will be used by the container to run Llama 3 fine-tuning. Execute the below commands after ensuring you are in the root folder of the ai-on-eks repository. 
+We'll build the docker image that will be used by the container to run Llama 3 fine-tuning. Execute the below commands after ensuring you are in the root folder of the ai-on-eks repository.
 
 **NOTE:** Before running the docker image builder script, make sure the AWS user or principal used to run the script has proper access to the ECR repository in the specific region you selected earlier. The script will create a repo and push the image into it.
 
