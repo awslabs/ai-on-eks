@@ -35,7 +35,7 @@
 | <a name="module_eks_blueprints_addons"></a> [eks\_blueprints\_addons](#module\_eks\_blueprints\_addons) | aws-ia/eks-blueprints-addons/aws | ~> 1.2 |
 | <a name="module_s3_bucket"></a> [s3\_bucket](#module\_s3\_bucket) | terraform-aws-modules/s3-bucket/aws | 4.1.2 |
 | <a name="module_triton_irsa"></a> [triton\_irsa](#module\_triton\_irsa) | aws-ia/eks-blueprints-addon/aws | ~> 1.0 |
-| <a name="module_triton_server_vllm"></a> [triton\_server\_vllm](#module\_triton\_server\_vllm) | aws-ia/eks-data-addons/aws | ~> 1.32.0 |
+| <a name="module_triton_server_trtllm"></a> [triton\_server\_trtllm](#module\_triton\_server\_trtllm) | aws-ia/eks-data-addons/aws | ~> 1.32.0 |
 | <a name="module_vpc"></a> [vpc](#module\_vpc) | terraform-aws-modules/vpc/aws | ~> 5.0 |
 
 ## Resources
@@ -78,10 +78,10 @@
 | <a name="input_enable_nvidia_triton_server"></a> [enable\_nvidia\_triton\_server](#input\_enable\_nvidia\_triton\_server) | Toggle to enable or disable NVIDIA Triton server resource creation | `bool` | `true` | no |
 | <a name="input_huggingface_token"></a> [huggingface\_token](#input\_huggingface\_token) | Hugging Face Secret Token | `string` | `"DUMMY_TOKEN_REPLACE_ME"` | no |
 | <a name="input_name"></a> [name](#input\_name) | Name of the VPC and EKS Cluster | `string` | `"nvidia-triton-server"` | no |
-| <a name="input_ngc_api_key"></a> [ngc\_api\_key](#input\_ngc\_api\_key) | NGC API Key | `string` | `"DUMMY_NGC_API_KEY_REPLACE_ME"` | no |
-| <a name="input_nim_models"></a> [nim\_models](#input\_nim\_models) | NVIDIA NIM Models | <pre>list(object({<br>    name    = string<br>    id      = string<br>    enable  = bool<br>    num_gpu = string<br>  }))</pre> | <pre>[<br>  {<br>    "enable": false,<br>    "id": "nvcr.io/nim/meta/llama-3.1-8b-instruct",<br>    "name": "llama-3-1-8b-instruct",<br>    "num_gpu": "4"<br>  },<br>  {<br>    "enable": true,<br>    "id": "nvcr.io/nim/meta/llama3-8b-instruct",<br>    "name": "llama3-8b-instruct",<br>    "num_gpu": "1"<br>  }<br>]</pre> | no |
-| <a name="input_region"></a> [region](#input\_region) | region | `string` | `"us-west-2"` | no |
-| <a name="input_secondary_cidr_blocks"></a> [secondary\_cidr\_blocks](#input\_secondary\_cidr\_blocks) | Secondary CIDR blocks to be attached to VPC | `list(string)` | <pre>[<br>  "100.64.0.0/16"<br>]</pre> | no |
+| <a name="input_ngc_api_key"></a> [ngc\_api\_key](#input\_ngc\_api\_key) | NGC API Key | `string` | `"DUMMY_TOKEN_REPLACE_ME"` | no |
+| <a name="input_nim_models"></a> [nim\_models](#input\_nim\_models) | NVIDIA NIM Models | <pre>list(object({<br/>    name    = string<br/>    id      = string<br/>    enable  = bool<br/>    num_gpu = string<br/>  }))</pre> | <pre>[<br/>  {<br/>    "enable": false,<br/>    "id": "nvcr.io/nim/meta/llama-3.1-8b-instruct",<br/>    "name": "llama-3-1-8b-instruct",<br/>    "num_gpu": "4"<br/>  },<br/>  {<br/>    "enable": false,<br/>    "id": "nvcr.io/nim/meta/llama3-8b-instruct",<br/>    "name": "llama3-8b-instruct",<br/>    "num_gpu": "1"<br/>  }<br/>]</pre> | no |
+| <a name="input_region"></a> [region](#input\_region) | region | `string` | `"us-east-1"` | no |
+| <a name="input_secondary_cidr_blocks"></a> [secondary\_cidr\_blocks](#input\_secondary\_cidr\_blocks) | Secondary CIDR blocks to be attached to VPC | `list(string)` | <pre>[<br/>  "100.64.0.0/16"<br/>]</pre> | no |
 | <a name="input_vpc_cidr"></a> [vpc\_cidr](#input\_vpc\_cidr) | VPC CIDR. This should be a valid private (RFC 1918) CIDR range | `string` | `"10.1.0.0/21"` | no |
 
 ## Outputs

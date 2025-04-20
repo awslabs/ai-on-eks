@@ -100,7 +100,7 @@ variable "nim_models" {
       name    = "llama3-8b-instruct"
       num_gpu = "1"
       id      = "nvcr.io/nim/meta/llama3-8b-instruct"
-      enable  = true
+      enable  = false
     }
     # Add more models as needed
   ]
