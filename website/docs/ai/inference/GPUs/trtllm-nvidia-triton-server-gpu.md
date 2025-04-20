@@ -653,6 +653,6 @@ From there, you can explore dashboards to monitor latency, throughput, GPU utili
 ## Cleanup
 To deprovision the resources created using this solution, run the cleanup script:
 ```bash
-cd ~/delhivery-prototype/ai-on-eks/infra/nvidia-triton-server/ && chmod +x cleanup.sh
+cd ~/ai-on-eks/infra/nvidia-triton-server/ && chmod +x cleanup.sh
 ./cleanup.sh
 ```
