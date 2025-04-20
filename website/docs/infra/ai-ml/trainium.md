@@ -142,7 +142,7 @@ If you are executing this script on a Cloud9 IDE/EC2 instance different from the
 :::
 
 ```bash
-cd ai-ml/trainium-inferentia/examples/dp-bert-large-pretrain
+cd infra/trainium-inferentia/examples/dp-bert-large-pretrain
 chmod +x 1-bert-pretrain-build-image.sh
 ./1-bert-pretrain-build-image.sh
 ```
@@ -192,7 +192,7 @@ PyTorch Neuron introduces a valuable tool known as [neuron_parallel_compile](htt
 Execute the following commands.This script prompts the user to configure their kubeconfig and verifies the presence of the `lib` folder with `trn1_dist_ddp.py`. It sets up Docker credentials, installs the **TorchX** client for Kubernetes. Using TorchX, the script runs a Kubernetes job to compile BERT graphs with optimized performance. Additionally, TorchX creates another Docker image and pushes it to the ECR repository within the same repo. This image is utilized in the subsequent pre-compiling pods, optimizing the overall BERT model training process.
 
 ```bash
-cd ai-ml/trainium-inferentia/examples/dp-bert-large-pretrain
+cd infra/trainium-inferentia/examples/dp-bert-large-pretrain
 chmod +x 2-bert-pretrain-precompile.sh
 ./2-bert-pretrain-precompile.sh
 ```
@@ -223,7 +223,7 @@ New pre-training cache files are stored under FSx for Lustre.
 We are now in the final step of training the BERT-large model with WikiCorpus data.
 
 ```bash
-cd ai-ml/trainium-inferentia/examples/dp-bert-large-pretrain
+cd infra/trainium-inferentia/examples/dp-bert-large-pretrain
 chmod +x 3-bert-pretrain.sh
 ./3-bert-pretrain.sh
 ```

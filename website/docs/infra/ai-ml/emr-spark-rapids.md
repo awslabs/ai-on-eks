@@ -64,12 +64,14 @@ Clone the repository
 
 ```bash
 git clone https://github.com/awslabs/ai-on-eks.git
+cd ai-on-eks
 ```
 
 Navigate into one of the example directories and run `install.sh` script
 
 ```bash
-cd ai-on-eks/infra/emr-spark-rapids/ && chmod +x install.sh
+cd infra/emr-spark-rapids
+chmod +x install.sh
 ./install.sh
 ```
 
@@ -142,7 +144,7 @@ Please note that the build process may take some time, depending on your network
 
 
 ```bash
-cd ~/ai-on-eks/infra/emr-spark-rapids/examples/xgboost
+cd infra/emr-spark-rapids/examples/xgboost
 docker build -t emr-6.10.0-spark-rapids-custom:0.10 -f Dockerfile .
 ```
 
@@ -199,7 +201,8 @@ Here, we will utilize a helper shell script to execute the job. This script requ
 This script will ask for certain inputs that you can obtain from Terraform outputs. See the example below.
 
 ```bash
-cd ai-ml/emr-spark-rapids/examples/xgboost/ && chmod +x execute_spark_rapids_xgboost.sh
+cd infra/emr-spark-rapids/examples/xgboost
+chmod +x execute_spark_rapids_xgboost.sh
 ./execute_spark_rapids_xgboost.sh
 
 # Example inputs shown below
@@ -317,7 +320,8 @@ Once logged in, add the AMP datasource to Grafana and import the Open Source GPU
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/infra/emr-spark-rapids/ && chmod +x cleanup.sh
+cd infra/emr-spark-rapids/
+chmod +x cleanup.sh
 ./cleanup.sh
 ```
 

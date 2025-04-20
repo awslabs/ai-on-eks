@@ -1,5 +1,6 @@
 ---
 sidebar_label: JARK on EKS
+sidebar_position: 1
 ---
 import CollapsibleContent from '../../../src/components/CollapsibleContent';
 
@@ -10,7 +11,7 @@ Deployment of ML models on EKS requires access to GPUs or Neuron instances. If y
 :::
 
 :::info
-These instructions only deploy the JARK cluster as a base. If you are looking to deploy specific models for inference or training, please refer to this [AI](https://awslabs.github.io/ai-on-eks/docs/ai) page for end-to-end instructions.
+These instructions only deploy the JARK cluster as a base. If you are looking to deploy specific models for inference or training, please refer to this [AI](https://awslabs.github.io/ai-on-eks/docs/blueprints) page for end-to-end instructions.
 :::
 
 ### What is JARK?
@@ -157,7 +158,7 @@ nvidia-device-plugin   nvidia-device-plugin-node-feature-discovery-master   1/1 
 
 :::info
 
-Please refer to [AI](https://awslabs.github.io/ai-on-eks/docs/ai) page for deploying AI models on EKS.
+Please refer to [AI](https://awslabs.github.io/ai-on-eks/docs/blueprints) page for deploying AI models on EKS.
 
 :::
 

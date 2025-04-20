@@ -1,3 +1,8 @@
+---
+sidebar_position: 0
+sidebar_label: Introduction
+---
+
 # Introduction
 
 The AIoEKS foundational infrastructure lives in the `infra/base` directory. This directory contains the base

@@ -144,10 +144,6 @@ spec:
   rules:
   - http:
       paths:
-      # Ray Dashboard: you can access the dashboard using the NLB DNS name with port 8265 and the path "/dashboard". However, the NLB is currently configured as private, preventing access from outside the VPC.
-      # To access the dashboard:
-      # Option 1: Use the `kubectl port-forward` command.
-      # Option 2: Deploy a public-facing NLB by modifying the configuration file "ai-ml/jark-stack/terraform/helm-values/ingress-nginx-values.yaml".
       - path: /dashboard/(.*)
         pathType: ImplementationSpecific
         backend:
