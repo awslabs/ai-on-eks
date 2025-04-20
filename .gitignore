@@ -62,3 +62,5 @@ website/package.json
 blueprints/inference/trtllm-nvidia-triton-server-gpu/llama/*
 blueprints/inference/trtllm-nvidia-triton-server-gpu/triton_engines/*
 blueprints/inference/trtllm-nvidia-triton-server-gpu/triton_model_files/*
+blueprints/inference/trtllm-nvidia-triton-server-gpu/benchmark-grpc/results.txt
+blueprints/inference/trtllm-nvidia-triton-server-gpu/benchmark-http/results/*

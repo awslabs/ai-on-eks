@@ -1,17 +1,100 @@
 locals {
-  triton_model = "triton-trtllm"
+  triton_model = "triton-vllm" # NOTE: modify this based on deployment
 }
 
 #---------------------------------------------------------------
 # Data on EKS Kubernetes Addons
 #---------------------------------------------------------------
-module "triton_server_trtllm" {
+
+# --------------------------------------------------------------------------------------------------------- #
+# NOTE: this is a reminder to modify "aws s3 sync command" within provisioner "local-exec", before deploying
+# --------------------------------------------------------------------------------------------------------- #
+# module "triton_server_trtllm" {
+#   count      = var.enable_nvidia_triton_server ? 1 : 0
+#   depends_on = [module.eks_blueprints_addons.kube_prometheus_stack]
+#   source     = "aws-ia/eks-data-addons/aws"
+#   version    = "~> 1.32.0" # ensure to update this to the latest/desired version
+#   oidc_provider_arn = module.eks.oidc_provider_arn
+#   enable_nvidia_triton_server = true
+#   nvidia_triton_server_helm_config = {
+#     version   = "1.0.0"
+#     timeout   = 120
+#     wait      = false
+#     namespace = kubernetes_namespace_v1.triton[count.index].metadata[0].name
+#     values = [
+#       <<-EOT
+#       replicaCount: 1
+#       image:
+#         repository: <replace-with-aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/triton-trtllm
+#         tag: latest
+#         pullPolicy: Always
+#       serviceAccount:
+#         create: true
+#         name: ${kubernetes_service_account_v1.triton[count.index].metadata[0].name}-sa
+#       modelRepositoryPath: s3://${module.s3_bucket[count.index].s3_bucket_id}/model_repository
+#       environment:
+#         - name: runtime
+#           value: "nvidia"
+#         - name: "shm-size"
+#           value: "2g"
+#         - name: "NCCL_IGNORE_DISABLED_P2P"
+#           value: "1"
+#         - name: tensor_parallel_size
+#           value: "1"
+#         - name: gpu_memory_utilization
+#           value: "0.9"
+#         - name: dtype
+#           value: "auto"
+#         - name: TRANSFORMERS_CACHE
+#           value: "/tmp/huggingface/cache"
+#       secretEnvironment:
+#         - name: "HUGGING_FACE_TOKEN"
+#           secretName: ${kubernetes_secret_v1.huggingface_token[count.index].metadata[0].name}
+#           key: "HF_TOKEN"
+#       resources:
+#         limits:
+#           cpu: 10
+#           memory: 60Gi
+#           nvidia.com/gpu: 1
+#         requests:
+#           cpu: 10
+#           memory: 60Gi
+#           nvidia.com/gpu: 1
+#       nodeSelector:
+#         NodeGroupType: g6e-gpu-karpenter
+#         type: karpenter
+#       hpa:
+#         enabled: true
+#         minReplicas: 1
+#         maxReplicas: 5
+#         metrics:
+#           - type: Pods
+#             pods:
+#               metric:
+#                 name: nv_inference_queue_duration_ms
+#               target:
+#                 type: AverageValue
+#                 averageValue: 10
+#       tolerations:
+#         - key: "nvidia.com/gpu"
+#           operator: "Exists"
+#           effect: "NoSchedule"
+#       EOT
+#     ]
+#   }
+# }
+
+
+module "triton_server_vllm" {
   count      = var.enable_nvidia_triton_server ? 1 : 0
   depends_on = [module.eks_blueprints_addons.kube_prometheus_stack]
   source     = "aws-ia/eks-data-addons/aws"
   version    = "~> 1.32.0" # ensure to update this to the latest/desired version
+
   oidc_provider_arn = module.eks.oidc_provider_arn
+
   enable_nvidia_triton_server = true
+
   nvidia_triton_server_helm_config = {
     version   = "1.0.0"
     timeout   = 120
@@ -21,28 +104,27 @@ module "triton_server_trtllm" {
       <<-EOT
       replicaCount: 1
       image:
-        repository: <replace-with-aws-account-id>.dkr.ecr.us-east-1.amazonaws.com/triton-trtllm
-        tag: latest
-        pullPolicy: Always
+        repository: nvcr.io/nvidia/tritonserver
+        tag: "24.06-vllm-python-py3"
       serviceAccount:
-        create: true
-        name: ${kubernetes_service_account_v1.triton[count.index].metadata[0].name}-sa
+        create: false
+        name: ${kubernetes_service_account_v1.triton[count.index].metadata[0].name}
       modelRepositoryPath: s3://${module.s3_bucket[count.index].s3_bucket_id}/model_repository
       environment:
-        - name: runtime
-          value: "nvidia"
+        - name: "LD_PRELOAD"
+          value: ""
+        - name: "TRANSFORMERS_CACHE"
+          value: "/home/triton-server/.cache"
         - name: "shm-size"
-          value: "2g"
+          value: "5g"
         - name: "NCCL_IGNORE_DISABLED_P2P"
           value: "1"
         - name: tensor_parallel_size
           value: "1"
         - name: gpu_memory_utilization
-          value: "0.9"
+          value: "0.8"
         - name: dtype
           value: "auto"
-        - name: TRANSFORMERS_CACHE
-          value: "/tmp/huggingface/cache"
       secretEnvironment:
         - name: "HUGGING_FACE_TOKEN"
           secretName: ${kubernetes_secret_v1.huggingface_token[count.index].metadata[0].name}
@@ -51,16 +133,15 @@ module "triton_server_trtllm" {
         limits:
           cpu: 10
           memory: 60Gi
-          nvidia.com/gpu: 1
+          nvidia.com/gpu: 4
         requests:
           cpu: 10
           memory: 60Gi
-          nvidia.com/gpu: 1
+          nvidia.com/gpu: 4
       nodeSelector:
-        NodeGroupType: g6e-gpu-karpenter
+        NodeGroupType: g5-gpu-karpenter
         type: karpenter
       hpa:
-        enabled: true
         minReplicas: 1
         maxReplicas: 5
         metrics:
@@ -131,7 +212,11 @@ resource "null_resource" "sync_local_to_s3" {
   }
 
   provisioner "local-exec" {
-    command = "aws s3 sync ../../blueprints/inference/trtllm-nvidia-triton-server-gpu/triton_model_files s3://${module.s3_bucket[count.index].s3_bucket_id}/model_repository"
+    # NOTE: Uncomment when using "triton_server_trtllm"
+    # command = "aws s3 sync ../../blueprints/inference/trtllm-nvidia-triton-server-gpu/triton_model_files s3://${module.s3_bucket[count.index].s3_bucket_id}/model_repository"
+
+    # NOTE: Uncomment when using "triton_server_vllm"
+    command = "aws s3 sync ../../blueprints/inference/vllm-nvidia-triton-server-gpu/ s3://${module.s3_bucket[count.index].s3_bucket_id}"
   }
 }
 

@@ -1,5 +1,0 @@
-tritonclient[all]
-pandas
-numpy
-transformers
-huggingface_hub[cli]
