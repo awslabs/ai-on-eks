@@ -15,6 +15,7 @@ repos:
       - id: terraform_docs
         args:
           - --args=--lockfile=false
+        exclude: ^(infra/base/terraform|infra/nvidia-nim/terraform)
       - id: terraform_tflint
         args:
           - --args=--only=terraform_deprecated_interpolation
@@ -30,5 +31,6 @@ repos:
           - --args=--only=terraform_required_providers
           - --args=--only=terraform_unused_required_providers
           - --args=--only=terraform_workspace_remote
+        exclude: ^(infra/base/terraform|infra/nvidia-nim/terraform)
       - id: terraform_validate
-        exclude: (docs|modules)
+        exclude: ^(docs|modules|infra/base/terraform|infra/nvidia-nim/terraform)
