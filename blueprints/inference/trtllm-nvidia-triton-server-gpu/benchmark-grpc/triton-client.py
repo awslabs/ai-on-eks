@@ -97,7 +97,7 @@ def create_request(
     }
     # print(f"request: {request}")
     return request
-    
+
 
 async def main(FLAGS):
     sampling_parameters = {"temperature": "0.01", "top_p": "1.0", "top_k": 20, "min_length": 1}

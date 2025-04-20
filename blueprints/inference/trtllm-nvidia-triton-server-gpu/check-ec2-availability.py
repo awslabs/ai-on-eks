@@ -1,4 +1,4 @@
-import boto3  
+import boto3
 from datetime import datetime
 from collections import defaultdict
 
@@ -20,27 +20,27 @@ from collections import defaultdict
 #     ]
 # }
 
-instance_types = ["g6e.xlarge", "g5.xlarge"] # Edit this line to change the instance types displayed  
+instance_types = ["g6e.xlarge", "g5.xlarge"] # Edit this line to change the instance types displayed
 print(f"checking for instance_types: {instance_types}")
 regions = [region["RegionName"] for region in boto3.client("ec2").describe_regions()["Regions"]]
 supported_regions = defaultdict(list)
-  
-for region in regions:  
-   ec2_region = boto3.client("ec2", region_name=region)  
-   response = ec2_region.describe_instance_type_offerings(  
-      # LocationType="availability-zone",  
-      Filters=[  
+
+for region in regions:
+   ec2_region = boto3.client("ec2", region_name=region)
+   response = ec2_region.describe_instance_type_offerings(
+      # LocationType="availability-zone",
+      Filters=[
         {
-          "Name": "instance-type", 
+          "Name": "instance-type",
           "Values": instance_types
-        } 
-      ]  
+        }
+      ]
    )
-   if response["InstanceTypeOfferings"]:  
-      supported_regions[region] = [offer["InstanceType"] for offer in response["InstanceTypeOfferings"]]  
+   if response["InstanceTypeOfferings"]:
+      supported_regions[region] = [offer["InstanceType"] for offer in response["InstanceTypeOfferings"]]
 
 print("# Supported Regions as of",datetime.now().strftime("%B %d, %Y"))
-print("================")  
+print("================")
 
 
 client = boto3.client("ssm")

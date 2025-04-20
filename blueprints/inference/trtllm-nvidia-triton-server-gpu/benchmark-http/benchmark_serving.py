@@ -60,7 +60,7 @@ class BenchmarkMetrics:
 @dataclasses.dataclass
 class SampleRequest:
     """A class representing a single inference request for benchmarking.
-    
+
     Attributes:
         prompt: The input text prompt for the model.
         prompt_len: The length of the prompt in tokens.
@@ -72,7 +72,7 @@ class SampleRequest:
 
 
 def sample_requests(
-    tokenizer: PreTrainedTokenizerBase, 
+    tokenizer: PreTrainedTokenizerBase,
     args: argparse.Namespace
 ) -> List[SampleRequest]:
     with open(args.dataset_path, "r", encoding="utf-8") as file:
@@ -84,11 +84,11 @@ def sample_requests(
     for prompt in sampled_prompts:
         input_requests.append(
             SampleRequest(
-                prompt=prompt["text"], 
+                prompt=prompt["text"],
                 prompt_len=prompt["token_count"],
                 expected_output_len=args.output_len
             )
-        )    
+        )
     return input_requests
 
 
@@ -98,23 +98,23 @@ async def get_request(
     burstiness: float = 1.0,
 ) -> AsyncGenerator[Tuple[int, SampleRequest], None]:
     """
-    Asynchronously generates requests at a specified rate 
+    Asynchronously generates requests at a specified rate
     with OPTIONAL burstiness.
-    
+
     Args:
         input_requests: A list of input requests, each represented as a tuple.
         request_rate: The rate at which requests are generated (requests/s).
-        burstiness (optional): The burstiness factor of the request generation. 
+        burstiness (optional): The burstiness factor of the request generation.
             Only takes effect when request_rate is not inf.
             Default value is 1, which follows a Poisson process.
             Otherwise, the request intervals follow a gamma distribution.
-            A lower burstiness value (0 < burstiness < 1) results 
-            in more bursty requests, while a higher burstiness value 
+            A lower burstiness value (0 < burstiness < 1) results
+            in more bursty requests, while a higher burstiness value
             (burstiness > 1) results in a more uniform arrival of requests.
     """
     # calculate scale parameter theta to maintain the desired request_rate.
     assert burstiness > 0, (f"A positive burstiness factor is expected, but given {burstiness}.")
-    
+
     theta = 1.0 / (request_rate * burstiness)
     input_requests = iter(input_requests)
     for i, request in enumerate(input_requests):
@@ -170,7 +170,7 @@ def calculate_metrics(
 
     if completed == 0:
         warnings.warn("All requests failed. This is likely due to a misconfiguration on the benchmark arguments.", stacklevel=2)
-    
+
     metrics = BenchmarkMetrics(
         completed=completed,
         total_input=total_input,
@@ -285,7 +285,7 @@ async def benchmark(
             output_len=request.expected_output_len,
         )
         tasks.append(asyncio.create_task(limited_request_func(request_func_input=request_func_input, pbar=pbar)))
-    
+
     outputs: List[RequestFuncOutput] = await asyncio.gather(*tasks)
 
     if profile:
@@ -357,11 +357,11 @@ async def benchmark(
         print("{s:{c}^{n}}".format(s=metric_header, n=50, c='-'))
         print("{:<40} {:<10.2f}".format(f"Mean {metric_name} (ms):", getattr(metrics, f"mean_{metric_attribute_name}_ms")))
         print("{:<40} {:<10.2f}".format(f"Median {metric_name} (ms):", getattr(metrics, f"median_{metric_attribute_name}_ms")))
-        
+
         result[f"mean_{metric_attribute_name}_ms"] = getattr(metrics, f"mean_{metric_attribute_name}_ms")
         result[f"median_{metric_attribute_name}_ms"] = getattr(metrics, f"median_{metric_attribute_name}_ms")
         result[f"std_{metric_attribute_name}_ms"] = getattr(metrics, f"std_{metric_attribute_name}_ms")
-        
+
         for p, value in getattr(metrics, f"percentiles_{metric_attribute_name}_ms"):
             p_word = str(int(p)) if int(p) == p else str(p)
             print("{:<40} {:<10.2f}".format(f"P{p_word} {metric_name} (ms):", value))
@@ -371,15 +371,15 @@ async def benchmark(
     process_one_metric("tpot", "TPOT", "Time per Output Token (excl. 1st token)")
     process_one_metric("itl", "ITL", "Inter-token Latency")
     process_one_metric("e2el", "E2EL", "End-to-end Latency")
-    
+
     print("=" * 50)
-    
+
     return result, ret
 
 
 def main(args: argparse.Namespace):
     print("-"*10, "\n", f"args: {args}", "\n", "-"*10)
-    
+
     random.seed(args.seed)
     np.random.seed(args.seed)
 
@@ -396,11 +396,11 @@ def main(args: argparse.Namespace):
 
     tokenizer = get_tokenizer(tokenizer_id, trust_remote_code=args.trust_remote_code)
 
-    if args.save_results:        
+    if args.save_results:
         result_file_name = f"{backend}_{args.request_rate}qps_{args.model.split('/')[-1]}_{args.num_prompts}_out{args.output_len}.txt"
     else:
         result_file_name = None
- 
+
     print(f"creating input_requests ...")
     input_requests = sample_requests(tokenizer, args)
     print(f"DONE creating input_requests!")
@@ -433,16 +433,16 @@ def main(args: argparse.Namespace):
             "max_concurrency": args.max_concurrency,
         }
         results = {"outputs": ret, **results, **benchmark_result}
-        
+
         if args.result_filename:
             result_file_name = args.result_filename
         if args.result_dir:
             result_file_name = os.path.join(args.result_dir, result_file_name)
-        
+
         # save to file
         # with open(result_file_name, "w", encoding='utf-8') as outfile:
         #     json.dump(results, outfile, indent=4)
-        
+
         # flat_results = flatten_dict(results)
         file_exists = os.path.isfile(result_file_name)
         # write or append to the CSV file
@@ -453,7 +453,7 @@ def main(args: argparse.Namespace):
                 writer.writeheader()
             # write the row of results
             writer.writerow(results)
-        
+
         print(f"see results in file: {result_file_name}")
 
 
@@ -476,8 +476,8 @@ if __name__ == "__main__":
         default="localhost"
     )
     parser.add_argument(
-        "--port", 
-        type=int, 
+        "--port",
+        type=int,
         default=8000
     )
     parser.add_argument(
@@ -557,8 +557,8 @@ if __name__ == "__main__":
         "results in a more uniform arrival of requests.",
     )
     parser.add_argument(
-        "--seed", 
-        type=int, 
+        "--seed",
+        type=int,
         default=0
     )
     parser.add_argument(

@@ -170,7 +170,7 @@ JAX --------------
 DeepSpeed --------
 ```
 
-3. Creating a Triton-Compatible Model: To make a model Triton-readable, you must properly set values in the model configuration files. A good reference template for inflight batching can be found in [tensorrtllm_backend/all_models/inflight_batcher_llm](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main/all_models/inflight_batcher_llm). 
+3. Creating a Triton-Compatible Model: To make a model Triton-readable, you must properly set values in the model configuration files. A good reference template for inflight batching can be found in [tensorrtllm_backend/all_models/inflight_batcher_llm](https://github.com/triton-inference-server/tensorrtllm_backend/tree/main/all_models/inflight_batcher_llm).
 
 4. Customizing Configuration Scripts: To tailor your deployment beyond the default minimal configuration, refer to the template script: `FILL_TEMPLATE_SCRIPT`. For optimal performance or customization, consult the official resources:
     - [Triton Model Config Guide](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/tensorrtllm_backend/docs/model_config.html)
@@ -198,7 +198,7 @@ Expected response:
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 100  1653    0  1418  100   235   1338    221  0:00:01  0:00:01 --:--:--  1560
- 
+
 
 ## Step 1: Define Reward Modeling
 Reward modeling is a technique used in reinforcement learning (RL) to create a model that predicts the expected return or reward for a given action in a given state. This model is then used to guide the agent's decision-making process.
@@ -244,7 +244,7 @@ genai-perf \
 
 Output will look like this:
 ```text
-                                  LLM Metrics                                   
+                                  LLM Metrics
 ┏━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓
 ┃              Statistic ┃    avg ┃    min ┃    max ┃    p99 ┃    p90 ┃    p75 ┃
 ┡━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━╇━━━━━━━━┩
@@ -284,7 +284,7 @@ Adjust these variables to match your environment:
 
 2. Update `nvidia-triton-server.tf`. Path: `ai-on-eks/infra/nvidia-triton-server/nvidia-triton-server.tf`.
 - Add the Triton deployment module. Be sure to replace the `image URI` and `tag` with the custom container image you built and pushed in earlier steps.
-<details> 
+<details>
 <summary>Click to expand the deployment module</summary>
 ```terraform
 module "triton_server_trtllm" {
@@ -431,7 +431,7 @@ horizontalpodautoscaler.autoscaling/nvidia-triton-server-triton-inference-server
 # View logs for the Karpenter deployment
 kubectl logs -f deployment/karpenter -n karpenter
 
-# Show all pods 
+# Show all pods
 kubectl get pods -n triton-trtllm | grep triton
 
 # View logs for a specific pod (replace with your actual pod name)
