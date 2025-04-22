@@ -7,7 +7,7 @@ variable "name" {
 # NOTE: Trainium and Inferentia are only available in us-west-2 and us-east-1 regions
 variable "region" {
   description = "region"
-  default     = "us-west-2"
+  default     = "us-east-1"
   type        = string
 }
 
@@ -72,7 +72,7 @@ variable "enable_nvidia_nim" {
 variable "ngc_api_key" {
   description = "NGC API Key"
   type        = string
-  default     = "DUMMY_NGC_API_KEY_REPLACE_ME"
+  default     = "DUMMY_TOKEN_REPLACE_ME"
   sensitive   = true
 }
 
@@ -100,7 +100,7 @@ variable "nim_models" {
       name    = "llama3-8b-instruct"
       num_gpu = "1"
       id      = "nvcr.io/nim/meta/llama3-8b-instruct"
-      enable  = true
+      enable  = false
     }
     # Add more models as needed
   ]

@@ -206,6 +206,50 @@ module "data_addons" {
   #---------------------------------------------------------------
   enable_karpenter_resources = true
   karpenter_resources_helm_config = {
+    g6e-gpu-karpenter = {
+      values = [
+        <<-EOT
+      name: g6e-gpu-karpenter
+      clusterName: ${module.eks.cluster_name}
+      ec2NodeClass:
+        karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
+        subnetSelectorTerms:
+          id: ${module.vpc.private_subnets[2]}
+        securityGroupSelectorTerms:
+          tags:
+            Name: ${module.eks.cluster_name}-node
+        instanceStorePolicy: RAID0
+      nodePool:
+        labels:
+          - type: karpenter
+          - NodeGroupType: g6e-gpu-karpenter
+        taints:
+          - key: nvidia.com/gpu
+            value: "Exists"
+            effect: "NoSchedule"
+        requirements:
+          - key: "karpenter.k8s.aws/instance-family"
+            operator: In
+            values: ["g6e"]
+          - key: "karpenter.k8s.aws/instance-size"
+            operator: In
+            values: [ "xlarge", "2xlarge", "4xlarge", "8xlarge", "16xlarge"]
+          - key: "kubernetes.io/arch"
+            operator: In
+            values: ["amd64"]
+          - key: "karpenter.sh/capacity-type"
+            operator: In
+            values: ["on-demand"]
+        limits:
+          cpu: 1000
+        disruption:
+          consolidationPolicy: WhenEmpty
+          consolidateAfter: 180s
+          expireAfter: 720h
+        weight: 100
+      EOT
+      ]
+    }
     g5-gpu-karpenter = {
       values = [
         <<-EOT
