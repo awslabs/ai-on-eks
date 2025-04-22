@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lora-finetune-app
+spec:
+  containers:
+    - name: app
+      image: <account-id>.dkr.ecr.<region>.amazonaws.com/llm-finetune/llama-finetuning-trn:feature-lora
+      command: ["/bin/sh", "-c"]
+      args: ["while true; do sleep 30; done"]
+      volumeMounts:
+        - name: persistent-storage
+          mountPath: /shared
+        - name: dshm
+          mountPath: /dev/shm
+      resources:
+        limits:
+          aws.amazon.com/neuron: "16"
+        requests:
+          aws.amazon.com/neuron: "16"
+  volumes:
+    - name: persistent-storage
+      persistentVolumeClaim:
+        claimName: fsx-static-pvc
+    - name: dshm
+      emptyDir:
+        medium: Memory
+  restartPolicy: Never
+  nodeSelector:
+    type: karpenter
+    instanceType: trainium-trn1
+  tolerations:
+    - key: "aws.amazon.com/neuron"
+      value: "true"
+      effect: "NoSchedule"
