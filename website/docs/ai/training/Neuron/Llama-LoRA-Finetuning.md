@@ -143,12 +143,12 @@ Once the script is complete, you can verify the training progress by checking th
 
 Next, we need to consolidate the adapter shards and merge the model. For this we run the python script `02__consolidate_adapter_shards_and_merge_model.py` by passing in the location of the checkpoint using the '-i' parameter and providing the location where you want to save the consolidated model using the '-o' parameter.
 ```
-python3 ./02__consolidate_adapter_shards_and_merge_model.py -i /shared/finetuned_models/20250220_170215/checkpoint-250/ -o /shared/tuned_model/20250220_170215
+python3 ./02__consolidate_adapter_shards_and_merge_model.py -i /neuron/finetuned_models/20250220_170215/checkpoint-250/ -o /neuron/finetuned_models/tuned_model
 ```
 
 Once the script is complete, we can test the fine-tuned model by running the `03__test_model.py` by passing in the location of the tuned model using the '--tuned-model' parameter.
 ```bash
-python3 ./03__test_model.py --tuned-model /shared/tuned_model/20250220_170215
+python3 ./03__test_model.py --tuned-model /neuron/finetuned_models/tuned_model
 ```
 
 You can exit from the interactive terminal of the pod once you are done testing the model.
