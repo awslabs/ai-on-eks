@@ -22,6 +22,7 @@ spec:
             cpu: "100m"
 
         serviceMonitor:
+          enabled: ${service_monitor_enabled}
           additionalLabels:
             release: kube-prometheus-stack
 

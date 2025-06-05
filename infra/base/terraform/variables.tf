@@ -125,7 +125,7 @@ variable "enable_argo_events" {
 variable "enable_argocd" {
   description = "Enable ArgoCD addon"
   type        = bool
-  default     = false
+  default     = true
 }
 variable "enable_mlflow_tracking" {
   description = "Enable MLFlow Tracking"
