@@ -52,7 +52,7 @@ def get_weather_agent() -> Agent:
         weather_agent = Agent(
             model=bedrock_model,
             system_prompt="""You are Weather Assistant helps the user with forecast or alerts:
-            - weather forecast for an US City for the next 3 days, if not specify which period
+            - weather forecast for an US City for the next 3 days if not specify which period
             - when returning forecast always include for each item if the weather is good for outdoor activities or not, this is useful information for the user to know for each day
             - know about weather alerts given an US City
             """,
