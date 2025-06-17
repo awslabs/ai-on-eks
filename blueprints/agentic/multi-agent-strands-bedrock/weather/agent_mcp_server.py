@@ -23,9 +23,9 @@ def weather_mcp_server():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Weather MCP Server')
     parser.add_argument('--transport',
-                       choices=['stdio', 'sse', 'streamable-http'],
+                       choices=['stdio','streamable-http'],
                        default='stdio',
-                       help='Transport protocol to use (stdio, sse, or streamable-http)')
+                       help='Transport protocol to use stdio(default) or streamable-http')
 
     args = parser.parse_args()
 
