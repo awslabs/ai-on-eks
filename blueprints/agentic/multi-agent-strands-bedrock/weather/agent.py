@@ -2,9 +2,11 @@ import os
 import json
 
 from mcp import StdioServerParameters, stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 from strands import Agent, tool
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
+
 
 @tool
 def weather_assistant_tool(query: str) -> str:
@@ -37,17 +39,28 @@ def get_weather_agent() -> Agent:
     bedrock_model = BedrockModel(model_id=model_id)
 
     try:
-        stdio_mcp_client = MCPClient(
-            lambda: stdio_client(
-            StdioServerParameters(
-                command="uvx",
-                args=["--from",".","--directory","weather-mcp-server","weather-mcp"]
+        mcp_server_url = os.getenv("MCP_SERVER_URL")
+        if mcp_server_url:
+            from mcp.client.streamable_http import streamablehttp_client
+            mcp_client = MCPClient(
+                lambda: streamablehttp_client(mcp_server_url)
             )
-        ))
-        stdio_mcp_client.start()
+        else:
+            mcp_client = MCPClient(
+                lambda: stdio_client(
+                    StdioServerParameters(
+                        command="uvx",
+                        args=["--from",".","--directory","weather-mcp-server","weather-mcp"]
+                    )
+                )
+            )
 
 
-        tools = stdio_mcp_client.list_tools_sync()
+
+        mcp_client.start()
+
+
+        tools = mcp_client.list_tools_sync()
         # Create the research agent with specific capabilities
         weather_agent = Agent(
             model=bedrock_model,

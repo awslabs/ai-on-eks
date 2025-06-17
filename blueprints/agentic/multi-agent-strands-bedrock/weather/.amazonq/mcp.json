@@ -3,6 +3,13 @@
     "weather": {
       "command": "uvx",
       "args": ["--no-cache","--from",".","--directory",".","weather-agent-mcp-server"]
+    },
+    "strands": {
+      "command": "uvx",
+      "timeout": 60000,
+      "args": [
+        "strands-agents-mcp-server@latest"
+      ]
     }
   }
 }
