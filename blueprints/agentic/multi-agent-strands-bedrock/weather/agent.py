@@ -26,10 +26,14 @@ def weather_assistant_tool(query: str) -> str:
 
 def weather_assistant(query: str) -> str:
     """Process and respond to weather forecast or alert queries."""
-    weather_agent = get_weather_agent()
-    response = str(weather_agent(query))
-    if response:
-        return response
+    try:
+        weather_agent = get_weather_agent()
+        response = str(weather_agent(query))
+        if response:
+            return response
+    except Exception as e:
+        print(f"Error processing weather query: {str(e)}")
+        return "I apologize, but I encountered an error while processing your request. Please try again later."
 
     return "I apologize, but I couldn't properly analyze your question. Could you please rephrase or provide more context?"
 

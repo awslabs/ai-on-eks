@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "weather": {
-      "command": "uvx",
-      "args": ["--no-cache","--from",".","--directory",".","weather-agent-mcp-server"]
+      "command": "uv",
+      "args": ["run","agent_mcp_server.py"]
     },
     "strands": {
       "command": "uvx",

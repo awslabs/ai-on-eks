@@ -20,7 +20,7 @@ def interactive_agent():
     while True:
         try:
             user_input = input("\n> ")
-            if user_input.lower() == "exit":
+            if user_input.lower() == "/quit":
                 print("\nGoodbye! 👋")
                 break
 
