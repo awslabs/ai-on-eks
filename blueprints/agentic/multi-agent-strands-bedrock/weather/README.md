@@ -48,3 +48,51 @@ uvx --no-cache --from . --directory . weather-agent-a2a-server
 ```bash
 uv run test_a2a_client.py
 ```
+
+# Running in a Container
+
+Build the container using docker
+```bash
+docker build . --tag agent
+```
+Build the container using finch
+```bash
+finch build . --tag agent
+```
+
+Run the agent as mcp server
+```bash
+docker run \
+-v $HOME/.aws:/app/.aws \
+-p 8080:8080 \
+-e AWS_REGION=${AWS_REGION} \
+-e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+-e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+-e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
+-e DEBUG=1 \
+agent weather-agent-mcp-server --transport streamable-http
+```
+
+Run the agent as a2a server
+```bash
+docker run \
+-v $HOME/.aws:/app/.aws \
+-p 9000:9000 \
+-e AWS_REGION=${AWS_REGION} \
+-e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+-e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+-e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
+-e DEBUG=1 \
+agent weather-agent-a2a-server
+```
+
+Run the agent interactive
+```bash
+docker run -it \
+-v $HOME/.aws:/app/.aws \
+-e AWS_REGION=${AWS_REGION} \
+-e AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+-e AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+-e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
+agent weather-agent-interactive
+```

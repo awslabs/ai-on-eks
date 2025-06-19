@@ -32,7 +32,7 @@ class A2AAgent:
         *,
         name: str,
         description: str,
-        host: str = "localhost",
+        host: str = "0.0.0.0",
         port: int = int(os.getenv("A2A_PORT", "9000")),
         version: str = "0.0.1",
     ):

@@ -1,6 +1,7 @@
 """Main entry point for the Weather Agent application."""
 
 import logging
+import os
 import sys
 
 from agent_a2a_server import weather_a2a_server as a2a_server_agent
@@ -9,7 +10,7 @@ from agent_mcp_server import weather_mcp_server as mcp_server_agent
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG if os.getenv('DEBUG') == '1' else logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
     force=True,

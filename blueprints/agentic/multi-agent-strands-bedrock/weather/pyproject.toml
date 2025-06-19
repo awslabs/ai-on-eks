@@ -3,7 +3,7 @@ name = "weather-agent"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 # mitigate https://github.com/strands-agents/sdk-python/commit/5fab010715fa26bc2bd68505367dbb7c09e0e3ed
 dependencies = [
     "a2a-sdk>=0.2.8",
@@ -11,7 +11,8 @@ dependencies = [
     "strands-agents @ git+https://github.com/strands-agents/sdk-python.git@main",
     "strands-agents-tools @ git+https://github.com/strands-agents/tools.git@main",
     "markdown",
-    "rich"
+    "rich",
+    "uv==0.7.11"
 ]
 
 [project.scripts]
@@ -29,3 +30,14 @@ packages = ["."]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
