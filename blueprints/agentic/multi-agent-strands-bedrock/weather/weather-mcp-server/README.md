@@ -5,8 +5,8 @@ A Model Context Protocol (MCP) server that provides weather forecasting capabili
 ## Features
 
 - **Weather Forecasts**: Get detailed weather forecasts for any location
-- **Location Geocoding**: Convert location names to coordinates automatically
 - **Weather Alerts**: Retrieve weather alerts for US states
+- **Automatic Geocoding**: Automatically converts location names to coordinates
 - **MCP Integration**: Seamlessly integrates with Amazon Q and other MCP clients
 
 ## Prerequisites
@@ -62,8 +62,8 @@ Create or update your Amazon Q MCP configuration file at `~/.config/amazonq/mcp.
 {
   "mcpServers": {
     "weather": {
-      "command": "uv",
-      "args": ["run", "weather.py"]
+      "command": "uvx",
+      "args": ["--no-cache", "--from", ".", "--directory", ".", "weather-mcp"]
     }
   }
 }
@@ -95,8 +95,7 @@ The weather MCP server provides these tools to Amazon Q:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `weather___get_forecast` | Get weather forecast for coordinates | `latitude`, `longitude` |
-| `weather___geocode_location` | Convert location name to coordinates | `location` |
+| `weather___get_forecast` | Get weather forecast for a location | `location` (city, address, etc.) |
 | `weather___get_alerts` | Get weather alerts for US states | `state` (2-letter code) |
 
 ## Example Usage
