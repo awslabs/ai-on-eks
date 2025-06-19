@@ -1011,8 +1011,8 @@ wheels = [
 
 [[package]]
 name = "strands-agents"
-version = "0.1.9.dev1+g4d7bb98"
-source = { git = "https://github.com/strands-agents/sdk-python.git?rev=main#4d7bb9820fd5153946abe08ac3513a4e2527bd73" }
+version = "0.1.8"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "botocore" },
@@ -1024,11 +1024,15 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/1e/f2/bb4c787ab9e7146a23ce37236145879b24e898c0fbf8cc54b21cbe0e481f/strands_agents-0.1.8.tar.gz", hash = "sha256:5ea95d2ece2b3d582e2870544fef31cc6d6c990385f7345dff7bc810f09c64a3", size = 149313, upload-time = "2025-06-18T17:43:16.59Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/fc/70c6136396847589cc01505a278bc308e4e29205b20a3a37cb0a2a885264/strands_agents-0.1.8-py3-none-any.whl", hash = "sha256:899aa16f1c444aa5af069d4d6ee3e631f52ce7eb6735273f0f0ddf23f24aa1a2", size = 109069, upload-time = "2025-06-18T17:43:15.1Z" },
+]
 
 [[package]]
 name = "strands-agents-tools"
 version = "0.1.6"
-source = { git = "https://github.com/strands-agents/tools.git?rev=main#a7a41ed88bced803847f2827899109b5a9d3cb13" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aws-requests-auth" },
     { name = "colorama" },
@@ -1043,6 +1047,10 @@ dependencies = [
     { name = "tenacity" },
     { name = "tzdata", marker = "sys_platform == 'win32'" },
     { name = "watchdog" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a7/c4/f7a34d942390e0487dac4a16bfe6aff306c1ebd16f163fddc6d4def74ba0/strands_agents_tools-0.1.6.tar.gz", hash = "sha256:38ee18604a3475a374f2840827ca276e85826c45f416faac26ccbe41760de326", size = 223574, upload-time = "2025-06-18T19:10:04.2Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/59/c07a583f32ae48a9dfcdc22ae48226626fb0ae88b17110e1e50838ac54fe/strands_agents_tools-0.1.6-py3-none-any.whl", hash = "sha256:1ce948831fe581d55be79e65ba05ac64a56ecd624d3c77c3f1b384e5370d2843", size = 159431, upload-time = "2025-06-18T19:10:02.583Z" },
 ]
 
 [[package]]
@@ -1220,8 +1228,8 @@ requires-dist = [
     { name = "markdown" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.9.4" },
     { name = "rich" },
-    { name = "strands-agents", git = "https://github.com/strands-agents/sdk-python.git?rev=main" },
-    { name = "strands-agents-tools", git = "https://github.com/strands-agents/tools.git?rev=main" },
+    { name = "strands-agents", specifier = ">=0.1.8" },
+    { name = "strands-agents-tools", specifier = ">=0.1.6" },
     { name = "uv", specifier = "==0.7.11" },
 ]
 

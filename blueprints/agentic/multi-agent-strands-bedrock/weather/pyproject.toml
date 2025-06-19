@@ -8,8 +8,8 @@ requires-python = ">=3.10"
 dependencies = [
     "a2a-sdk>=0.2.8",
     "mcp[cli]>=1.9.4",
-    "strands-agents @ git+https://github.com/strands-agents/sdk-python.git@main",
-    "strands-agents-tools @ git+https://github.com/strands-agents/tools.git@main",
+    "strands-agents>=0.1.8",
+    "strands-agents-tools>=0.1.6",
     "markdown",
     "rich",
     "uv==0.7.11"

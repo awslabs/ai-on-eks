@@ -16,7 +16,6 @@ A weather assistant built with Strands Agents, MCP (Model Context Protocol), and
 uv sync
 ```
 
-
 # Run interactive mode
 ```bash
 uv run agent_interactive.py
@@ -72,6 +71,7 @@ docker run \
 -e DEBUG=1 \
 agent weather-agent-mcp-server --transport streamable-http
 ```
+Connect your mcp client such as `npx @modelcontextprotocol/inspector`
 
 Run the agent as a2a server
 ```bash
@@ -85,6 +85,7 @@ docker run \
 -e DEBUG=1 \
 agent weather-agent-a2a-server
 ```
+Then test in another terminal running `uv run test_a2a_client.py`
 
 Run the agent interactive
 ```bash
@@ -96,3 +97,4 @@ docker run -it \
 -e AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN} \
 agent weather-agent-interactive
 ```
+Type a question, to exit use `/quit`
