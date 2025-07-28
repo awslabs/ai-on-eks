@@ -257,8 +257,7 @@ spec:
             configMap:
               name: vllm-serve-script
           nodeSelector:
-            instanceType: mixed-x86
-            workload: rayhead
+            instanceType: x86-cpu-karpenter
     workerGroupSpecs:
     - groupName: inf2-group
       replicas: 1
@@ -323,7 +322,6 @@ spec:
               name: vllm-serve-script
           nodeSelector:
             instanceType: inferentia-inf2
-            provisionerType: Karpenter
           tolerations:
           - key: "aws.amazon.com/neuron"
             operator: "Exists"

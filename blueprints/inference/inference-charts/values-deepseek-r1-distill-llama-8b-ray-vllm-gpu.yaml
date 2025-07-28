@@ -1,0 +1,38 @@
+modelParameters:
+  modelId: deepseek-ai/DeepSeek-R1-Distill-Llama-8B
+  gpuMemoryUtilization: 0.9
+  maxModelLen: 8192
+  maxNumSeqs: 4
+  maxNumBatchedTokens: 16384
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 1
+  enablePrefixCaching: true
+  numGpus: 1
+
+inference:
+  serviceName: deepseekr1-dis-llama-8b-ray-vllm
+  serviceNamespace: default
+  accelerator: gpu
+  framework: rayVllm
+
+  rayOptions:
+    rayVersion: 2.47.0
+  modelServer:
+    vllmVersion: 0.9.1
+    pythonVersion: 3.11
+    image:
+      repository: rayproject/ray
+      tag: 2.47.0-py311
+    deployment:
+      resources:
+        gpu:
+          limits:
+            cpu: 12
+            memory: "60G"
+            nvidia.com/gpu: 1
+          requests:
+            cpu: 12
+            memory: "60G"
+            nvidia.com/gpu: 1

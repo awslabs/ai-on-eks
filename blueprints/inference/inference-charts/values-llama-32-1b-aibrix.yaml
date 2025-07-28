@@ -1,0 +1,23 @@
+modelParameters:
+  modelId: NousResearch/Llama-3.2-1B
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 8192
+  maxNumSeqs: 4
+  maxNumBatchedTokens: 8192
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 1
+  enablePrefixCaching: false
+  numGpus: 1
+
+inference:
+  serviceName: llama-32-1b-aibrix
+  serviceNamespace: default
+  accelerator: gpu
+  framework: aibrix
+
+  modelServer:
+    image:
+      repository: vllm/vllm-openai
+      tag: v0.9.1

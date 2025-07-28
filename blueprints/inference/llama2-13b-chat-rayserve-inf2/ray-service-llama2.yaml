@@ -82,9 +82,7 @@ spec:
             - name: LD_LIBRARY_PATH
               value: "/home/ray/anaconda3/lib:$LD_LIBRARY_PATH"
           nodeSelector: # This is using Karpenter Nodes with the provisioner label
-            instanceType: mixed-x86
-            provisionerType: Karpenter
-            workload: rayhead
+            instanceType: x86-cpu-karpenter
           volumes:
           - name: ray-logs
             emptyDir: {}
@@ -119,7 +117,6 @@ spec:
               value: "/home/ray/anaconda3/lib:$LD_LIBRARY_PATH"
           nodeSelector:
             instanceType: inferentia-inf2
-            provisionerType: Karpenter
           tolerations:
           - key: "aws.amazon.com/neuron"
             operator: "Exists"

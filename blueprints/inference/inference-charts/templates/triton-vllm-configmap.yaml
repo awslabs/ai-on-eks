@@ -1,0 +1,24 @@
+{{- if eq .Values.inference.framework "triton-vllm" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: triton-model-repository
+  namespace: {{.Values.inference.serviceNamespace}}
+data:
+  config.pbtxt: |
+    backend: "vllm"
+
+    instance_group [
+      {
+        kind: KIND_MODEL
+        count: 1
+      }
+    ]
+
+  model.json: |
+    {
+      "model": "{{.Values.modelParameters.modelId}}",
+      "gpu_memory_utilization": {{.Values.modelParameters.gpuMemoryUtilization}},
+      "enforce_eager": true
+    }
+{{- end }}

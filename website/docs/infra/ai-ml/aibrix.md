@@ -41,7 +41,7 @@ Ensure that you have installed the following tools on your machine.
 
 ### Deploy
 
-Clone the repository
+**1. Clone the repository:**
 
 ```bash
 git clone https://github.com/awslabs/ai-on-eks.git
@@ -52,14 +52,13 @@ If you are using profile for authentication
 set your `export AWS_PROFILE="<PROFILE_name>"` to the desired profile name
 :::
 
+**2. Review and customize configurations:**
+
+- Check available addons in `infra/base/terraform/variables.tf`
+- Modify addon settings in `infra/aibrix/terraform/blueprint.tfvars` as needed
+- Update the AWS region in `blueprint.tfvars`
+
 Navigate into aibrix and run `install.sh` script
-
-:::info
-Ensure that you update the region in the `variables.tf` file before deploying the blueprint.
-Additionally, confirm that your local region setting matches the specified region to prevent any discrepancies.
-For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
-:::
-
 
 ```bash
 cd ai-on-eks/infra/aibrix

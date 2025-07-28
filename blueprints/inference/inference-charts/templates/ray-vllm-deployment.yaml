@@ -1,0 +1,269 @@
+{{- if eq .Values.inference.framework "rayVllm" }}
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: {{.Values.inference.serviceName}}
+  namespace: {{.Values.inference.serviceNamespace}}
+spec:
+  deploymentUnhealthySecondThreshold: 900
+  rayClusterConfig:
+    {{- if .Values.inference.rayOptions.autoscaling.enabled }}
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      upscalingMode: {{ .Values.inference.rayOptions.autoscaling.upscalingMode }}
+      idleTimeoutSeconds: {{ .Values.inference.rayOptions.autoscaling.idleTimeoutSeconds }}
+      resources: {}
+    {{- end }}
+    {{- if and .Values.inference.rayOptions.gcs.highAvailability.enabled }}
+    # GCS High Availability Configuration using RayService CRD
+    gcsFaultToleranceOptions:
+      redisAddress: "{{ .Values.inference.rayOptions.gcs.highAvailability.redis.address }}:{{ .Values.inference.rayOptions.gcs.highAvailability.redis.port }}"
+      {{- if and .Values.inference.rayOptions.gcs.highAvailability.redis.secretName .Values.inference.rayOptions.gcs.highAvailability.redis.secretPasswordKey}}
+      redisPassword:
+        valueFrom:
+          secretKeyRef:
+            name: {{ .Values.inference.rayOptions.gcs.highAvailability.redis.secretName }}
+            key: {{ .Values.inference.rayOptions.gcs.highAvailability.redis.secretPasswordKey }}
+      {{- end }}
+    {{- end }}
+    headGroupSpec:
+      headService:
+        metadata:
+          namespace: {{.Values.inference.serviceNamespace}}
+      rayStartParams:
+        dashboard-host: 0.0.0.0
+        num-cpus: '0'
+      template:
+        spec:
+          containers:
+            - env:
+                - name: HUGGING_FACE_HUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      key: token
+                      name: hf-token
+                - name: LD_LIBRARY_PATH
+                  value: /home/ray/anaconda3/lib
+                - name: RAY_GRAFANA_HOST
+                  value: {{ .Values.inference.rayOptions.observability.rayGrafanaHost }}
+                - name: RAY_PROMETHEUS_HOST
+                  value: {{ .Values.inference.rayOptions.observability.rayPrometheusHost }}
+                - name: RAY_GRAFANA_IFRAME_HOST
+                  value: {{ .Values.inference.rayOptions.observability.rayGrafanaIframeHost }}
+              image: "{{ .Values.inference.modelServer.image.repository }}:{{ .Values.inference.modelServer.image.tag }}"
+              imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+              lifecycle:
+                preStop:
+                  exec:
+                    command:
+                      - /bin/sh
+                      - '-c'
+                      - ray stop
+              name: head
+              ports:
+                - containerPort: 6379
+                  name: gcs
+                  protocol: TCP
+                - containerPort: 8265
+                  name: dashboard
+                  protocol: TCP
+                - containerPort: 10001
+                  name: client
+                  protocol: TCP
+                - containerPort: 8000
+                  name: serve
+                  protocol: TCP
+              resources:
+                limits:
+                  cpu: 4
+                  memory: 20Gi
+                requests:
+                  cpu: 4
+                  memory: 20Gi
+              volumeMounts:
+                - mountPath: /tmp/ray
+                  name: ray-logs
+                - mountPath: /home/ray/vllm_serve.py
+                  subPath: vllm_serve.py
+                  name: vllm-script
+            - name: fluentbit
+              image: {{ .Values.fluentbit.image.repository }}:{{ .Values.fluentbit.image.tag }}
+              env:
+                - name: POD_LABELS
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.labels['ray.io/cluster']
+              resources:
+                {{- toYaml .Values.fluentbit.resources | nindent 18 }}
+              volumeMounts:
+                - mountPath: /tmp/ray
+                  name: ray-logs
+                - mountPath: /fluent-bit/etc/fluent-bit.conf
+                  subPath: fluent-bit.conf
+                  name: fluentbit-config
+          volumes:
+            - emptyDir: {}
+              name: ray-logs
+            - configMap:
+                items:
+                  - key: vllm_serve.py
+                    path: vllm_serve.py
+                name: ray-vllm-serve
+              name: vllm-script
+            - name: fluentbit-config
+              configMap:
+                name: fluentbit-config
+    rayVersion: {{ .Values.inference.rayOptions.rayVersion }}
+    workerGroupSpecs:
+      - groupName: worker
+        maxReplicas: {{ .Values.inference.modelServer.deployment.maxReplicas }}
+        minReplicas: {{ .Values.inference.modelServer.deployment.minReplicas }}
+        replicas: {{ .Values.inference.modelServer.deployment.replicas }}
+        numOfHosts: 1
+        rayStartParams: {}
+        template:
+          spec:
+            {{- if eq .Values.inference.accelerator "neuron" }}
+            schedulerName: my-scheduler
+            {{- end }}
+            containers:
+              - env:
+                  - name: LD_LIBRARY_PATH
+                    value: /home/ray/anaconda3/lib
+                  - name: VLLM_PORT
+                    value: '{{ .Values.vllm.port }}'
+                  - name: VLLM_LOGGING_LEVEL
+                    value: {{ .Values.vllm.logLevel }}
+                  - name: HUGGING_FACE_HUB_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        key: token
+                        name: hf-token
+                  {{- if .Values.modelParameters }}
+                  {{- range $key, $value := .Values.modelParameters }}
+                  - name: {{ $key | snakecase | upper }}
+                    value: "{{ $value }}"
+                  {{- end }}
+                  {{- end }}
+                  {{- if eq .Values.inference.accelerator "neuron" }}
+                  - name: NEURON_CC_FLAGS
+                    value: "-O1"
+                  {{- end }}
+                image: "{{ .Values.inference.modelServer.image.repository }}:{{ .Values.inference.modelServer.image.tag }}{{ if eq .Values.inference.accelerator "gpu" }}-gpu{{ end }}"
+                imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+                lifecycle:
+                  preStop:
+                    exec:
+                      command:
+                        - /bin/sh
+                        - '-c'
+                        - ray stop
+                name: worker
+                resources:
+                  {{- if eq .Values.inference.accelerator "gpu" }}
+                  {{- toYaml .Values.inference.modelServer.deployment.resources.gpu | nindent 18 }}
+                  {{- else }}
+                  {{- toYaml .Values.inference.modelServer.deployment.resources.neuron | nindent 18 }}
+                  {{- end }}
+                volumeMounts:
+                  - mountPath: /tmp/ray
+                    name: ray-logs
+              - name: fluentbit
+                image: {{ .Values.fluentbit.image.repository }}:{{ .Values.fluentbit.image.tag }}
+                env:
+                  - name: POD_LABELS
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: metadata.labels['ray.io/cluster']
+                resources:
+                  {{- toYaml .Values.fluentbit.resources | nindent 18 }}
+                volumeMounts:
+                  - mountPath: /tmp/ray
+                    name: ray-logs
+                  - mountPath: /fluent-bit/etc/fluent-bit.conf
+                    subPath: fluent-bit.conf
+                    name: fluentbit-config
+            {{- if eq .Values.inference.accelerator "gpu" }}
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+            {{- else }}
+            tolerations:
+              - key: "aws.amazon.com/neuron"
+                operator: "Exists"
+                effect: "NoSchedule"
+            {{- end }}
+            {{- if .Values.inference.modelServer.deployment.instanceType }}
+            nodeSelector:
+              beta.kubernetes.io/instance-type: {{ .Values.inference.modelServer.deployment.instanceType }}
+            {{- end }}
+            {{- if and .Values.inference.modelServer.deployment.topologySpreadConstraints.enabled .Values.inference.modelServer.deployment.topologySpreadConstraints.constraints }}
+            topologySpreadConstraints:
+              {{- $firstConstraint := index .Values.inference.modelServer.deployment.topologySpreadConstraints.constraints 0 }}
+              # Prefer same AZ as head pod (soft constraint)
+              - maxSkew: {{ $firstConstraint.maxSkew }}
+                topologyKey: {{ $firstConstraint.topologyKey }}
+                whenUnsatisfiable: {{ $firstConstraint.whenUnsatisfiable }}
+                labelSelector:
+                  matchLabels:
+                    "ray.io/cluster": "{{$.Values.inference.serviceName}}"
+                    {{- range $key, $value := $firstConstraint.labelSelector.matchLabels }}
+                    "{{ $key }}": "{{ $value }}"
+                    {{- end }}
+              {{- if gt (len .Values.inference.modelServer.deployment.topologySpreadConstraints.constraints) 1 }}
+              {{- $secondConstraint := index .Values.inference.modelServer.deployment.topologySpreadConstraints.constraints 1 }}
+              # Require workers to be grouped together (hard constraint)
+              - maxSkew: {{ $secondConstraint.maxSkew }}
+                topologyKey: {{ $secondConstraint.topologyKey }}
+                whenUnsatisfiable: {{ $secondConstraint.whenUnsatisfiable }}
+                labelSelector:
+                  matchLabels:
+                    "ray.io/cluster": "{{$.Values.inference.serviceName}}"
+                    "ray.io/group": "worker"
+                    {{- range $key, $value := $secondConstraint.labelSelector.matchLabels }}
+                    "{{ $key }}": "{{ $value }}"
+                    {{- end }}
+              {{- end }}
+            {{- end }}
+            {{- if and .Values.inference.modelServer.deployment.podAffinity.enabled .Values.inference.modelServer.deployment.podAffinity.preferredDuringSchedulingIgnoredDuringExecution }}
+            affinity:
+              podAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  {{- range .Values.inference.modelServer.deployment.podAffinity.preferredDuringSchedulingIgnoredDuringExecution }}
+                  - weight: {{ .weight }}
+                    podAffinityTerm:
+                      topologyKey: {{ .podAffinityTerm.topologyKey }}
+                      labelSelector:
+                        matchLabels:
+                          "ray.io/cluster": "{{$.Values.inference.serviceName}}"
+                          "ray.io/group": "worker"
+                  {{- end }}
+            {{- end }}
+            volumes:
+              - emptyDir: {}
+                name: ray-logs
+              - name: fluentbit-config
+                configMap:
+                  name: fluentbit-config
+  serveConfigV2: |
+    applications:
+      - name: serve
+        import_path: vllm_serve:deployment
+        {{- if eq .Values.inference.accelerator "gpu" }}
+        runtime_env:
+          pip:
+            - vllm=={{.Values.inference.modelServer.vllmVersion}}
+        {{- end }}
+        deployments:
+          - name: serve
+            ray_actor_options:
+              {{- if eq .Values.inference.accelerator "gpu" }}
+              num_gpus: {{ .Values.modelParameters.numGpus }}
+              {{- else }}
+              resources: {"neuron_cores": {{ mul .Values.modelParameters.numGpus 2 }}}
+              {{- end }}
+            num_replicas: {{ .Values.inference.rayOptions.autoscaling.actorAutoscaling.minActors }}
+            max_replicas_per_node: {{ .Values.inference.rayOptions.autoscaling.actorAutoscaling.maxActors }}
+  serviceUnhealthySecondThreshold: 900
+{{- end }}

@@ -1,0 +1,202 @@
+{{- if eq .Values.inference.framework "rayVllm" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ray-vllm-serve
+  labels:
+    "app.kubernetes.io/component": "{{.Values.inference.serviceName}}"
+data:
+  vllm_serve.py: |
+    import json
+    import re
+    from typing import AsyncGenerator, List, Optional
+    from fastapi import BackgroundTasks, FastAPI
+    from prometheus_client import make_asgi_app
+    from starlette.requests import Request
+    from starlette.responses import StreamingResponse, Response, JSONResponse
+    from starlette.routing import Mount
+    from vllm.engine.arg_utils import AsyncEngineArgs
+    from vllm.engine.async_llm_engine import AsyncLLMEngine
+    from vllm.entrypoints.openai.serving_models import BaseModelPath, OpenAIServingModels
+    from vllm.sampling_params import SamplingParams
+    from vllm.utils import random_uuid
+    from ray import serve
+    from starlette.requests import Request
+    from starlette.responses import StreamingResponse, JSONResponse
+    import os
+    import logging
+    from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
+    from vllm.entrypoints.openai.serving_completion import OpenAIServingCompletion
+    from vllm.transformers_utils.config import get_config
+    from huggingface_hub import login
+    from vllm.entrypoints.openai.protocol import (
+        CompletionRequest,
+        CompletionResponse,
+        ChatCompletionRequest,
+        ChatCompletionResponse,
+        ErrorResponse,
+    )
+
+    # Environment and configuration setup
+    logger = logging.getLogger("ray.serve")
+    app = FastAPI()
+
+
+    def get_model_config(model_path: str) -> dict:
+        try:
+            config = get_config(model_path)
+            return {
+                "architecture": config.architectures[0] if config.architectures else None,
+                "vocab_size": config.vocab_size,
+                "hidden_size": config.hidden_size,
+                "num_hidden_layers": config.num_hidden_layers,
+                "num_attention_heads": config.num_attention_heads,
+            }
+        except Exception as e:
+            logger.warning(f"Error reading model config: {e}")
+            return {}
+
+
+    @serve.deployment(name="serve")
+    @serve.ingress(app)
+    class VLLMDeployment:
+        def __init__(self, response_role: str = "assistant",
+                     chat_template: Optional[str] = None, **kwargs):
+            # setup vLLM metrics for scraping
+            route = Mount("/metrics", make_asgi_app())
+            # Workaround for 307 Redirect for /metrics
+            route.path_regex = re.compile('^/metrics(?P<path>.*)')
+            app.routes.append(route)
+
+            hf_token = os.getenv("HUGGING_FACE_HUB_TOKEN")
+            if not hf_token:
+                logger.warning("HUGGING_FACE_HUB_TOKEN environment variable is not set")
+            else:
+                login(token=hf_token)
+                logger.info("Successfully logged in to Hugging Face Hub")
+
+            self.engine_args = AsyncEngineArgs(
+                model=os.getenv("MODEL_ID", "NousResearch/Llama-3.2-1B"),
+                # Model identifier from Hugging Face Hub or local path.
+                dtype="auto",
+                # Automatically determine the data type (e.g., float16 or float32) for model weights and computations.
+                gpu_memory_utilization=float(os.getenv("GPU_MEMORY_UTILIZATION", "0.8")),
+                # Percentage of GPU memory to utilize, reserving some for overhead.
+                max_model_len=int(os.getenv("MAX_MODEL_LEN", "8192")),
+                # Maximum sequence length (in tokens) the model can handle, including both input and output tokens.
+                max_num_seqs=int(os.getenv("MAX_NUM_SEQ", "4")),
+                # Maximum number of sequences (requests) to process in parallel.
+                max_num_batched_tokens=int(os.getenv("MAX_NUM_BATCHED_TOKENS", "8192")),
+                # Maximum number of tokens processed in a single batch across all sequences (max_model_len * max_num_seqs).
+                trust_remote_code=True,
+                # Allow execution of untrusted code from the model repository (use with caution).
+                enable_chunked_prefill=False,
+                # Disable chunked prefill to avoid compatibility issues with prefix caching.
+                tokenizer_pool_size=int(os.getenv("TOKENIZER_POOL_SIZE", "4")),
+                # Number of tokenizer instances to handle concurrent requests efficiently.
+                tokenizer_pool_type="ray",  # Pool type for tokenizers; 'ray' uses Ray for distributed processing.
+                # max_parallel_loading_workers=int(os.getenv("MAX_PARALLEL_LOADING_WORKERS", "2")),  # Number of parallel workers to load the model concurrently.
+                pipeline_parallel_size=int(os.getenv("PIPELINE_PARALLEL_SIZE", "1")),
+                # Number of pipeline parallelism stages; typically set to 1 unless using model parallelism.
+                tensor_parallel_size=int(os.getenv("TENSOR_PARALLEL_SIZE", "1")),
+                # Number of tensor parallelism stages; typically set to 1 unless using model parallelism.
+                enable_prefix_caching=bool(os.getenv("ENABLE_PREFIX_CACHING", "true")),
+                # Enable prefix caching to improve performance for similar prompt prefixes.
+                # worker_use_ray=True,
+                served_model_name=(os.getenv("SERVED_MODEL_NAME", os.getenv("MODEL_ID", "NousResearch/Llama-3.2-1B"))),
+                enforce_eager=True,
+            )
+            self.openai_serving_chat = None
+            self.openai_serving = None
+            self.response_role = response_role
+            self.chat_template = chat_template
+            self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+            self.max_model_len = self.engine_args.max_model_len
+            logger.info(f"VLLM Engine initialized with max_model_len: {self.max_model_len}")
+
+        @app.get("/v1/models")
+        async def get_models(self):
+            # Return model information for Open WebUI compatibility
+            model_info = {
+                "object": "list",
+                "data": [
+                    {
+                        "id": self.engine_args.model,
+                        "object": "model",
+                        "owned_by": "organization",
+                        "permission": []
+                    }
+                ]
+            }
+            return JSONResponse(content=model_info)
+
+        @app.post("/v1/completions")
+        async def create_completion(self,
+                                    request: CompletionRequest, raw_request: Request):
+            if not self.openai_serving:
+                model_config = await self.engine.get_model_config()
+                base_model_paths = [BaseModelPath(name=self.engine_args.served_model_name, model_path=self.engine_args.model)]
+                openai_serving_models = OpenAIServingModels(
+                    engine_client=self.engine,
+                    model_config=model_config,
+                    base_model_paths=base_model_paths,
+                )
+                self.openai_serving = OpenAIServingCompletion(
+                    engine_client=self.engine,
+                    model_config=model_config,
+                    models=openai_serving_models,
+                    request_logger=None
+                )
+
+            logger.info(f"Request: {request}")
+            generator = await self.openai_serving.create_completion(
+                request, raw_request
+            )
+            if isinstance(generator, ErrorResponse):
+                return JSONResponse(
+                    content=generator.model_dump(), status_code=generator.code
+                )
+            if request.stream:
+                return StreamingResponse(content=generator, media_type="text/event-stream")
+            else:
+                assert isinstance(generator, CompletionResponse)
+                return JSONResponse(content=generator.model_dump())
+
+        @app.post("/v1/chat/completions")
+        async def create_chat_completion(
+                self, request: ChatCompletionRequest, raw_request: Request
+        ):
+            if not self.openai_serving_chat:
+                model_config = await self.engine.get_model_config()
+                base_model_paths = [BaseModelPath(name=self.engine_args.served_model_name, model_path=self.engine_args.model)]
+                openai_serving_models = OpenAIServingModels(
+                    engine_client=self.engine,
+                    model_config=model_config,
+                    base_model_paths=base_model_paths,
+                )
+                self.openai_serving_chat = OpenAIServingChat(
+                    engine_client=self.engine,
+                    model_config=model_config,
+                    models=openai_serving_models,
+                    response_role=self.response_role,
+                    request_logger=None,
+                    chat_template=self.chat_template,
+                    chat_template_content_format="auto"
+                )
+            logger.info(f"Request: {request}")
+            generator = await self.openai_serving_chat.create_chat_completion(
+                request, raw_request
+            )
+            if isinstance(generator, ErrorResponse):
+                return JSONResponse(
+                    content=generator.model_dump(), status_code=generator.code
+                )
+            if request.stream:
+                return StreamingResponse(content=generator, media_type="text/event-stream")
+            else:
+                assert isinstance(generator, ChatCompletionResponse)
+                return JSONResponse(content=generator.model_dump())
+
+
+    deployment = VLLMDeployment.bind()
+{{- end }}

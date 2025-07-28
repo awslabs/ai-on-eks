@@ -1,0 +1,32 @@
+# Triton Inference Server with vLLM backend - GPU configuration
+inference:
+  serviceName: triton-vllm-gpu
+  serviceNamespace: default
+  accelerator: gpu
+  framework: triton-vllm
+
+  modelServer:
+    image:
+      repository: nvcr.io/nvidia/tritonserver
+      tag: 25.06-vllm-python-py3
+    deployment:
+      replicas: 1
+      instanceType: g5.2xlarge
+      resources:
+        gpu:
+          requests:
+            nvidia.com/gpu: 1
+            cpu: 4
+            memory: 16Gi
+          limits:
+            nvidia.com/gpu: 1
+            cpu: 8
+            memory: 32Gi
+
+modelParameters:
+  modelId: meta-llama/Llama-3.2-1B
+  gpuMemoryUtilization: 0.8
+
+service:
+  type: ClusterIP
+  port: 8000

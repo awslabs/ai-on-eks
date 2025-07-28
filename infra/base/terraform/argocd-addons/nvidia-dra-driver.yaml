@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-dra-driver-gpu
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.ngc.nvidia.com/nvidia
+    chart: nvidia-dra-driver-gpu
+    targetRevision: "25.3.0-rc.2"
+    helm:
+      values: |
+        nvidiaDriverRoot: /
+        nvidiaCtkPath: /usr/bin/nvidia-ctk
+        gpuResourcesEnabledOverride: true # Required to deploy GPU and MIG deviceclasses
+
+        resources:
+          gpus:
+            enabled: true # set to false to disable experimental gpu support
+          computeDomains:
+            enabled: true
+
+        controller:
+          nodeSelector: null
+          affinity: null
+          tolerations: []
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "200m"
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+
+        kubeletPlugin:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - key: "nvidia.com/gpu.present"
+                        operator: In
+                        values:
+                          - "true"
+          tolerations:
+            - key: "nvidia.com/gpu"
+              operator: Exists
+              effect: NoSchedule
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "100m"
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nvidia-dra-driver-gpu
+
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,60 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-device-plugin
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://nvidia.github.io/k8s-device-plugin
+    chart: nvidia-device-plugin
+    targetRevision: "0.17.2"
+    helm:
+      values: |
+        # Target only GPU nodes with accelerator: nvidia label
+        nodeSelector:
+          accelerator: nvidia
+
+        # Enable GPU Feature Discovery (default: false)
+        gfd:
+          enabled: true
+
+        # Configure Node Feature Discovery components
+        nfd:
+          gc:
+            nodeSelector:
+              accelerator: nvidia
+          topologyUpdater:
+            nodeSelector:
+              accelerator: nvidia
+          worker:
+            nodeSelector:
+              accelerator: nvidia
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+              - operator: "Exists"
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nvidia-device-plugin
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

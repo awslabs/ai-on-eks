@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ai-on-eks-inference-charts
+description: A Helm chart for AI/ML inference workloads on GPU and Neuron
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

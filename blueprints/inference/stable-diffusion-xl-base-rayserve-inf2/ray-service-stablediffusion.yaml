@@ -79,9 +79,7 @@ spec:
                 cpu: "2"
                 memory: "20G"
           nodeSelector:
-            instanceType: mixed-x86
-            provisionerType: Karpenter
-            workload: rayhead
+            instanceType: x86-cpu-karpenter
           volumes:
           - name: ray-logs
             emptyDir: {}
@@ -113,7 +111,6 @@ spec:
                 aws.amazon.com/neuron: "6" # All Neuron cores of inf2.24xlarge
           nodeSelector:
             instanceType: inferentia-inf2
-            provisionerType: Karpenter
           tolerations:
           - key: "aws.amazon.com/neuron"
             operator: "Exists"

@@ -310,7 +310,6 @@ spec:
               name: vllm-serve-script
           nodeSelector:
             instanceType: inferentia-inf2
-            provisionerType: Karpenter
           tolerations:
           - key: "aws.amazon.com/neuron"
             operator: "Exists"

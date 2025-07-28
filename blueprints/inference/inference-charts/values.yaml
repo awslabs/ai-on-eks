@@ -1,0 +1,144 @@
+# Default values for inference-charts
+# This is a YAML-formatted file.
+
+global:
+  # Common settings across all inference types
+  image:
+    pullPolicy: IfNotPresent
+
+  # Common resource settings
+  resources:
+    requests:
+      cpu: 1
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+fluentbit:
+  image:
+    repository: fluent/fluent-bit
+    tag: 3.2.2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+vllm:
+  logLevel: debug
+  port: 8004
+
+modelParameters:
+  modelId: NousResearch/Llama-3.2-1B
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 8192
+  maxNumSeqs: 4
+  maxNumBatchedTokens: 8192
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 1
+  enablePrefixCaching: true
+  numGpus: 1
+
+# Inference configuration
+inference:
+  serviceName: inference
+  serviceNamespace: default
+
+  # Accelerator type: gpu or neuron
+  accelerator: gpu
+
+  # Framework type: vllm, rayVllm, or triton-vllm
+  framework: vllm
+
+  #Ray Specific Options
+  rayOptions:
+    rayVersion: 2.47.0
+    # Ray native autoscaling configuration
+    autoscaling:
+      enabled: false
+      # Ray autoscaler specific settings
+      upscalingMode: "Default"
+      idleTimeoutSeconds: 60  # How long to wait before scaling down idle nodes
+      actorAutoscaling:
+        minActors: 1
+        maxActors: 1
+    gcs:
+      highAvailability:
+        enabled: false
+        redis:
+          address: redis.redis
+          port: 6379
+          secretName:
+          secretPasswordKey:
+    observability:
+      rayPrometheusHost: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+      rayGrafanaHost: http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local
+      rayGrafanaIframeHost: http://localhost:3000
+
+  modelServer:
+    image:
+      repository: vllm/vllm-openai
+      tag: latest
+    deployment:
+      replicas: 1
+      maxReplicas: 2
+      minReplicas: 1
+      resources:
+        gpu:
+          requests:
+            nvidia.com/gpu: 1
+          limits:
+            nvidia.com/gpu: 1
+        neuron:
+          requests:
+            aws.amazon.com/neuron: 1
+          limits:
+            aws.amazon.com/neuron: 1
+      # Topology constraints for pod scheduling
+      topologySpreadConstraints:
+        enabled: true
+        # Default constraints for Ray deployments:
+        # 1. Prefer workers in same AZ as head (soft constraint)
+        # 2. Require workers to be grouped together (hard constraint)
+        constraints:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels: {} # Will be populated with deployment labels
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels: {} # Will be populated with worker-specific labels
+      # Pod affinity for Karpenter - helps with node provisioning decisions
+      podAffinity:
+        enabled: true
+        # Strong preference for same AZ (helps Karpenter understand intent)
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: topology.kubernetes.io/zone
+              labelSelector:
+                matchLabels: {} # Will be populated with deployment labels
+    env: {}
+
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []

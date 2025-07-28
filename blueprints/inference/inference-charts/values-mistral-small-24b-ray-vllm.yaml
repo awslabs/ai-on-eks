@@ -1,0 +1,35 @@
+modelParameters:
+  modelId: mistralai/Mistral-Small-24B-Instruct-2501
+  gpuMemoryUtilization: 0.9
+  maxModelLen: 8192
+  maxNumSeqs: 4
+  maxNumBatchedTokens: 32768
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 4
+  enablePrefixCaching: true
+  numGpus: 4
+
+inference:
+  serviceName: mistral-small-24B-instruct-2501-ray-vllm
+  serviceNamespace: default
+  accelerator: gpu
+  framework: rayVllm
+
+  rayOptions:
+    rayVersion: 2.46.0
+
+  modelServer:
+    vllmVersion: 0.9.0
+    pythonVersion: 3.11
+    image:
+      repository: rayproject/ray
+      tag: 2.46.0-py3.11
+    deployment:
+      resources:
+        gpu:
+          requests:
+            nvidia.com/gpu: 4
+          limits:
+            nvidia.com/gpu: 4

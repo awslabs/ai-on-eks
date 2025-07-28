@@ -1,0 +1,240 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-gpu-operator
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://nvidia.github.io/gpu-operator
+    chart: gpu-operator
+    targetRevision: "v24.9.2"
+    helm:
+      values: |
+        # Disable driver installation since EKS AMI already has drivers
+        driver:
+          enabled: false
+
+        # Enable MIG support with mixed strategy
+        mig:
+          strategy: mixed  # Supports both MIG and non-MIG workloads
+
+        # MIG Manager configuration with embedded MIG profiles
+        migManager:
+          enabled: true
+          env:
+            - name: WITH_REBOOT
+              value: "true"
+          config:
+            create: true
+            name: custom-mig-parted-configs
+            default: "all-disabled"
+            data:
+              config.yaml: |-
+                version: v1
+                mig-configs:
+                  all-disabled:
+                    - devices: all
+                      mig-enabled: false
+
+                  # P4D profiles (A100 40GB)
+                  p4d-half-balanced:
+                    - devices: [0, 1, 2, 3]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.5gb": 2
+                        "2g.10gb": 1
+                        "3g.20gb": 1
+                    - devices: [4, 5, 6, 7]
+                      mig-enabled: false
+
+                  p4d-all-small:
+                    - devices: all
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.5gb": 7
+
+                  p4d-mixed-workload:
+                    - devices: [0, 1]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.5gb": 4
+                        "2g.10gb": 1
+                    - devices: [2, 3]
+                      mig-enabled: true
+                      mig-devices:
+                        "3g.20gb": 1
+                        "1g.5gb": 2
+                    - devices: [4, 5, 6, 7]
+                      mig-enabled: false
+
+                  p4d-inference-optimized:
+                    - devices: [0, 1, 2, 3, 4, 5]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.5gb": 6
+                    - devices: [6, 7]
+                      mig-enabled: false
+
+                  # P4DE profiles (A100 80GB)
+                  p4de-half-balanced:
+                    - devices: [0, 1, 2, 3]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 2
+                        "2g.20gb": 1
+                        "3g.40gb": 1
+                    - devices: [4, 5, 6, 7]
+                      mig-enabled: false
+
+                  p4de-all-small:
+                    - devices: all
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 7
+
+                  p4de-mixed-workload:
+                    - devices: [0, 1]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 3
+                        "2g.20gb": 1
+                        "3g.40gb": 1
+                    - devices: [2, 3]
+                      mig-enabled: true
+                      mig-devices:
+                        "7g.80gb": 1
+                    - devices: [4, 5, 6, 7]
+                      mig-enabled: false
+
+                  p4de-inference-optimized:
+                    - devices: [0, 1, 2, 3, 4, 5]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 4
+                        "2g.20gb": 1
+                    - devices: [6, 7]
+                      mig-enabled: false
+
+                  p4de-training-optimized:
+                    - devices: [0, 1]
+                      mig-enabled: true
+                      mig-devices:
+                        "3g.40gb": 1
+                        "2g.20gb": 1
+                    - devices: [2, 3, 4, 5]
+                      mig-enabled: true
+                      mig-devices:
+                        "7g.80gb": 1
+                    - devices: [6, 7]
+                      mig-enabled: false
+
+                  # P5 profiles (H100 80GB)
+                  p5-half-balanced:
+                    - devices: [0, 1, 2, 3]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 2
+                        "2g.20gb": 1
+                        "3g.40gb": 1
+                    - devices: [4, 5, 6, 7]
+                      mig-enabled: false
+
+                  p5-all-small:
+                    - devices: all
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 7
+
+                  p5-inference-optimized:
+                    - devices: [0, 1, 2, 3, 4, 5]
+                      mig-enabled: true
+                      mig-devices:
+                        "1g.10gb": 4
+                        "2g.20gb": 1
+                    - devices: [6, 7]
+                      mig-enabled: false
+
+        # Device plugin configuration
+        devicePlugin:
+          enabled: true
+          config:
+            name: ""
+            create: false
+            default: ""
+
+        # Enable other components
+        toolkit:
+          enabled: true
+
+        # Node feature discovery
+        nfd:
+          enabled: true
+
+        # GPU feature discovery
+        gfd:
+          enabled: true
+
+        # DCGM exporter for monitoring
+        dcgmExporter:
+          enabled: true
+          serviceMonitor:
+            enabled: ${service_monitor_enabled}
+            interval: 15s
+            honorLabels: false
+            additionalLabels:
+              release: kube-prometheus-stack
+
+        # Node status exporter
+        nodeStatusExporter:
+          enabled: false
+
+        # Operator configuration
+        operator:
+          defaultRuntime: containerd
+          runtimeClass: nvidia
+
+        # Tolerations and node targeting for all daemonsets
+        daemonsets:
+          tolerations:
+            - key: "nvidia.com/gpu"
+              operator: "Exists"
+              effect: "NoSchedule"
+          # Target only nodes with accelerator: nvidia label (consistent with device plugin)
+          nodeSelector:
+            accelerator: nvidia
+
+        # Resources
+        operator:
+          resources:
+            limits:
+              cpu: 500m
+              memory: 350Mi
+            requests:
+              cpu: 200m
+              memory: 100Mi
+
+        # Priority class for critical workloads
+        daemonsets:
+          priorityClassName: system-node-critical
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

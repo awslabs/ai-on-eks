@@ -66,7 +66,7 @@ export TF_VAR_enable_rayserve_ha_elastic_cache_redis=true
 Then, run the `install.sh` script to install the EKS cluster with KubeRay operator and other add-ons.
 
 ```bash
-cd ai-on-eks/infra/trainimum-inferentia
+cd ai-on-eks/infra/trainium-inferentia
 ./install.sh
 ```
 

@@ -15,6 +15,7 @@ repos:
       - id: terraform_docs
         args:
           - --args=--lockfile=false
+        files: ^(infra|blueprints)/.*\.tf$
       - id: terraform_tflint
         args:
           - --args=--only=terraform_deprecated_interpolation
@@ -36,11 +37,12 @@ repos:
           # this task is running across all of the blueprints in the github checks and can cause failures for missing/corrupted dependencies
           - --hook-config=--parallelism-limit=1
         exclude: (docs|modules)
+  # https://github.com/trufflesecurity/trufflehog?tab=readme-ov-file#floppy_disk-installation
   - repo: local
     hooks:
       - id: trufflehog
         name: TruffleHog
         description: Detect secrets in your data.
-        entry: bash -c 'trufflehog git file://. --since-commit HEAD --fail --no-update'
+        entry: bash -c 'trufflehog git file://. --since-commit HEAD --branch $(git rev-parse --abbrev-ref HEAD) --fail --no-update'
         language: system
         stages: ["pre-commit", "pre-push"]

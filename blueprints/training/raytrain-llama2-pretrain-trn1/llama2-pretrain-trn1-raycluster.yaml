@@ -67,8 +67,7 @@ spec:
         # Node Selector for Karpenter
         # Karpenter will provision this head pod on a node with the specified labels.
         nodeSelector:
-          instanceType: mixed-x86
-          provisionerType: Karpenter
+          instanceType: x86-cpu-karpenter
         volumes:
           - name: log-volume
             emptyDir: {}

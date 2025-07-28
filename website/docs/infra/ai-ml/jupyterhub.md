@@ -87,16 +87,18 @@ This blueprint provides support for three authentication mechanisms: `dummy` and
 
 **Type1 Deployment config changes:**
 
-Only update the `region` variable in the `variables.tf` file.
+Only update the `region` variable in the `blueprint.tfvars` file.
 
 **Type2 Deployment config changes:**
 
-Update the `variables.tf` file with the following variables:
+Update the `blueprint.tfvars` file with the following variables:
  - `acm_certificate_domain`
  - `jupyterhub_domain`
  - `jupyter_hub_auth_mechanism=cognito`
 
 **Type3 Deployment config changes:**
+
+Update the `blueprint.tfvars` file with the following variables:
 - `acm_certificate_domain`
 - `jupyterhub_domain`
 - `jupyter_hub_auth_mechanism=oauth`

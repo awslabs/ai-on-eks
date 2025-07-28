@@ -160,6 +160,117 @@ module "eks" {
         Name = "core-node-grp"
       })
     }
+
+    # Node group for NVIDIA GPU workloads with NVIDIA K8s DRA Testing
+    nvidia-gpu = {
+      ami_type       = "AL2023_x86_64_NVIDIA"
+      instance_types = ["g6.4xlarge"] # Use p4d for testing MIG
+
+      # Mount instance store volumes in RAID-0 for kubelet and containerd
+      cloudinit_pre_nodeadm = [
+        {
+          content_type = "application/node.eks.aws"
+          content      = <<-EOT
+            ---
+            apiVersion: node.eks.aws/v1alpha1
+            kind: NodeConfig
+            spec:
+              instance:
+                localStorage:
+                  strategy: RAID0
+          EOT
+        }
+      ]
+
+      labels = {
+        NodeGroupType            = "g6-mng"
+        "nvidia.com/gpu.present" = "true"
+      }
+
+      min_size     = 0
+      max_size     = 1
+      desired_size = 0
+
+      taints = {
+        # Ensure only GPU workloads are scheduled on this node group
+        gpu = {
+          key    = "nvidia.com/gpu"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
+    }
+
+    #---------------------------------------------------------------
+    # NVIDIA P4de MIG Node Group with Capacity Reservation
+    #---------------------------------------------------------------
+    cbr = {
+      ami_type       = "AL2023_x86_64_NVIDIA"
+      instance_types = ["p4de.24xlarge"]
+
+      cloudinit_pre_nodeadm = [
+        {
+          content_type = "application/node.eks.aws"
+          content      = <<-EOT
+            ---
+            apiVersion: node.eks.aws/v1alpha1
+            kind: NodeConfig
+            spec:
+              instance:
+                localStorage:
+                  strategy: RAID0
+          EOT
+        }
+      ]
+
+      min_size     = 0
+      max_size     = 1
+      desired_size = 0
+
+      # This will:
+      # 1. Create a placement group to place the instances close to one another
+      # 2. Ignore subnets that reside in AZs that do not support the instance type
+      # 3. Expose all of the available EFA interfaces on the launch template
+      enable_efa_support = true
+
+      # NOTE: "nvidia.com/mig.config" label is required for MIG support to match with the MIG profile.
+      # Check mig profiel config in infra/base/terraform/argocd-addons/nvidia-gpu-operator.yaml
+      labels = {
+        "nvidia.com/gpu.present"        = "true"
+        "nvidia.com/gpu.product"        = "A100-SXM4-80GB"
+        "nvidia.com/mig.config"         = "p4de-half-balanced" # References GPU Operator embedded MIG profile
+        "node-type"                     = "p4de"
+        "vpc.amazonaws.com/efa.present" = "true"
+      }
+
+      taints = {
+        # Ensure only GPU workloads are scheduled on this node group
+        gpu = {
+          key    = "nvidia.com/gpu"
+          value  = "true"
+          effect = "NO_SCHEDULE"
+        }
+      }
+
+      #-------------------------------------
+      # NOTE: This code is using second private subnet "${local.region}b" availability zone
+      # TODO - Update the subnet to match the availability zone of YOUR capacity reservation
+      #-------------------------------------
+      subnet_ids = [compact([for subnet_id, cidr_block in zipmap(module.vpc.private_subnets, module.vpc.private_subnets_cidr_blocks) : substr(cidr_block, 0, 4) == "100." ? subnet_id : null])[1]]
+
+      #------------------------------------
+      # TODO - Uncomment the below block and update the capacity reservation ID
+      #------------------------------------
+      # capacity_type = "CAPACITY_BLOCK"
+      # instance_market_options = {
+      #   market_type = "capacity-block"
+      # }
+      # capacity_reservation_specification = {
+      #   capacity_reservation_target = {
+      #     capacity_reservation_id = "cr-abcedefgh" # Replace with your capacity reservation ID
+      #   }
+      # }
+    }
   }
 }
 

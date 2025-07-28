@@ -1,0 +1,29 @@
+modelParameters:
+  modelId: fahadh4ilyas/Llama-4-Scout-17B-16E-Instruct-INT4
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 1024
+  maxNumSeqs: 1
+  maxNumBatchedTokens: 8192
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 8
+  enablePrefixCaching: false
+  numGpus: 8
+
+inference:
+  serviceName: llama-4-scout-17b-vllm
+  serviceNamespace: default
+  accelerator: gpu
+  framework: vllm
+  modelServer:
+    image:
+      repository: vllm/vllm-openai
+      tag: v0.9.1
+    deployment:
+      resources:
+        gpu:
+          requests:
+            nvidia.com/gpu: 8
+          limits:
+            nvidia.com/gpu: 8

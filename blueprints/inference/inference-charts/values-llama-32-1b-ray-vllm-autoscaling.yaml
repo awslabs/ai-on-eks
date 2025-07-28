@@ -1,0 +1,48 @@
+# This deployment is intentionally suboptimal to highlight autoscaling
+modelParameters:
+  modelId: NousResearch/Llama-3.2-1B
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 8192
+  maxNumSeqs: 4
+  maxNumBatchedTokens: 8192
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 1
+  enablePrefixCaching: true
+  numGpus: 1
+
+inference:
+  serviceName: llama-32-1b-ray-vllm-scaling
+  serviceNamespace: default
+  accelerator: gpu
+  framework: rayVllm
+
+  rayOptions:
+    rayVersion: 2.47.0
+    autoscaling:
+      enabled: true
+      actorAutoscaling:
+        minActors: 2
+        maxActors: 4
+
+  modelServer:
+    vllmVersion: 0.9.1
+    pythonVersion: 3.11
+    image:
+      repository: rayproject/ray
+      tag: 2.47.0-py311
+    deployment:
+      replicas: 2
+      minReplicas: 2
+      maxReplicas: 3
+      resources:
+        gpu:
+          requests:
+            cpu: 4
+            memory: 16Gi
+            nvidia.com/gpu: 4
+          limits:
+            cpu: 4
+            memory: 16Gi
+            nvidia.com/gpu: 4

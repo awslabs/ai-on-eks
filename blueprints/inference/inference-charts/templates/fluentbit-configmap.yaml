@@ -1,0 +1,20 @@
+{{- if eq .Values.inference.framework "rayVllm" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluentbit-config
+data:
+  fluent-bit.conf: |
+    [INPUT]
+        Name tail
+        Path /tmp/ray/session_latest/logs/*
+        Tag ray
+        Path_Key true
+        Refresh_Interval 5
+    [FILTER]
+        Name modify
+        Match ray
+        Add POD_LABELS ${POD_LABELS}
+    [OUTPUT]
+        Name stdout
+{{- end }}

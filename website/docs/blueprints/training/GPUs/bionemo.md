@@ -64,7 +64,7 @@ cd ai-on-eks/infra/bionemo
 
 #### Run the install script
 
-Use the provided helper script `install.sh` to run the terraform init and apply commands. By default the script deploys EKS cluster to `us-west-2` region. Update `variables.tf` to change the region. This is also the time to update any other input variables or make any other changes to the terraform template.
+Use the provided helper script `install.sh` to run the terraform init and apply commands. By default the script deploys EKS cluster to `us-west-2` region. Update `blueprint.tfvars` to change the region. This is also the time to update any other input variables or make any other changes to the terraform template.
 
 
 ```bash

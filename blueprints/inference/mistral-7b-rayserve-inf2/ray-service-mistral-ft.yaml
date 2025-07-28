@@ -105,9 +105,7 @@ spec:
                   name: hf-token
                   key: hf-token
           nodeSelector:
-            instanceType: mixed-x86
-            provisionerType: Karpenter
-            workload: rayhead
+            instanceType: x86-cpu-karpenter
           volumes:
           - name: ray-logs
             emptyDir: {}
@@ -148,7 +146,6 @@ spec:
                   key: hf-token
           nodeSelector:
             instanceType: inferentia-inf2
-            provisionerType: Karpenter
           tolerations:
           - key: "aws.amazon.com/neuron"
             operator: "Exists"

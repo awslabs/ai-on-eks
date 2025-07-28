@@ -1,0 +1,30 @@
+modelParameters:
+  modelId: NousResearch/Meta-Llama-3-70B-Instruct
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 4096
+  maxNumSeqs: 10
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 16
+  enablePrefixCaching: false
+  numGpus: 12
+
+inference:
+  serviceName: llama-3-70b-ray-vllm-neuron
+  serviceNamespace: default
+  accelerator: neuron
+  framework: rayVllm
+
+  modelServer:
+    image:
+      repository: 975050295866.dkr.ecr.us-west-2.amazonaws.com/ray-vllm-neuron
+      tag: 2.47.0-0.9.1
+    deployment:
+      instanceType: inf2.48xlarge
+      resources:
+        neuron:
+          requests:
+            aws.amazon.com/neuron: 12
+          limits:
+            aws.amazon.com/neuron: 12

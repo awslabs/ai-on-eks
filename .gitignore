@@ -57,3 +57,10 @@ node_modules
 gen-ai/inference/stable-diffusion-rayserve-gpu/locust/__pycache__/*
 website/package-lock.json
 website/package.json
+
+# Dynamo-specific ignores
+blueprints/inference/nvidia-dynamo/dynamo/
+blueprints/inference/nvidia-dynamo/dynamo_venv/
+blueprints/inference/nvidia-dynamo/dynamo_env.sh
+blueprints/inference/nvidia-dynamo/venv/
+tmp/

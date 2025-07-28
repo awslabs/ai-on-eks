@@ -1,0 +1,59 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }}.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+{{- if and .Values.inference.accelerator .Values.inference.framework }}
+The following service is available:
+
+{{- if eq .Values.inference.framework "vllm" }}
+{{ .Values.inference.accelerator | title }} VLLM Service:
+  $ kubectl get svc {{ .Release.Name }}
+
+  Access the OpenAI-compatible API at:
+  http://{{ .Release.Name }}:{{ .Values.service.port }}/v1/chat/completions
+{{- end }}
+
+{{- if eq .Values.inference.framework "rayVllm" }}
+{{ .Values.inference.accelerator | title }} Ray-VLLM Service:
+  $ kubectl get svc {{ .Release.Name }}
+
+  Access the OpenAI-compatible API at:
+  http://{{ .Release.Name }}-{{ .Values.inference.accelerator }}-ray-vllm:{{ .Values.service.port }}/v1/chat/completions
+{{- end }}
+
+Example curl command to test the API:
+
+curl -X POST \
+  http://<SERVICE_NAME>:{{ .Values.service.port }}/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "default",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Hello, how are you?"
+      }
+    ],
+    "temperature": 0.7,
+    "max_tokens": 100
+  }'
+
+Available API endpoints:
+- /v1/models - List available models
+- /v1/completions - Text completion API
+- /v1/chat/completions - Chat completion API
+- /metrics - Prometheus metrics endpoint
+{{- else }}
+No inference service was enabled. Please set both accelerator and framework values:
+
+- inference.accelerator: gpu or neuron
+- inference.framework: vllm or rayVllm
+
+For example:
+  $ helm upgrade {{ .Release.Name }} . --set inference.accelerator=gpu --set inference.framework=vllm
+{{- end }}

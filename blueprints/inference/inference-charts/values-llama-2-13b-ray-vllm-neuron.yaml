@@ -1,0 +1,30 @@
+modelParameters:
+  modelId: NousResearch/Llama-2-13b-chat-hf
+  gpuMemoryUtilization: 0.8
+  maxModelLen: 1024
+  maxNumSeqs: 1
+  maxNumBatchedTokens: 1024
+  tokenizerPoolSize: 4
+  maxParallelLoadingWorkers: 2
+  pipelineParallelSize: 1
+  tensorParallelSize: 20 # Llama 2 has 40 attention heads, must be divisible
+  enablePrefixCaching: false
+  numGpus: 12
+
+inference:
+  serviceName: llama-2-13b-ray-vllm-neuron
+  serviceNamespace: default
+  accelerator: neuron
+  framework: rayVllm
+
+  modelServer:
+    image:
+      repository: 975050295866.dkr.ecr.us-west-2.amazonaws.com/ray-vllm-neuron
+      tag: 2.47.0-0.9.1
+    deployment:
+      resources:
+        neuron:
+          requests:
+            aws.amazon.com/neuron: 12
+          limits:
+            aws.amazon.com/neuron: 12

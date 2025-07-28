@@ -112,7 +112,7 @@ Navigate into one of the example directories and run `install.sh` script
 
 **Important Note:**
 
-**Step1**: Ensure that you update the region in the `variables.tf` file before deploying the blueprint.
+**Step1**: Ensure that you update the region in the `blueprint.tfvars` file before deploying the blueprint.
 Additionally, confirm that your local region setting matches the specified region to prevent any discrepancies.
 
 For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:

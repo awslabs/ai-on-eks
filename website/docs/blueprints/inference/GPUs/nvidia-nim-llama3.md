@@ -120,14 +120,14 @@ export TF_VAR_ngc_api_key=<replace-with-your-NGC-API-KEY>
 
 **2. Installation**
 
-Important Note: Ensure that you update the region in the variables.tf file before deploying the blueprint. Additionally, confirm that your local region setting matches the specified region to prevent any discrepancies. For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
+Important Note: Ensure that you update the region in the `blueprint.tfvars` file before deploying the blueprint. Additionally, confirm that your local region setting matches the specified region to prevent any discrepancies. For example, set your `export AWS_DEFAULT_REGION="<REGION>"` to the desired region:
 
 Run the installation script:
 
 :::info
 
 
-This pattern deploys a model called `nvcr.io/nim/meta/llama3-8b-instruct`. You can modify the `nim_models` variable in the `variables.tf` file to add more models. Multiple models can be deployed simultaneously using this pattern.
+This pattern deploys a model called `nvcr.io/nim/meta/llama3-8b-instruct`. You can modify the `nim_models` variable in the `blueprint.tfvars` file to add more models. Multiple models can be deployed simultaneously using this pattern.
 :::
 
 :::caution

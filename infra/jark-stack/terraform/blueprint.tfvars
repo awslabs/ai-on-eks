@@ -6,8 +6,15 @@ enable_argo_workflows            = true
 enable_argo_events               = true
 enable_argocd                    = true
 enable_ai_ml_observability_stack = true
+# -------------------------------------------------------------------------------------
+# Enable this to NVIDIA K8s DRA Driver with NVIDIA GPU Opeator
+#   Check infra/base/terraform/variables.tf for more details
+# -------------------------------------------------------------------------------------
+# enable_nvidia_dra_driver         = true
+# enable_nvidia_gpu_operator       = true
+# -------------------------------------------------------------------------------------
 # region                           = "us-west-2"
-# eks_cluster_version              = "1.32"
+# eks_cluster_version              = "1.33"
 
 # -------------------------------------------------------------------------------------
 # EKS Addons Configuration
@@ -18,7 +25,6 @@ enable_ai_ml_observability_stack = true
 # If you need to add a new addon that isn't listed here:
 # 1. Add the addon name to the `enable_cluster_addons` variable in `base/terraform/variables.tf`
 # 2. Update the `locals.cluster_addons` logic in `eks.tf` to include any required configuration
-#
 # -------------------------------------------------------------------------------------
 
 # enable_cluster_addons = {

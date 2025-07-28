@@ -48,6 +48,15 @@ resource "kubernetes_storage_class" "default_gp3" {
 }
 
 #---------------------------------------------------------------
+# Karpenter Node instance role Access Entry
+#---------------------------------------------------------------
+resource "aws_eks_access_entry" "karpenter_nodes" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = module.eks_blueprints_addons.karpenter.node_iam_role_arn
+  type          = "EC2_LINUX"
+}
+
+#---------------------------------------------------------------
 # EKS Blueprints Addons
 #---------------------------------------------------------------
 module "eks_blueprints_addons" {
@@ -204,7 +213,7 @@ module "data_addons" {
   #---------------------------------------
   enable_kuberay_operator = var.enable_kuberay_operator
   kuberay_operator_helm_config = {
-    version = "1.1.1"
+    version = "1.4.0"
     # Enabling Volcano as Batch scheduler for KubeRay Operator
     values = [
       <<-EOT
@@ -234,37 +243,6 @@ module "data_addons" {
         # S3 bucket config for artifacts
         s3_bucket_name = try(module.mlflow_s3_bucket[0].s3_bucket_id, "")
       })
-    ]
-  }
-  #---------------------------------------------------------------
-  # NVIDIA Device Plugin Add-on
-  #---------------------------------------------------------------
-  enable_nvidia_device_plugin = true
-  nvidia_device_plugin_helm_config = {
-    version = "v0.17.1"
-    name    = "nvidia-device-plugin"
-    values = [
-      <<-EOT
-        nodeSelector:
-          accelerator: nvidia
-        gfd:
-          enabled: true
-        nfd:
-          gc:
-            nodeSelector:
-              accelerator: nvidia
-          topologyUpdater:
-            nodeSelector:
-              accelerator: nvidia
-          worker:
-            nodeSelector:
-              accelerator: nvidia
-            tolerations:
-              - key: nvidia.com/gpu
-                operator: Exists
-                effect: NoSchedule
-              - operator: "Exists"
-      EOT
     ]
   }
 
