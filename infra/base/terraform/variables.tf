@@ -319,3 +319,24 @@ variable "enable_nvidia_dcgm_exporter" {
   type        = bool
   default     = true
 }
+
+#Milvus
+variable "enable_vectordb_milvus" {
+  description = "Enable VectorDB Milvus"
+  type        = bool
+  default     = false
+}
+
+#Weaviate
+variable "enable_vectordb_weaviate" {
+  description = "Enable Qdrant Milvus"
+  type        = bool
+  default     = false
+}
+
+#Qdrant
+variable "enable_vectordb_qdrant" {
+  description = "Enable Qdrant Milvus"
+  type        = bool
+  default     = false
+}

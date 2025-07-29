@@ -1,0 +1,55 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: qdrant
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://qdrant.github.io/qdrant-helm
+    chart: qdrant
+    targetRevision : 1.14.1
+    helm:
+      values: |
+        # From https://github.com/qdrant/qdrant-helm/blob/main/charts/qdrant/values.yaml
+        replicaCount: 3
+        nodeSelector:
+          instanceType: "arm64-cpu-ssd-karpenter"           
+        resources:
+          limits:
+            cpu: "4"
+            memory: "16G"
+          requests:
+            cpu: "4"
+            memory: "16G"
+        config:
+          cluster:
+            enabled: true
+            p2p:
+              port: 6335
+              enable_tls: false
+            consensus:
+              tick_period_ms: 100
+        # In production scenario apiKey should be set for Authentication, an external secret can be used here
+        apiKey: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: qdrant
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/instance: qdrant
+      annotations:
+        argocd.argoproj.io/tracking-id: >-
+          qdrant:/qdrant:qdrant/qdrant
+
+
+

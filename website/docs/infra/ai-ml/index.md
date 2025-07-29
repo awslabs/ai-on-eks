@@ -68,6 +68,9 @@ Each stack inherits the `base` stack's components. These components include:
 | `enable_mpi_operator`                    | Enable the MPI Operator                             | `false`                  |
 | `enable_aibrix_stack`                    | Enable the AIBrix stack                             | `false`                  |
 | `aibrix_stack_version`                   | AIBrix Stack version                                | `v0.2.1`                 |
+| `enable_vectordb_milvus`                 | Enable Milvus                                       | `false`                  |
+| `enable_vectordb_weaviate`               | Enable Weaviate                                     | `false`                  |
+| `enable_vectordb_qdrant`                 | Enable Qdrant                                       | `false`                  |
 
 ### JupyterHub
 

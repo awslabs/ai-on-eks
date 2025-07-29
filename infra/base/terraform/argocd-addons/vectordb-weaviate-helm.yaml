@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: weaviate
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://weaviate.github.io/weaviate-helm/
+    chart: weaviate
+    targetRevision : 17.4.3
+    helm:
+      values: |
+        # From https://raw.githubusercontent.com/weaviate/weaviate-helm/refs/heads/master/weaviate/values.yaml 
+        replicas: 4
+        nodeSelector:
+          instanceType: "arm64-cpu-karpenter"
+        service:
+          name: weaviate
+          ports:
+            - name: http
+              protocol: TCP
+              port: 50052
+              # Target port is going to be the same for every port
+          type: ClusterIP
+        grpcService:
+          enabled: true
+          name: weaviate-grpc
+          ports:
+            - name: grpc
+              protocol: TCP
+              port: 50051
+              # Target port is going to be the same for every port
+          type: ClusterIP
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: weaviate
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/instance: weaviate
+      annotations:
+        argocd.argoproj.io/tracking-id: >-
+          weaviate:/weaviate:weaviate/weaviate
+
+

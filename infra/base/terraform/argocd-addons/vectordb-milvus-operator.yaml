@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: milvus
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/background
+spec:
+  project: default
+  source:
+    chart: milvus-operator
+    repoURL: https://zilliztech.github.io/milvus-operator/
+    targetRevision: "v1.2.6"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: milvus
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        argocd.argoproj.io/instance: milvus
+      annotations:
+        argocd.argoproj.io/tracking-id: >-
+          milvus:/milvus:milvus/milvus

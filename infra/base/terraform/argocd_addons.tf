@@ -77,3 +77,24 @@ resource "kubectl_manifest" "nvidia_dcgm_exporter" {
     module.eks_blueprints_addons
   ]
 }
+
+# Milvus Operator
+resource "kubectl_manifest" "vectordb_milvus_yaml" {
+  count     = var.enable_vectordb_milvus ? 1 : 0
+  yaml_body = file("${path.module}/argocd-addons/vectordb-milvus-operator.yaml")
+  depends_on = [module.eks_blueprints_addons]
+}
+
+# Weaviate
+resource "kubectl_manifest" "vectordb_weaviate_yaml" {
+  count     = var.enable_vectordb_weaviate ? 1 : 0
+  yaml_body = file("${path.module}/argocd-addons/vectordb-weaviate-helm.yaml")
+  depends_on = [module.eks_blueprints_addons]
+}
+
+# Qdrant
+resource "kubectl_manifest" "vectordb_qdrant_yaml" {
+  count     = var.enable_vectordb_qdrant ? 1 : 0
+  yaml_body = file("${path.module}/argocd-addons/vectordb-qdrant-helm.yaml")
+  depends_on = [module.eks_blueprints_addons]
+}

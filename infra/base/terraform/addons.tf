@@ -590,6 +590,101 @@ module "data_addons" {
       EOT
       ]
     }
+    # Graviton Nodepools
+    arm64-cpu-karpenter = {
+      values = [
+        <<-EOT
+      name: arm64-cpu-karpenter
+      clusterName: ${module.eks.cluster_name}
+      ec2NodeClass:
+        amiSelectorTerms:
+          - alias: bottlerocket@latest
+        karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
+        subnetSelectorTerms:
+          id: ${module.vpc.private_subnets[2]}
+        securityGroupSelectorTerms:
+          tags:
+            Name: ${module.eks.cluster_name}-node
+        blockDeviceMappings:
+          # Root device
+          - deviceName: /dev/xvda
+            ebs:
+              volumeSize: 100Gi
+              volumeType: gp3
+              encrypted: true
+          # Data device: Container resources such as images and logs
+          - deviceName: /dev/xvdb
+            ebs:
+              volumeSize: 300Gi
+              volumeType: gp3
+              encrypted: true
+              ${var.bottlerocket_data_disk_snapshot_id != null ? "snapshotID: ${var.bottlerocket_data_disk_snapshot_id}" : ""}
+      nodePool:
+        labels:
+          - instanceType: arm64-cpu-karpenter
+          - type: karpenter
+        requirements:
+          - key: "karpenter.k8s.aws/instance-family"
+            operator: In
+            values: ["m7g","r8g","c7g"] # Instance choices should be determined as per workload and nodePool/s should be modified accordingly
+          - key: "kubernetes.io/arch"
+            operator: In
+            values: ["arm64"]
+          - key: "karpenter.sh/capacity-type"
+            operator: In
+            values: [ "on-demand"]
+        limits:
+          cpu: 1000
+        disruption:
+          consolidationPolicy: WhenEmpty
+          consolidateAfter: 300s
+          expireAfter: 720h
+        weight: 100
+      EOT
+      ]
+    }
+    arm64-cpu-ssd-karpenter = {
+      values = [
+        <<-EOT
+      name: arm64-cpu-ssd-karpenter
+      clusterName: ${module.eks.cluster_name}
+      ec2NodeClass:
+        amiSelectorTerms:
+          - alias: bottlerocket@latest
+        karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
+        subnetSelectorTerms:
+          id: ${module.vpc.private_subnets[2]}
+        securityGroupSelectorTerms:
+          tags:
+            Name: ${module.eks.cluster_name}-node
+        instanceStorePolicy: RAID0
+      nodePool:
+        labels:
+          - instanceType: arm64-cpu-ssd-karpenter
+          - type: karpenter
+        requirements:
+          - key: "karpenter.k8s.aws/instance-family"
+            operator: In
+            values: ["r7gd"] # Instance choices should be determined as per workload and nodePool/s should be modified accordingly
+          - key: "karpenter.k8s.aws/instance-size"
+            operator: In
+            values: [ "4xlarge","8xlarge" ]
+          - key: "kubernetes.io/arch"
+            operator: In
+            values: ["arm64"]
+          - key: "karpenter.sh/capacity-type"
+            operator: In
+            values: ["on-demand"]
+        limits:
+          cpu: 1000
+        disruption:
+          consolidationPolicy: WhenEmpty
+          consolidateAfter: 300s
+          expireAfter: 720h
+        weight: 100
+      EOT
+      ]
+    }
   }
 
   depends_on = [
