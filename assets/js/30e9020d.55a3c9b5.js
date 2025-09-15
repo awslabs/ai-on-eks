@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdoeks_website=self.webpackChunkdoeks_website||[]).push([[4870],{47237:e=>{e.exports=JSON.parse('{"categoryGeneratedIndex":{"title":"AI/ML on EKS","slug":"/category/aiml-on-eks","permalink":"/ai-on-eks/docs/category/aiml-on-eks","sidebar":"infra","navigation":{"next":{"title":"Introduction","permalink":"/ai-on-eks/docs/infra/ai-ml/"}}}}')}}]);
