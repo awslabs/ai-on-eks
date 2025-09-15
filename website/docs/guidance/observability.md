@@ -20,7 +20,7 @@ Observability for AI/ML workloads requires a holistic view of multiple hardware/
 Understanding the performance of AI/ML workloads is challenging: Is the GPU getting data fast enough? Is the CPU the bottleneck? Is the storage fast enough? These are questions that are hard to answer in isolation. The more of the picture one is able to see, the more clarity there is in identifying performance bottlenecks.
 
 ## How
-The [JARK](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/jark) infrastructure already comes with this architecture enabled by default, if you would like to add it to your infrastructure, you need to ensure 2 variables are set to `true` in `blueprint.tfvars`:
+The [JARK](https://awslabs.github.io/ai-on-eks/docs/infra/jark) infrastructure already comes with this architecture enabled by default, if you would like to add it to your infrastructure, you need to ensure 2 variables are set to `true` in `blueprint.tfvars`:
 
 ```yaml
 enable_argocd                    = true

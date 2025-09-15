@@ -25,7 +25,7 @@ AIBrix is an open source initiative designed to provide essential building block
 Before deploying this blueprint, it is important to be cognizant of the costs associated with the utilization of GPU Instances.
 :::
 
-Please refer to [AI](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/aibrix) page for deploying AIBrix models on EKS.
+Please refer to [AI](https://awslabs.github.io/ai-on-eks/docs/infra/aibrix) page for deploying AIBrix models on EKS.
 
 </CollapsibleContent>
 

@@ -21,7 +21,7 @@ The inference charts support the following deployment types:
 
 Before deploying the inference charts, ensure you have:
 
-- Amazon EKS cluster with GPU or AWS Neuron nodes ([JARK-stack](../../infra/ai-ml/jark.md) for a quick start)
+- Amazon EKS cluster with GPU or AWS Neuron nodes ([JARK-stack](../../infra/jark.md) for a quick start)
 - Helm 3.0+
 - For GPU deployments: NVIDIA device plugin installed
 - For Neuron deployments: AWS Neuron device plugin installed
