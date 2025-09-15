@@ -5,7 +5,7 @@ locals {
     3 = "20"
     2 = "21"
   })
-  vpc_cidr = strcontains(var.vpc_cidr, "/") ? var.vpc_cidr : format("%s/%s", var.vpc_cidr, local.cidr_bits[var.availability_zones_count])
+  vpc_cidr = strcontains(var.vpc_cidr, "/") ? var.vpc_cidr : format("%s/%s", var.vpc_cidr, local.cidr_bits[local.region_az_count])
 
   # Calculate subnet sizes based on number of AZs to avoid overlaps
   # We need to allocate space for: private subnets, public subnets, and database subnets
@@ -15,7 +15,7 @@ locals {
   # For 2 AZs: /24 subnets (256 IPs each)
   # For 3 AZs: /25 subnets (128 IPs each)
   # For 4 AZs: /26 subnets (64 IPs each)
-  subnet_newbits = var.availability_zones_count == 2 ? 3 : var.availability_zones_count == 3 ? 4 : 5
+  subnet_newbits = local.region_az_count == 2 ? 3 : local.region_az_count == 3 ? 4 : 5
 
   # Private subnets: Start from index 0
   # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.0.0/24", "10.1.1.0/24"]
@@ -25,19 +25,19 @@ locals {
   # Public subnets: Start after private subnets
   # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.2.0/24", "10.1.3.0/24"]
   # e.g., 10.1.0.0/20 with 3 AZs => ["10.1.1.128/25", "10.1.2.0/25", "10.1.2.128/25"]
-  public_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + var.availability_zones_count)]
+  public_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + local.region_az_count)]
 
   # Database subnets: Start after public subnets
   # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.4.0/24", "10.1.5.0/24"]
   # e.g., 10.1.0.0/20 with 3 AZs => ["10.1.3.0/25", "10.1.3.128/25", "10.1.4.0/25"]
-  database_private_subnets = var.enable_database_subnets ? [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + (2 * var.availability_zones_count))] : []
+  database_private_subnets = var.enable_database_subnets ? [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + (2 * local.region_az_count))] : []
 
   # RFC6598 range 100.64.0.0/16 for EKS Data Plane subnets across configurable AZs
   # Divide the secondary CIDR equally among AZs
   # For 2 AZs: /17 subnets (32768 IPs each)
   # For 3 AZs: /18 subnets (16384 IPs each)
   # For 4 AZs: /18 subnets (16384 IPs each) - using only 4 of 4 possible /18 subnets
-  secondary_newbits                  = var.availability_zones_count <= 2 ? 1 : 2
+  secondary_newbits                  = local.region_az_count <= 2 ? 1 : 2
   secondary_ip_range_private_subnets = [for k, v in local.azs : cidrsubnet(element(var.secondary_cidr_blocks, 0), local.secondary_newbits, k)]
 }
 

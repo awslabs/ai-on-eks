@@ -14,7 +14,7 @@ module "efs" {
 
   # Mount targets / security group
   mount_targets = {
-    for k, v in zipmap(local.azs, slice(module.vpc.private_subnets, length(module.vpc.private_subnets) - var.availability_zones_count, length(module.vpc.private_subnets))) : k => { subnet_id = v }
+    for k, v in zipmap(local.azs, slice(module.vpc.private_subnets, length(module.vpc.private_subnets) - local.region_az_count, length(module.vpc.private_subnets))) : k => { subnet_id = v }
   }
   security_group_description = "${local.name} EFS security group"
   security_group_vpc_id      = module.vpc.vpc_id

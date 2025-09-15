@@ -49,7 +49,8 @@ data "aws_iam_session_context" "current" {
 locals {
   name                   = var.name
   region                 = var.region
-  azs                    = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
+  region_az_count        = min(var.availability_zones_count, length(data.aws_availability_zones.available.names))
+  azs                    = slice(data.aws_availability_zones.available.names, 0, local.region_az_count)
   partition              = data.aws_partition.current.partition
   account_id             = data.aws_caller_identity.current.account_id
   mlflow_name            = "mlflow"
