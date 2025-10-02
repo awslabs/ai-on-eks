@@ -1,0 +1,13 @@
+model: SanctumAI/Llama-3.2-1B-Instruct-GGUF
+
+inference:
+  serviceName: llama-32-1b-instruct-llama-cpp
+  serviceNamespace: default
+  framework: llama-cpp
+
+  modelServer:
+    image:
+      repository: ghcr.io/ggml-org/llama.cpp
+      tag: full-b4729 # https://github.com/ggml-org/llama.cpp/issues/13891 Pinning old version until addressed
+      deployment:
+        instanceType: # specify specific graviton instance or let Karpenter chose

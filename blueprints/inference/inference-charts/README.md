@@ -9,6 +9,7 @@ Inferentia/Trainium) hardware.
 
 The chart supports the following deployment types:
 
+- Graviton based Llama.cpp deployments
 - GPU-based VLLM deployments
 - GPU-based Ray-VLLM deployments
 - GPU-based Triton-VLLM deployments
@@ -20,7 +21,7 @@ The chart supports the following deployment types:
 - Neuron-based Triton-VLLM deployments (Coming Soon)
 - Ray-VLLM deployments with (optional) GCS High Availability
 
-### VLLM vs Ray-VLLM vs LeaderWorkerSet-VLLM
+### VLLM vs Ray-VLLM vs AIBrix vs Triton-vLLM vs LeaderWorkerSet-VLLM vs Llama.cpp vs Diffusers
 
 **VLLM Deployments** (`framework: vllm`):
 
@@ -63,6 +64,13 @@ The chart supports the following deployment types:
 - Automatic leader-worker coordination and service discovery
 - Requires LeaderWorkerSet CRD to be installed in the cluster
 
+**Llama.cpp Deployments** (`framework: llama-cpp`)
+
+- Direct Llama.cpp deployment using Kubernetes Deployment
+- Simpler architecture, faster startup
+- Uses `ggml-org/llama.cpp` image
+- Suitable for single-node, cost-effective inference
+
 **Diffusers Deployments** (`framework: diffusers`):
 
 - Hugging Face Diffusers library for image generation and diffusion models
@@ -96,40 +104,40 @@ kubectl create secret generic hf-token --from-literal=token=your_huggingface_tok
 
 The following table lists the configurable parameters of the inference-charts chart and their default values.
 
-| Parameter                                                                | Description                                                                         | Default                                                                     |
-|--------------------------------------------------------------------------|-------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
-| `global.image.pullPolicy`                                                | Global image pull policy                                                            | `IfNotPresent`                                                              |
-| `inference.accelerator`                                                  | Accelerator type to use (gpu or neuron)                                             | `gpu`                                                                       |
-| `inference.framework`                                                    | Framework type to use (vllm, ray-vllm, triton-vllm, aibrix, lws-vllm, or diffusers) | `vllm`                                                                      |
-| `inference.serviceName`                                                  | Name of the inference service                                                       | `inference`                                                                 |
-| `inference.serviceNamespace`                                             | Namespace for the inference service                                                 | `default`                                                                   |
-| `inference.modelServer.image.repository`                                 | Model server image repository                                                       | `vllm/vllm-openai`                                                          |
-| `inference.modelServer.image.tag`                                        | Model server image tag                                                              | `latest`                                                                    |
-| `inference.modelServer.vllmVersion`                                      | VLLM version (for Ray deployments)                                                  | Not set                                                                     |
-| `inference.modelServer.pythonVersion`                                    | Python version (for Ray deployments)                                                | Not set                                                                     |
-| `inference.modelServer.env`                                              | Custom environment variables                                                        | `{}`                                                                        |
-| `inference.modelServer.deployment.replicas`                              | Number of replicas                                                                  | `1`                                                                         |
-| `inference.modelServer.deployment.minReplicas`                           | Minimum number of replicas (for Ray)                                                | `1`                                                                         |
-| `inference.modelServer.deployment.maxReplicas`                           | Maximum number of replicas (for Ray)                                                | `2`                                                                         |
-| `inference.modelServer.deployment.instanceType`                          | Node selector for instance type                                                     | Not set                                                                     |
-| `inference.modelServer.deployment.topologySpreadConstraints.enabled`     | Enable topology spread constraints                                                  | `true`                                                                      |
-| `inference.modelServer.deployment.topologySpreadConstraints.constraints` | List of topology spread constraints                                                 | See default configuration                                                   |
-| `inference.modelServer.deployment.podAffinity.enabled`                   | Enable pod affinity                                                                 | `true`                                                                      |
-| `inference.rayOptions.rayVersion`                                        | Ray version to use                                                                  | `2.47.0`                                                                    |
-| `inference.rayOptions.autoscaling.enabled`                               | Enable Ray native autoscaling                                                       | `false`                                                                     |
-| `inference.rayOptions.autoscaling.upscalingMode`                         | Ray autoscaler upscaling mode                                                       | `Default`                                                                   |
-| `inference.rayOptions.autoscaling.idleTimeoutSeconds`                    | Idle timeout before scaling down                                                    | `60`                                                                        |
-| `inference.rayOptions.autoscaling.actorAutoscaling.minActors`            | Minimum number of actors                                                            | `1`                                                                         |
-| `inference.rayOptions.autoscaling.actorAutoscaling.maxActors`            | Maximum number of actors                                                            | `1`                                                                         |
-| `inference.rayOptions.observability.rayPrometheusHost`                   | Ray Prometheus host URL                                                             | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090` |
-| `inference.rayOptions.observability.rayGrafanaHost`                      | Ray Grafana host URL                                                                | `http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local`         |
-| `inference.rayOptions.observability.rayGrafanaIframeHost`                | Ray Grafana iframe host URL                                                         | `http://localhost:3000`                                                     |
-| `vllm.logLevel`                                                          | Log level for VLLM                                                                  | `debug`                                                                     |
-| `vllm.port`                                                              | VLLM server port                                                                    | `8004`                                                                      |
-| `service.type`                                                           | Service type                                                                        | `ClusterIP`                                                                 |
-| `service.port`                                                           | Service port                                                                        | `8000`                                                                      |
-| `fluentbit.image.repository`                                             | Fluent Bit image repository                                                         | `fluent/fluent-bit`                                                         |
-| `fluentbit.image.tag`                                                    | Fluent Bit image tag                                                                | `3.2.2`                                                                     |
+| Parameter                                                                | Description                                                                                    | Default                                                                     |
+|--------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `global.image.pullPolicy`                                                | Global image pull policy                                                                       | `IfNotPresent`                                                              |
+| `inference.accelerator`                                                  | Accelerator type to use (gpu or neuron)                                                        | `gpu`                                                                       |
+| `inference.framework`                                                    | Framework type to use (vllm, ray-vllm, triton-vllm, aibrix, lws-vllm, llama-cpp, or diffusers) | `vllm`                                                                      |
+| `inference.serviceName`                                                  | Name of the inference service                                                                  | `inference`                                                                 |
+| `inference.serviceNamespace`                                             | Namespace for the inference service                                                            | `default`                                                                   |
+| `inference.modelServer.image.repository`                                 | Model server image repository                                                                  | `vllm/vllm-openai`                                                          |
+| `inference.modelServer.image.tag`                                        | Model server image tag                                                                         | `latest`                                                                    |
+| `inference.modelServer.vllmVersion`                                      | VLLM version (for Ray deployments)                                                             | Not set                                                                     |
+| `inference.modelServer.pythonVersion`                                    | Python version (for Ray deployments)                                                           | Not set                                                                     |
+| `inference.modelServer.env`                                              | Custom environment variables                                                                   | `{}`                                                                        |
+| `inference.modelServer.deployment.replicas`                              | Number of replicas                                                                             | `1`                                                                         |
+| `inference.modelServer.deployment.minReplicas`                           | Minimum number of replicas (for Ray)                                                           | `1`                                                                         |
+| `inference.modelServer.deployment.maxReplicas`                           | Maximum number of replicas (for Ray)                                                           | `2`                                                                         |
+| `inference.modelServer.deployment.instanceType`                          | Node selector for instance type                                                                | Not set                                                                     |
+| `inference.modelServer.deployment.topologySpreadConstraints.enabled`     | Enable topology spread constraints                                                             | `true`                                                                      |
+| `inference.modelServer.deployment.topologySpreadConstraints.constraints` | List of topology spread constraints                                                            | See default configuration                                                   |
+| `inference.modelServer.deployment.podAffinity.enabled`                   | Enable pod affinity                                                                            | `true`                                                                      |
+| `inference.rayOptions.rayVersion`                                        | Ray version to use                                                                             | `2.47.0`                                                                    |
+| `inference.rayOptions.autoscaling.enabled`                               | Enable Ray native autoscaling                                                                  | `false`                                                                     |
+| `inference.rayOptions.autoscaling.upscalingMode`                         | Ray autoscaler upscaling mode                                                                  | `Default`                                                                   |
+| `inference.rayOptions.autoscaling.idleTimeoutSeconds`                    | Idle timeout before scaling down                                                               | `60`                                                                        |
+| `inference.rayOptions.autoscaling.actorAutoscaling.minActors`            | Minimum number of actors                                                                       | `1`                                                                         |
+| `inference.rayOptions.autoscaling.actorAutoscaling.maxActors`            | Maximum number of actors                                                                       | `1`                                                                         |
+| `inference.rayOptions.observability.rayPrometheusHost`                   | Ray Prometheus host URL                                                                        | `http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090` |
+| `inference.rayOptions.observability.rayGrafanaHost`                      | Ray Grafana host URL                                                                           | `http://kube-prometheus-stack-grafana.monitoring.svc.cluster.local`         |
+| `inference.rayOptions.observability.rayGrafanaIframeHost`                | Ray Grafana iframe host URL                                                                    | `http://localhost:3000`                                                     |
+| `vllm.logLevel`                                                          | Log level for VLLM                                                                             | `debug`                                                                     |
+| `vllm.port`                                                              | VLLM server port                                                                               | `8004`                                                                      |
+| `service.type`                                                           | Service type                                                                                   | `ClusterIP`                                                                 |
+| `service.port`                                                           | Service port                                                                                   | `8000`                                                                      |
+| `fluentbit.image.repository`                                             | Fluent Bit image repository                                                                    | `fluent/fluent-bit`                                                         |
+| `fluentbit.image.tag`                                                    | Fluent Bit image tag                                                                           | `3.2.2`                                                                     |
 
 ### Model Parameters
 
@@ -470,6 +478,12 @@ helm install gpu-triton-vllm ./inference-charts --values values-llama-32-1b-trit
 helm install gpt-oss-vllm ./inference-charts --values values-gpt-oss-20b-vllm.yaml
 ```
 
+### Deploy Llama 3.2 1B Instruct with Llama.cpp
+
+```bash
+helm install llama-32-1b-llama-cpp ./inference-charts --values values-llama-32-1b-instruct-llama-cpp.yaml
+```
+
 ### Deploy Diffusers Models
 
 #### Deploy FLUX.1 Schnell for image generation
@@ -580,7 +594,7 @@ helm install custom-inference ./inference-charts --values custom-values.yaml
 
 ## API Endpoints
 
-### VLLM and Ray-VLLM Deployments
+### VLLM, Ray-VLLM, AIBrix, LWS, Llama.cpp Deployments
 
 The deployed service exposes the following OpenAI-compatible API endpoints:
 
