@@ -602,6 +602,71 @@ module "data_addons" {
       EOT
       ]
     }
+    graviton-cpu-karpenter = {
+      values = [
+        <<-EOT
+      name: graviton-cpu-karpenter
+      clusterName: ${module.eks.cluster_name}
+      ec2NodeClass:
+        amiFamily: Bottlerocket
+        amiSelectorTerms:
+          - alias: bottlerocket@latest
+        karpenterRole: ${split("/", module.eks_blueprints_addons.karpenter.node_iam_role_arn)[1]}
+        subnetSelectorTerms:
+          tags:
+            karpenter.sh/discovery: "${module.eks.cluster_name}"
+            Name: "${module.eks.cluster_name}-private-secondary*" # Only seconddary cidr subnets
+        securityGroupSelectorTerms:
+          tags:
+            Name: ${module.eks.cluster_name}-node
+        blockDeviceMappings:
+          # Root device
+          - deviceName: /dev/xvda
+            ebs:
+              volumeSize: 100Gi
+              volumeType: gp3
+              encrypted: true
+          # Data device: Container resources such as images and logs
+          - deviceName: /dev/xvdb
+            ebs:
+              volumeSize: 300Gi
+              volumeType: gp3
+              encrypted: true
+              ${var.bottlerocket_data_disk_snapshot_id != null ? "snapshotID: ${var.bottlerocket_data_disk_snapshot_id}" : ""}
+
+      nodePool:
+        labels:
+          - type: karpenter
+          - instanceType: graviton-cpu-karpenter
+        requirements:
+          - key: karpenter.k8s.aws/instance-category
+            operator: In
+            values:
+            - c
+            - m
+            - r
+          - key: karpenter.k8s.aws/instance-generation
+            operator: Gt
+            values: ["6"]
+          - key: "karpenter.k8s.aws/instance-size"
+            operator: In
+            values: ["8xlarge"]
+          - key: "kubernetes.io/arch"
+            operator: In
+            values: ["arm64"]
+          - key: "karpenter.sh/capacity-type"
+            operator: In
+            values: ["on-demand"]
+        limits:
+          cpu: 1000
+        disruption:
+          consolidationPolicy: WhenEmpty
+          consolidateAfter: 300s
+          expireAfter: 720h
+        weight: 100
+      EOT
+      ]
+    }
   }
 
   depends_on = [
