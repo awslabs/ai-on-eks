@@ -6,7 +6,7 @@ sidebar_label: Inference-Ready Cluster
 
 The Inference-Ready EKS Cluster is a pre-configured infrastructure solution designed specifically for AI/ML inference
 workloads. This solution provides a Kubernetes cluster with all the necessary components to deploy and run inference
-services using the AI on EKS [inference charts](../blueprints/inference/inference-charts.md) or your own deployments
+services using the AI on EKS [inference charts](../../blueprints/inference/inference-charts.md) or your own deployments
 and models.
 
 An expanded [Readme](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/inference-ready-cluster/README.md)
@@ -21,7 +21,7 @@ requirements, different tools are needed to properly deploy, run, and scale the 
 models that aren't just LLMs, such as text -> image diffusion models or more traditional Machine Learning models.
 
 This infrastructure is meant to be the first layer of support. Alongside
-the [Inference Charts](../blueprints/inference/inference-charts.md) and the Guidance you'll also find in this
+the [Inference Charts](../../blueprints/inference/inference-charts.md) and the Guidance you'll also find in this
 repository, AI on EKS aims to equip you with all the tools and knowledge you need to be able to run the inference you
 want.
 
@@ -49,7 +49,7 @@ features:
 - **Autoscaling**: Karpenter-based node autoscaling for cost optimization
 
 The cluster is specifically designed to work seamlessly with the AI on
-EKS [Inference Charts](../blueprints/inference/inference-charts.md), providing a complete end-to-end solution for
+EKS [Inference Charts](../../blueprints/inference/inference-charts.md), providing a complete end-to-end solution for
 deploying inference workloads.
 
 ## Resources
@@ -177,7 +177,7 @@ dashboards are configured to automatically visualize the metrics and logs side b
 ### Step 7: Cluster Ready
 
 Users can access EKS API and can deploy containerized AI/ML inference workloads via Kubernetes CLI using the AI on EKS
-[inference charts](../blueprints/inference/inference-charts.md) or other repositories by interacting with AWS Network
+[inference charts](../../blueprints/inference/inference-charts.md) or other repositories by interacting with AWS Network
 Load Balancer (NLB) endpoint.
 
 ### Step 8: Verify Deployment
@@ -358,7 +358,7 @@ You should see the following output (expand the section to see the output)
 ## Inference on EKS
 
 EKS is a powerful platform for running AI/ML inference. For a deep dive on many of the inference possibilities on EKS,
-please check the [inference](../blueprints/inference/index.md) section.
+please check the [inference](../../blueprints/inference/index.md) section.
 
 ### Inference Charts Integration
 
@@ -417,7 +417,7 @@ helm install neuron-inference . \
   --values values-llama-31-8b-vllm-neuron.yaml
 ```
 
-Please check the [inference charts](../blueprints/inference/inference-charts.md) section for a deeper look at what is
+Please check the [inference charts](../../blueprints/inference/inference-charts.md) section for a deeper look at what is
 available.
 
 ### Observability Integration
@@ -435,7 +435,7 @@ Access Grafana dashboard:
 kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 ```
 
-Please see the [observability](../guidance/observability.md) for an in-depth look at using the observability
+Please see the [observability](../../guidance/observability.md) for an in-depth look at using the observability
 features.
 
 ### Cost Optimization
