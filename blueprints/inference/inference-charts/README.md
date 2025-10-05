@@ -181,6 +181,7 @@ The chart includes pre-configured values files for the following models:
   LeaderWorkerSet-VLLM)
 - **Mistral Small 24B**: `values-mistral-small-24b-ray-vllm.yaml` (Ray-VLLM)
 - **GPT OSS 20B**: `values-gpt-oss-20b-vllm.yaml` (VLLM)
+- **Qwen 3 Coder 480B** `values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml`(LeaderWorkerSet-VLLM)
 
 #### Diffusion Models
 
@@ -402,6 +403,12 @@ helm install gpu-vllm-inference ./inference-charts --values values-llama-32-1b-v
 
 ```bash
 helm install llama4-lws-inference ./inference-charts --values values-llama-4-scout-17b-lws-vllm.yaml
+```
+
+### Deploy GPU LeaderWorkerSet-VLLM with Qwen3 Coder 480B A35B Instruct model
+
+```bash
+helm install qwen3-coder-lws-inference ./inference-charts --values values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml
 ```
 
 ### Deploy GPU Ray-VLLM with Llama 3.2 1B model
