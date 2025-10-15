@@ -20,6 +20,10 @@ In this repository, you'll find a variety of deployment blueprints for creating 
 
 ### 🧠 AI
 
+🚀 [Inference-Ready Cluster](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/inference-ready-cluster) 👈 This solution enables supporting multiple inference patters on EKS
+
+🚀 [Inference Charts](https://awslabs.github.io/ai-on-eks/docs/blueprints/inference/inference-charts) 👈 These charts support deploying various models on EKS
+
 🚀 [JARK-Stack on EKS](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/jark) 👈 This blueprint deploys JARK stack for AI workloads with NVIDIA GPUs.
 
 🚀 [Generative AI on EKS](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/) 👈 Collection of Generative AI Training and Inference LLM deployment patterns

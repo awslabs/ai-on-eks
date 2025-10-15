@@ -76,7 +76,7 @@ data:
                 logger.info("Successfully logged in to Hugging Face Hub")
 
             self.engine_args = AsyncEngineArgs(
-                model=os.getenv("MODEL_ID", "NousResearch/Llama-3.2-1B"),
+                model=os.getenv("MODEL", "NousResearch/Llama-3.2-1B"),
                 # Model identifier from Hugging Face Hub or local path.
                 dtype="auto",
                 # Automatically determine the data type (e.g., float16 or float32) for model weights and computations.
@@ -103,7 +103,7 @@ data:
                 enable_prefix_caching=bool(os.getenv("ENABLE_PREFIX_CACHING", "true")),
                 # Enable prefix caching to improve performance for similar prompt prefixes.
                 # worker_use_ray=True,
-                served_model_name=(os.getenv("SERVED_MODEL_NAME", os.getenv("MODEL_ID", "NousResearch/Llama-3.2-1B"))),
+                served_model_name=(os.getenv("SERVED_MODEL_NAME", os.getenv("MODEL", "NousResearch/Llama-3.2-1B"))),
                 enforce_eager=True,
             )
             self.openai_serving_chat = None

@@ -62,3 +62,24 @@ locals {
     GithubRepo = "github.com/awslabs/ai-on-eks"
   }
 }
+
+resource "random_bytes" "this" {
+  length = 2
+}
+
+resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
+  count         = var.solution_id != null && var.solution_description != null ? 1 : 0
+  name          = "tracking-stack-${random_bytes.this.hex}"
+  on_failure    = "DO_NOTHING"
+  template_body = <<STACK
+    {
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Description": "(${var.solution_id}) ${var.solution_description}",
+        "Resources": {
+            "EmptyResource": {
+                "Type": "AWS::CloudFormation::WaitConditionHandle"
+            }
+        }
+    }
+    STACK
+}

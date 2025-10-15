@@ -237,6 +237,21 @@ You will need to create the service linked role in the AWS account you're using 
 aws iam create-service-linked-role --aws-service-name spot.amazonaws.com
 ```
 
+
+## Karpenter in CrashLoopBackOff after deployment - STS error
+
+After deployment, when checking karpenter pods it is in CrashLoopBackOff state with the following logs:
+```
+{"level":"ERROR","time":"2025-09-30T12:52:27.746Z","logger":"controller","message":"ec2 api connectivity check failed","commit":"13242ea","error":"operation error EC2: DescribeInstanceTypes,
+get identity: get credentials: failed to refresh cached credentials, failed to retrieve credentials, operation error STS: AssumeRoleWithWebIdentity, https response error StatusCode: 403, RequestID: xxx, RegionDisabledException: STS is not activated in this region for account:xxxxx. Your account administrator can activate STS in this region using the IAM Console."}
+```
+
+## Solution:
+
+The message "STS is not activated in this region for account" means an AWS account administrator must enable the AWS Security Token Service (STS) in the specific region where the request is being made before any requests to generate temporary credentials can succeed. You can activate STS for the region using the AWS IAM console on the Account Settings page, which also shows which regions are currently active.
+
+Documentation link: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_enable-regions.html
+
 ## Error: AmazonEKS_CNI_IPv6_Policy does not exist
 If you encounter the error below when deploying a solution that supports IPv6:
 

@@ -139,6 +139,9 @@ spec:
                       secretKeyRef:
                         key: token
                         name: hf-token
+                  # TODO: Remove this when switching to RayLLM API
+                  - name: MODEL
+                    value: "{{ .Values.model}}"
                   {{- if .Values.modelParameters }}
                   {{- range $key, $value := .Values.modelParameters }}
                   - name: {{ $key | snakecase | upper }}

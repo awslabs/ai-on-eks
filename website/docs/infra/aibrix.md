@@ -149,7 +149,7 @@ To avoid unwanted charges to your AWS account, delete all the AWS resources crea
 This script will cleanup the environment using `-target` option to ensure all the resources are deleted in correct order.
 
 ```bash
-cd ai-on-eks/infra/aibrix/terraform
+cd ai-on-eks/infra/aibrix/terraform/_LOCAL
 ./cleanup.sh
 ```
 

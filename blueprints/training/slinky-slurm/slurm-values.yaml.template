@@ -22,24 +22,21 @@ commonAffinity: &commonAffinity
 
 # Slurm controller (slurmctld) configurations.
 controller:
-  affinity: *commonAffinity
   persistence:
-    storageClass: gp3
+    storageClassName: gp3
+  podSpec:
+    affinity: *commonAffinity
 
 # Slurm accounting (slurmdbd) configurations.
 accounting:
-  affinity: *commonAffinity
-
-# `bitnami/mariadb` subchart configurations.
-mariadb:
-  primary:
+  enabled: true
+  podSpec:
     affinity: *commonAffinity
-    persistence:
-      storageClass: gp3
 
 # Slurm REST API (slurmrestd) configurations.
 restapi:
-  affinity: *commonAffinity
+  podSpec:
+    affinity: *commonAffinity
 
 # `slurm-exporter` subchart configurations.
 slurm-exporter:
@@ -47,46 +44,43 @@ slurm-exporter:
     affinity: *commonAffinity
 
 # Login node configurations.
-login:
-  enabled: true
-  replicas: 1
-  service:
-    type: LoadBalancer
-  servicePort: 22
-  rootSshAuthorizedKeys:
-    - ${ssh_key}
-  sshdConfig:
-    AuthorizedKeysFile: "/root/.ssh/authorized_keys"
-    ChallengeResponseAuthentication: "no"
-    PasswordAuthentication: "no"
-    PubkeyAuthentication: "yes"
-    PermitRootLogin: "yes"
-    Port: "22"
-  extraVolumeMounts:
-    - name: fsx-lustre
-      mountPath: /fsx
-  extraVolumes:
-     - name: fsx-lustre
-       persistentVolumeClaim:
-        claimName: fsx-static-pvc
-  affinity: *commonAffinity
+loginsets:
+  slinky:
+    enabled: true
+    replicas: 1
+    login:
+      volumeMounts:
+        - name: fsx-lustre
+          mountPath: /fsx
+    rootSshAuthorizedKeys: |
+      ${ssh_key}
+    extraSshdConfig: |
+      AuthorizedKeysFile /root/.ssh/authorized_keys
+      ChallengeResponseAuthentication no
+      PasswordAuthentication no
+      PubkeyAuthentication yes
+      PermitRootLogin yes
+      Port 22
+    podSpec:
+      affinity: *commonAffinity
+      volumes:
+        - name: fsx-lustre
+          persistentVolumeClaim:
+            claimName: fsx-static-pvc
+    service:
+      spec:
+        type: LoadBalancer
+      port: 22
 
 # Slurm compute (slurmd) configurations.
-compute:
-  nodesets:
-    - name: node
-      enabled: true
-      replicas: 4
+nodesets:
+  slinky:
+    enabled: true
+    replicas: 4
+    slurmd:
       image:
         repository: ${image_repository}
         tag: ${image_tag}
-      nodeSelector:
-        instanceType: g5-gpu-karpenter
-        kubernetes.io/os: linux
-      tolerations:
-      - key: "nvidia.com/gpu"
-        operator: "Exists"
-        effect: "NoSchedule"
       resources:
         limits:
           nvidia.com/gpu: "1"
@@ -94,17 +88,23 @@ compute:
         requests:
           nvidia.com/gpu: "1"
           vpc.amazonaws.com/efa: 1
-      extraVolumeMounts:
+      volumeMounts:
         - name: fsx-lustre
           mountPath: /fsx
         - name: shmem
           mountPath: /dev/shm
-      extraVolumes:
+    podSpec:
+      nodeSelector:
+        instanceType: g5-gpu-karpenter
+        kubernetes.io/os: linux
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      volumes:
         - name: fsx-lustre
           persistentVolumeClaim:
             claimName: fsx-static-pvc
         - name: shmem
           hostPath:
             path: /dev/shm
-      partition:
-        enabled: true

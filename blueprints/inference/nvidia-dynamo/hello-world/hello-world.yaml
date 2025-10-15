@@ -1,0 +1,98 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Hello World DynamoGraphDeployment for ArgoCD deployment
+# This should be applied to the dynamo-cloud namespace where the platform is deployed
+
+apiVersion: nvidia.com/v1alpha1
+kind: DynamoGraphDeployment
+metadata:
+  name: hello-world
+  namespace: dynamo-cloud  # CRITICAL: Must be in same namespace as platform
+spec:
+  services:
+    Frontend:
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - "exit 0"
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - 'echo ok'
+        initialDelaySeconds: 10
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+      dynamoNamespace: hello-world  # Dynamo logical namespace
+      componentType: frontend
+      replicas: 1
+      resources:
+        requests:
+          cpu: "1"
+          memory: "2Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"
+      extraPodSpec:
+        mainContainer:
+          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.5.0
+          workingDir: /workspace/examples/runtime/hello_world/
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - "python3 client.py"
+        # NGC authentication handled by dynamo-cloud namespace secret
+        imagePullSecrets:
+          - name: docker-imagepullsecret
+    HelloWorldWorker:
+      livenessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - "exit 0"
+        periodSeconds: 5
+        timeoutSeconds: 2
+        failureThreshold: 3
+      readinessProbe:
+        exec:
+          command:
+            - /bin/sh
+            - -c
+            - 'grep "Serving endpoint" /tmp/hello_world.log'
+        initialDelaySeconds: 60
+        periodSeconds: 60
+        timeoutSeconds: 30
+        failureThreshold: 10
+      dynamoNamespace: hello-world  # Dynamo logical namespace
+      componentType: worker
+      replicas: 1
+      resources:
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+        limits:
+          cpu: "1"
+          memory: "4Gi"
+      extraPodSpec:
+        mainContainer:
+          image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:0.5.0
+          workingDir: /workspace/examples/runtime/hello_world/
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - "python3 hello_world.py 2>&1 | tee /tmp/hello_world.log"
+        # NGC authentication handled by dynamo-cloud namespace secret
+        imagePullSecrets:
+          - name: docker-imagepullsecret

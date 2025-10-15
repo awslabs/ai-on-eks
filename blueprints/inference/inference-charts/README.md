@@ -137,7 +137,7 @@ The chart provides configuration for various model parameters:
 
 | Parameter                                   | Description                           | Default                     |
 |---------------------------------------------|---------------------------------------|-----------------------------|
-| `modelParameters.modelId`                   | Model ID from Hugging Face Hub        | `NousResearch/Llama-3.2-1B` |
+| `model`                                     | Model ID from Hugging Face Hub        | `NousResearch/Llama-3.2-1B` |
 | `modelParameters.gpuMemoryUtilization`      | GPU memory utilization                | `0.8`                       |
 | `modelParameters.maxModelLen`               | Maximum model sequence length         | `8192`                      |
 | `modelParameters.maxNumSeqs`                | Maximum number of sequences           | `4`                         |
@@ -147,12 +147,11 @@ The chart provides configuration for various model parameters:
 | `modelParameters.pipelineParallelSize`      | Pipeline parallel size                | `1`                         |
 | `modelParameters.tensorParallelSize`        | Tensor parallel size                  | `1`                         |
 | `modelParameters.enablePrefixCaching`       | Enable prefix caching                 | `true`                      |
-| `modelParameters.numGpus`                   | Number of GPUs to use                 | `1`                         |
 | `modelParameters.pipeline`                  | Pipeline type for diffusers framework | Not set                     |
 
-**Note**: Model parameters are automatically converted to environment variables in SCREAMING_SNAKE_CASE format (e.g.,
-`modelId` becomes `MODEL_ID`, `maxNumSeqs` becomes `MAX_NUM_SEQS`). For diffusers deployments, the `pipeline` parameter
-specifies the diffusion pipeline type to use.
+**Note**: Model parameters are automatically converted to command line arguments in kebab-case format (e.g.,`maxNumSeqs`
+becomes `--max-num-seqs`). For diffusers deployments, the `pipeline` parameter specifies the diffusion pipeline type to
+use.
 
 ### Ray GCS High Availability Parameters
 
@@ -176,11 +175,13 @@ The chart includes pre-configured values files for the following models:
 
 - **DeepSeek R1 Distill Llama 8B**: `values-deepseek-r1-distill-llama-8b-ray-vllm-gpu.yaml` (Ray-VLLM)
 - **Llama 3.2 1B**: `values-llama-32-1b-vllm.yaml` (VLLM), `values-llama-32-1b-ray-vllm.yaml` (Ray-VLLM),
-  `values-llama-32-1b-ray-vllm-autoscaling.yaml` (Ray-VLLM with autoscaling), and
-  `values-llama-32-1b-ray-vllm-redis.yaml` (Ray-VLLM with Redis), `values-llama-32-1b-aibrix.yaml` (AIBrix)
+  `values-llama-32-1b-ray-vllm-autoscaling.yaml` (Ray-VLLM with autoscaling),
+  `values-llama-32-1b-aibrix.yaml` (AIBrix), and `values-llama-32-1b-triton-vllm-gpu.yaml` (Triton-VLLM)
 - **Llama 4 Scout 17B**: `values-llama-4-scout-17b-vllm.yaml` (VLLM) and `values-llama-4-scout-17b-lws-vllm.yaml` (
   LeaderWorkerSet-VLLM)
 - **Mistral Small 24B**: `values-mistral-small-24b-ray-vllm.yaml` (Ray-VLLM)
+- **GPT OSS 20B**: `values-gpt-oss-20b-vllm.yaml` (VLLM)
+- **Qwen 3 Coder 480B** `values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml`(LeaderWorkerSet-VLLM)
 
 #### Diffusion Models
 
@@ -340,24 +341,23 @@ The chart supports multiple diffusion pipeline types through the `modelParameter
 For Diffusers deployments, use the following configuration structure:
 
 ```yaml
+model: stabilityai/stable-diffusion-xl-base-1.0
+
+modelParameters:
+  pipeline: diffusion
+
 inference:
+  serviceName: sd-diffusers
+  serviceNamespace: default
   accelerator: gpu
   framework: diffusers
-  serviceName: my-diffusers-service
-  serviceNamespace: default
 
   modelServer:
     image:
-      repository: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/IMAGE_NAME
-      tag: IMAGE_TAG
+      repository: diffusers/diffusers-pytorch-cuda
+      tag: latest
     deployment:
-      instanceType: g6e.2xlarge  # Recommended GPU instance type
-      replicas: 1
-
-modelParameters:
-  modelId: "stabilityai/stable-diffusion-xl-base-1.0"
-  numGpus: 1
-  pipeline: diffusion  # Choose appropriate pipeline type
+      instanceType: g6e.2xlarge
 ```
 
 ### Hardware Requirements
@@ -403,6 +403,12 @@ helm install gpu-vllm-inference ./inference-charts --values values-llama-32-1b-v
 
 ```bash
 helm install llama4-lws-inference ./inference-charts --values values-llama-4-scout-17b-lws-vllm.yaml
+```
+
+### Deploy GPU LeaderWorkerSet-VLLM with Qwen3 Coder 480B A35B Instruct model
+
+```bash
+helm install qwen3-coder-lws-inference ./inference-charts --values values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml
 ```
 
 ### Deploy GPU Ray-VLLM with Llama 3.2 1B model
@@ -459,16 +465,16 @@ helm install gpu-ray-vllm-mistral ./inference-charts --values values-mistral-sma
 helm install gpu-ray-vllm-autoscale ./inference-charts --values values-llama-32-1b-ray-vllm-autoscaling.yaml
 ```
 
-### Deploy GPU Ray-VLLM with Llama 3.2 1B model with Redis GCS HA
+### Deploy GPU Triton-VLLM with Llama 3.2 1B
 
 ```bash
-helm install gpu-ray-vllm-redis ./inference-charts --values values-llama-32-1b-ray-vllm-redis.yaml
+helm install gpu-triton-vllm ./inference-charts --values values-llama-32-1b-triton-vllm-gpu.yaml
 ```
 
-### Deploy GPU Triton-VLLM
+### Deploy GPT OSS 20B with VLLM
 
 ```bash
-helm install gpu-triton-vllm ./inference-charts --values values-triton-vllm-gpu.yaml
+helm install gpt-oss-vllm ./inference-charts --values values-gpt-oss-20b-vllm.yaml
 ```
 
 ### Deploy Diffusers Models
@@ -554,8 +560,9 @@ inference:
             nvidia.com/gpu: 1
     env: { }  # Custom environment variables
 
+model: "NousResearch/Llama-3.2-1B"
+
 modelParameters:
-  modelId: "NousResearch/Llama-3.2-1B"
   gpuMemoryUtilization: 0.8
   maxModelLen: 8192
   maxNumSeqs: 4
@@ -565,12 +572,10 @@ modelParameters:
   pipelineParallelSize: 1
   tensorParallelSize: 1
   enablePrefixCaching: true
-  numGpus: 1
 
 # For diffusers deployments, use this configuration instead:
+# model: "stabilityai/stable-diffusion-xl-base-1.0"
 # modelParameters:
-#   modelId: "stabilityai/stable-diffusion-xl-base-1.0"
-#   numGpus: 1
 #   pipeline: diffusion
 ```
 
@@ -620,6 +625,23 @@ curl http://localhost:8000/v2/models/llama-3-2-1b
 curl -X POST http://localhost:8000/v2/models/vllm_model/generate \
   -H 'Content-Type: application/json' \
   -d '{"text_input":"what is the capital of France?"}'
+```
+
+### Diffusers Deployments
+
+The deployed service exposes REST API endpoints for image generation:
+
+- `/v1/generations` - Primary image generation endpoint
+
+**Example Diffusers API Usage:**
+
+```bash
+# Generate an image using the diffusers API
+curl -X POST http://localhost:8000/v1/generations \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "prompt": "A beautiful sunset over mountains"
+  }'
 ```
 
 ## Ray GCS High Availability
