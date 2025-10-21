@@ -22,10 +22,11 @@ The inference charts support multiple deployment frameworks:
 - **Triton-VLLM** - Production-ready inference server with advanced features
 - **AIBrix** - VLLM with AIBrix-specific configurations
 - **LeaderWorkerSet-VLLM** - Multi-node inference for large models
+- **Llama.cpp** - Graviton-based cost-effective inference with fast startup
 - **Diffusers** - Hugging Face Diffusers for image generation
 - **S3 Model Copy** - Download models from Hugging Face to S3 storage
 
-Both GPU and AWS Neuron (Inferentia/Trainium) accelerators are supported across these frameworks.
+GPU, AWS Neuron (Inferentia/Trainium), and AWS Graviton accelerators are supported across these frameworks.
 
 ## Prerequisites
 
@@ -81,7 +82,7 @@ The inference charts include pre-configured values files for popular models acro
 ### Language Models
 
 - **DeepSeek R1 Distill Llama 8B** - Advanced reasoning model
-- **Llama 3.2 1B** - Lightweight language model
+- **Llama 3.2 1B** - Lightweight language model (available on GPU, Neuron, and Graviton)
 - **Llama 4 Scout 17B** - Mid-size language model
 - **Mistral Small 24B** - Efficient large language model
 - **GPT OSS 20B** - Open-source GPT variant
@@ -100,7 +101,7 @@ The inference charts include pre-configured values files for popular models acro
 - **Llama 3 70B** - Large model on Inferentia
 - **Llama 3.1 8B** - Efficient Inferentia deployment
 
-Each model comes with optimized configurations for different frameworks (VLLM, Ray-VLLM, Triton-VLLM, etc.).
+Each model comes with optimized configurations for different frameworks (VLLM, Ray-VLLM, Triton-VLLM, Llama.cpp, etc.).
 
 ## Deployment Examples
 
@@ -118,6 +119,14 @@ helm install deepseek-ray ./blueprints/inference/inference-charts \
 # Deploy Llama 4 Scout 17B with LeaderWorkerSet-VLLM
 helm install llama4-lws ./blueprints/inference/inference-charts \
   --values ./blueprints/inference/inference-charts/values-llama-4-scout-17b-lws-vllm.yaml
+```
+
+### Graviton Deployments
+
+```bash
+# Deploy Llama 3.2 1B Instruct with Llama.cpp on Graviton
+helm install llama32-graviton ./blueprints/inference/inference-charts \
+  --values ./blueprints/inference/inference-charts/values-llama-32-1b-instruct-llama-cpp.yaml
 ```
 
 ### Diffusion Model Deployments
@@ -143,6 +152,25 @@ helm install llama31-neuron ./blueprints/inference/inference-charts \
 helm install llama3-70b-neuron ./blueprints/inference/inference-charts \
   --values ./blueprints/inference/inference-charts/values-llama-3-70b-ray-vllm-neuron.yaml
 ```
+
+### Graviton Deployments
+
+AWS Graviton processors provide cost-effective inference for CPU-based workloads. The Llama.cpp framework is optimized for Graviton processors and offers:
+
+- **Cost Efficiency** - Lower cost per inference compared to GPU instances
+- **Fast Startup** - Quick deployment with minimal overhead
+- **GGUF Model Support** - Optimized quantized models for efficient CPU inference
+- **OpenAI-Compatible API** - Drop-in replacement for OpenAI API endpoints
+
+```bash
+# Deploy Llama 3.2 1B Instruct with Llama.cpp on Graviton
+helm install llama32-graviton ./blueprints/inference/inference-charts \
+  --values ./blueprints/inference/inference-charts/values-llama-32-1b-instruct-llama-cpp.yaml
+```
+
+:::info Graviton Instance Types
+For optimal performance with Llama.cpp deployments, consider using Graviton-based instance types such as `c7g.large`, `c7g.xlarge`, or `m7g.large`. The chart will automatically select appropriate instances if no specific `instanceType` is configured.
+:::
 
 ### S3 Model Copy
 
@@ -192,7 +220,7 @@ permission to S3.
 | Parameter                                   | Description                                                   | Default                     |
 |---------------------------------------------|---------------------------------------------------------------|-----------------------------|
 | `inference.accelerator`                     | Accelerator type (`gpu` or `neuron`)                          | `gpu`                       |
-| `inference.framework`                       | Framework (`vllm`, `ray-vllm`, `triton-vllm`, `aibrix`, etc.) | `vllm`                      |
+| `inference.framework`                       | Framework (`vllm`, `ray-vllm`, `triton-vllm`, `aibrix`, `llama-cpp`, etc.) | `vllm`                      |
 | `inference.serviceName`                     | Name of the inference service                                 | `inference`                 |
 | `inference.modelServer.deployment.replicas` | Number of replicas                                            | `1`                         |
 | `model`                                     | Model ID from Hugging Face Hub                                | `NousResearch/Llama-3.2-1B` |
@@ -212,7 +240,7 @@ Create a custom values file:
 ```yaml
 inference:
   accelerator: gpu  # or neuron
-  framework: vllm   # vllm, ray-vllm, triton-vllm, aibrix, lws-vllm, diffusers
+  framework: vllm   # vllm, ray-vllm, triton-vllm, aibrix, lws-vllm, llama-cpp, diffusers
   serviceName: my-inference
   modelServer:
     deployment:
@@ -237,7 +265,7 @@ helm install my-inference ./blueprints/inference/inference-charts \
 
 The deployed services expose different API endpoints based on the framework:
 
-### VLLM/Ray-VLLM
+### VLLM/Ray-VLLM/Llama.cpp
 
 - `/v1/models` - List available models
 - `/v1/chat/completions` - Chat completion API
@@ -265,7 +293,7 @@ kubectl port-forward svc/<service-name> 8000
 Test the API:
 
 ```bash
-# Chat completion (VLLM/Ray-VLLM)
+# Chat completion (VLLM/Ray-VLLM, Llama.cpp)
 curl -X POST http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
@@ -308,6 +336,11 @@ curl -X POST http://localhost:8000/v1/generations \
     - Check Triton server logs for model loading errors
     - Verify model repository configuration
     - Ensure proper health check endpoints are accessible
+
+6. **Llama.cpp deployment issues**
+    - Ensure GGUF model format is compatible
+    - Verify Graviton instance availability in your region
+    - Check CPU resource allocation for optimal performance
 
 ### Logs
 
