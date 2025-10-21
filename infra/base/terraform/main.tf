@@ -34,7 +34,10 @@ data "aws_eks_cluster_auth" "this" {
   name = module.eks.cluster_name
 }
 
-data "aws_availability_zones" "available" {}
+data "aws_availability_zones" "available" {
+  # exclude zones where EKS control plane can't reside in: https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html#network-requirements-subnets
+  exclude_zone_ids = ["use1-az3", "usw1-az2", "cac1-az3"]
+}
 
 data "aws_ecrpublic_authorization_token" "token" {
   provider = aws.ecr
@@ -49,8 +52,9 @@ data "aws_iam_session_context" "current" {
 locals {
   name                   = var.name
   region                 = var.region
-  region_az_count        = min(var.availability_zones_count, length(data.aws_availability_zones.available.names))
-  azs                    = slice(data.aws_availability_zones.available.names, 0, local.region_az_count)
+  az_names               = data.aws_availability_zones.available.names
+  region_az_count        = min(var.availability_zones_count, length(local.az_names))
+  azs                    = slice(local.az_names, 0, local.region_az_count)
   partition              = data.aws_partition.current.partition
   account_id             = data.aws_caller_identity.current.account_id
   mlflow_name            = "mlflow"
