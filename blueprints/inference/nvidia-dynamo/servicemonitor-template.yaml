@@ -1,0 +1,47 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: EXAMPLE_NAME-frontend
+  namespace: dynamo-cloud
+  labels:
+    nvidia.com/dynamo-component: Frontend
+    nvidia.com/dynamo-namespace: EXAMPLE_NAME
+    app.kubernetes.io/name: EXAMPLE_NAME-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  ports:
+  - name: http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    nvidia.com/dynamo-component: Frontend
+    nvidia.com/dynamo-namespace: EXAMPLE_NAME
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: EXAMPLE_NAME-frontend-metrics
+  namespace: dynamo-cloud
+  labels:
+    # Required label for Prometheus to discover this ServiceMonitor
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: dynamo-metrics
+    example: EXAMPLE_NAME
+spec:
+  selector:
+    matchLabels:
+      # Match Services for frontend pods
+      nvidia.com/dynamo-component: Frontend
+      nvidia.com/dynamo-namespace: EXAMPLE_NAME
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 10s
+    scrapeTimeout: 10s
+    honorLabels: true
+  namespaceSelector:
+    matchNames:
+    - dynamo-cloud

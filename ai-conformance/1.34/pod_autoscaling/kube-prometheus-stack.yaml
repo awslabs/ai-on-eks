@@ -1,0 +1,9 @@
+prometheus:
+  prometheusSpec:
+    ruleSelectorNilUsesHelmValues: false
+    ruleNamespaceSelector: {}
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+kube-state-metrics:
+  extraArgs:
+    - --metric-labels-allowlist=pods=[*]

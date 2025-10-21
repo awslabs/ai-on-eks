@@ -1,0 +1,23 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: cuda
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: cuda
+    apiVersion: apps/v1
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Object
+      object:
+        metric:
+          name: cuda_gpu
+        describedObject:
+          kind: Deployment
+          apiVersion: apps/v1
+          name: cuda
+        target:
+          type: Value
+          value: 5

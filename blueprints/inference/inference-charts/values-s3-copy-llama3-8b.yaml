@@ -1,0 +1,5 @@
+s3ModelCopy:
+  namespace: default
+  model: NousResearch/Meta-Llama-3-8B-Instruct
+  s3Path: s3-models/ # Set to your S3 Bucket for models
+serviceAccountName: default # Ensure service account has S3 permissions

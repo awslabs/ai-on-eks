@@ -1,0 +1,13 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: eks-gpu-cluster
+  region: us-west-2
+  version: "1.34"
+
+nodeGroups:
+  - name: gpu-pool
+    instanceType: g4dn.12xlarge
+    desiredCapacity: 1
+    volumeSize: 80

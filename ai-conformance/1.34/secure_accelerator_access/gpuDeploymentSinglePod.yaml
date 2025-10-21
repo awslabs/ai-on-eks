@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: gpu-test1
+  name: gpu-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gpu-test1
+  template:
+    metadata:
+      labels:
+        app: gpu-test1
+    spec:
+      containers:
+      - name: ctr0
+        image: ubuntu:22.04
+        command: ["bash", "-c"]
+        args: ["nvidia-smi -L; trap 'exit 0' TERM; sleep 9999 & wait"]
+        resources:
+          claims:
+          - name: gpu0
+      resourceClaims:
+      - name: gpu0
+        resourceClaimTemplateName: single-gpu
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"

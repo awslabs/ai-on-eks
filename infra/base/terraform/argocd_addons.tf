@@ -118,3 +118,23 @@ resource "kubectl_manifest" "mpi_operator" {
     kubectl_manifest.cert_manager_yaml
   ]
 }
+
+# NVIDIA Dynamo CRDs
+resource "kubectl_manifest" "nvidia_dynamo_crds_yaml" {
+  count     = var.enable_dynamo_stack ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/nvidia-dynamo-crds.yaml", { dynamo_version = var.dynamo_stack_version })
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}
+
+# NVIDIA Dynamo Platform
+resource "kubectl_manifest" "nvidia_dynamo_platform_yaml" {
+  count     = var.enable_dynamo_stack ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/nvidia-dynamo-platform.yaml", { dynamo_version = var.dynamo_stack_version })
+
+  depends_on = [
+    module.eks_blueprints_addons
+  ]
+}

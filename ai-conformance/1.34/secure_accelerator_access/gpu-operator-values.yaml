@@ -1,0 +1,10 @@
+driver:
+  enabled: false
+devicePlugin:
+  enabled: false
+toolkit:
+  enabled: false
+nfd:
+  enabled: true
+gfd:
+  enabled: true

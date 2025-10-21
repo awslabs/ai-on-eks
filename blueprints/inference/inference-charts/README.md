@@ -20,6 +20,7 @@ The chart supports the following deployment types:
 - Neuron-based Ray-VLLM deployments
 - Neuron-based Triton-VLLM deployments (Coming Soon)
 - Ray-VLLM deployments with (optional) GCS High Availability
+- S3 Model Copy jobs for downloading models from Hugging Face to S3
 
 ### VLLM vs Ray-VLLM vs AIBrix vs Triton-vLLM vs LeaderWorkerSet-VLLM vs Llama.cpp vs Diffusers
 
@@ -89,6 +90,7 @@ The chart supports the following deployment types:
 - Hugging Face Hub token (stored as a Kubernetes secret named `hf-token`)
 - For Ray: KubeRay Infrastructure
 - For AIBrix: AIBrix Infrastructure
+- For S3 Model Copy: Service account with S3 write permissions
 
 ## Installation
 
@@ -138,6 +140,10 @@ The following table lists the configurable parameters of the inference-charts ch
 | `service.port`                                                           | Service port                                                                                   | `8000`                                                                      |
 | `fluentbit.image.repository`                                             | Fluent Bit image repository                                                                    | `fluent/fluent-bit`                                                         |
 | `fluentbit.image.tag`                                                    | Fluent Bit image tag                                                                           | `3.2.2`                                                                     |
+| `s3ModelCopy.namespace`                                                  | Namespace for S3 model copy job                                                                | `default`                                                                   |
+| `s3ModelCopy.model`                                                      | Hugging Face model ID to copy to S3                                                            | Not set                                                                     |
+| `s3ModelCopy.s3Path`                                                     | S3 path where model should be uploaded                                                         | Not set                                                                     |
+| `serviceAccountName`                                                     | Service account name                                                                           | `default`                                                                   |
 
 ### Model Parameters
 
@@ -189,6 +195,7 @@ The chart includes pre-configured values files for the following models:
   LeaderWorkerSet-VLLM)
 - **Mistral Small 24B**: `values-mistral-small-24b-ray-vllm.yaml` (Ray-VLLM)
 - **GPT OSS 20B**: `values-gpt-oss-20b-vllm.yaml` (VLLM)
+- **Qwen 3 Coder 480B** `values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml`(LeaderWorkerSet-VLLM)
 
 #### Diffusion Models
 
@@ -392,6 +399,45 @@ curl -X POST http://localhost:8000/v1/generations \
   }'
 ```
 
+## S3 Model Copy
+
+The chart includes an S3 Model Copy feature that allows you to download models from Hugging Face Hub and upload them to
+S3 storage. This is useful for:
+
+- Pre-staging models in S3 for faster deployment
+- Creating model repositories in private S3 buckets
+- Reducing inference startup time by leveraging AWS internal network
+
+### S3 Model Copy Configuration
+
+The S3 Model Copy feature is implemented as a Kubernetes Job that runs independently of inference deployments.
+
+| Parameter               | Description                               | Default   |
+|-------------------------|-------------------------------------------|-----------|
+| `s3ModelCopy.namespace` | Namespace for the S3 copy job             | `default` |
+| `s3ModelCopy.model`     | Hugging Face model ID to download         | Not set   |
+| `s3ModelCopy.s3Path`    | S3 path where model should be uploaded    | Not set   |
+| `serviceAccountName`    | Service account with S3 write permissions | `default` |
+
+### Prerequisites for S3 Model Copy
+
+1. **Service Account with S3 Permissions**: The service account must have IAM permissions to write to your target S3
+   bucket. It is suggested to create a service account and
+   use [Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) to grant the service account
+   permission to S3. A service account will also be needed for loading the models from S3 in the inference server.
+2. **Hugging Face Token**: Required for downloading models (same `hf-token` secret used by inference deployments)
+
+### Example S3 Model Copy Configuration
+
+```yaml
+s3ModelCopy:
+  namespace: default
+  model: NousResearch/Meta-Llama-3-8B-Instruct
+  s3Path: my-model-bucket/ # Model will be copied as s3://my-model-bucket/NousResearch/Meta-Llama-3-8B-Instruct
+
+serviceAccountName: s3-model-copy-sa  # Service account with S3 write permissions
+```
+
 ## Examples
 
 ### Deploy GPU Ray-VLLM with DeepSeek R1 Distill Llama 8B model
@@ -410,6 +456,12 @@ helm install gpu-vllm-inference ./inference-charts --values values-llama-32-1b-v
 
 ```bash
 helm install llama4-lws-inference ./inference-charts --values values-llama-4-scout-17b-lws-vllm.yaml
+```
+
+### Deploy GPU LeaderWorkerSet-VLLM with Qwen3 Coder 480B A35B Instruct model
+
+```bash
+helm install qwen3-coder-lws-inference ./inference-charts --values values-qwen-3-coder-480b-a35b-instruct-lws-vllm.yaml
 ```
 
 ### Deploy GPU Ray-VLLM with Llama 3.2 1B model
@@ -520,6 +572,33 @@ helm install omnigen-diffusers ./inference-charts --values values-omni-gen-diffu
 
 ```bash
 helm install latent-diffusion ./inference-charts --values values-latent-diffusion-diffusers.yaml
+```
+
+### S3 Model Copy Examples
+
+#### Copy Llama 3 8B model from Hugging Face to S3
+
+```bash
+helm install s3-copy-llama3 ./inference-charts --values values-s3-copy-llama3-8b.yaml
+```
+
+#### Custom S3 Model Copy
+
+Create a custom values file for copying any model to S3:
+
+```yaml
+s3ModelCopy:
+  namespace: default
+  model: deepseek-ai/DeepSeek-R1
+  s3Path: my-models-bucket/
+
+serviceAccountName: s3-copy-service-account
+```
+
+Then deploy:
+
+```bash
+helm install custom-s3-copy ./inference-charts --values custom-s3-copy-values.yaml
 ```
 
 ### Custom Deployment

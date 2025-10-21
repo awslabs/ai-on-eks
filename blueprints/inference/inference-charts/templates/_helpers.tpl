@@ -73,5 +73,8 @@ app.kubernetes.io/component: {{.Values.inference.serviceName}}
 {{- if eq .Values.inference.framework "aibrix" }}
     {{- $args = append $args (printf "--served-model-name %s" .Values.inference.serviceName) }}
 {{- end }}
+{{- if .Values.vllm.loadFormat }}
+    {{- $args = append $args (printf "--load-format %s" .Values.vllm.loadFormat ) }}
+{{- end}}
 {{- printf "%s" (join " " $args) | trimSuffix " " -}}
 {{- end -}}

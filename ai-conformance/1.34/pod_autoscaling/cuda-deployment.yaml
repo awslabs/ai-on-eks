@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cuda
+  labels:
+    app: cuda
+spec:
+  selector:
+    matchLabels:
+      app: cuda
+  template:
+    metadata:
+      labels:
+        app: cuda
+    spec:
+      containers:
+        - name: cuda
+          image: "k8s.gcr.io/cuda-vector-add:v0.1"
+          command: ["bash", "-c", "for (( c=1; c<=5000; c++ )); do ./vectorAdd; done"]
+          resources:
+            limits:
+              nvidia.com/gpu: 1

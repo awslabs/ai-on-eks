@@ -54,6 +54,8 @@ spec:
           volumeMounts:
             - mountPath: /dev/shm
               name: dshm
+          startupProbe:
+            {{- toYaml .Values.inference.modelServer.deployment.startupProbe | nindent 12 }}
       {{- if eq .Values.inference.accelerator "neuron" }}
       tolerations:
         - key: "aws.amazon.com/neuron"
@@ -92,6 +94,7 @@ spec:
         - name: dshm
           emptyDir:
             medium: Memory
+      serviceAccountName: {{ .Values.serviceAccountName }}
 ---
 apiVersion: v1
 kind: Service

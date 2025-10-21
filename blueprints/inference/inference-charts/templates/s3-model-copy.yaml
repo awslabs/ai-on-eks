@@ -1,0 +1,65 @@
+{{- if .Values.s3ModelCopy.model }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s3-copy-configmap
+  namespace: {{ .Values.s3ModelCopy.namespace }}
+data:
+  script.sh: |
+    #!/bin/bash
+    pip install huggingface-hub==0.35.3 hf_transfer==0.1.9
+    mkdir -p /app/download/$HUGGING_FACE_MODEL
+    apt update && apt install -y curl unzip
+    ARCH=$(uname -m)
+    if [ "$ARCH" != "x86_64" ] && [ "$ARCH" != "aarch64" ]; then
+        echo "Unsupported architecture: $ARCH. Only x86_64 and aarch64 are supported."
+        exit 1
+    fi
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}-2.31.16.zip" -o "awscliv2.zip"
+    unzip -q awscliv2.zip
+    ./aws/install
+    aws --version
+    hf download --exclude original/ metal/ --local-dir /app/download/$HUGGING_FACE_MODEL $HUGGING_FACE_MODEL
+    aws s3 cp --recursive /app/download/ s3://$S3_PATH
+    aws s3 sync --delete /app/download/$HUGGING_FACE_MODEL/ s3://$S3_PATH/$HUGGING_FACE_MODEL/
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-copy
+  namespace: {{ .Values.s3ModelCopy.namespace }}
+spec:
+  template:
+    spec:
+      {{- if .Values.s3ModelCopy.instanceType }}
+      nodeSelector:
+        node.kubernetes.io/instance-type: {{ .Values.s3ModelCopy.instanceType }}
+      {{- end }}
+      containers:
+        - name: s3copy
+          image: python:3.13-slim
+          command: ["/bin/sh", "/app/script.sh"]
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+            - name: HF_HUB_ENABLE_HF_TRANSFER
+              value: "1"
+            - name: HUGGING_FACE_MODEL
+              value: "{{ .Values.s3ModelCopy.model }}"
+            - name: S3_PATH
+              value: "{{ .Values.s3ModelCopy.s3Path }}"
+          volumeMounts:
+            - mountPath: /app/script.sh
+              name: script
+              subPath: script.sh
+      serviceAccountName: "{{ if .Values.s3ModelCopy.serviceAccountName }}{{ .Values.s3ModelCopy.serviceAccountName }}{{ else }}{{ .Values.serviceAccountName }}{{ end }}"
+      restartPolicy: Never
+      volumes:
+        - name: script
+          configMap:
+            name: s3-copy-configmap
+  backoffLimit: 4
+{{- end }}

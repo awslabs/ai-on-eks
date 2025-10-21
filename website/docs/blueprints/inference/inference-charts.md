@@ -4,10 +4,13 @@ sidebar_label: Inference Charts
 
 # AI on EKS Inference Charts
 
-The AI on EKS Inference Charts provide a streamlined Helm-based approach to deploy AI/ML inference workloads on both GPU and AWS Neuron (Inferentia/Trainium) hardware. This chart supports multiple deployment configurations and comes with pre-configured values for popular models.
+The AI on EKS Inference Charts provide a streamlined Helm-based approach to deploy AI/ML inference workloads on both GPU
+and AWS Neuron (Inferentia/Trainium) hardware. This chart supports multiple deployment configurations and comes with
+pre-configured values for popular models.
 
 :::info Advanced Usage
-For detailed configuration options, advanced deployment scenarios, and comprehensive parameter documentation, see the [complete README](https://github.com/awslabs/ai-on-eks/blob/main/blueprints/inference/inference-charts/README.md).
+For detailed configuration options, advanced deployment scenarios, and comprehensive parameter documentation, see
+the [complete README](https://github.com/awslabs/ai-on-eks/blob/main/blueprints/inference/inference-charts/README.md).
 :::
 
 ## Overview
@@ -20,6 +23,7 @@ The inference charts support multiple deployment frameworks:
 - **AIBrix** - VLLM with AIBrix-specific configurations
 - **LeaderWorkerSet-VLLM** - Multi-node inference for large models
 - **Diffusers** - Hugging Face Diffusers for image generation
+- **S3 Model Copy** - Download models from Hugging Face to S3 storage
 
 Both GPU and AWS Neuron (Inferentia/Trainium) accelerators are supported across these frameworks.
 
@@ -36,6 +40,7 @@ Before deploying the inference charts, ensure you have:
 - Hugging Face Hub token (stored as a Kubernetes secret named `hf-token`)
 - For Ray: KubeRay Infrastructure
 - For AIBrix: AIBrix Infrastructure
+- For S3 Model Copy: Service account with S3 write permissions
 
 ## Quick Start
 
@@ -74,6 +79,7 @@ helm install deepseek-inference ./blueprints/inference/inference-charts \
 The inference charts include pre-configured values files for popular models across different categories:
 
 ### Language Models
+
 - **DeepSeek R1 Distill Llama 8B** - Advanced reasoning model
 - **Llama 3.2 1B** - Lightweight language model
 - **Llama 4 Scout 17B** - Mid-size language model
@@ -81,6 +87,7 @@ The inference charts include pre-configured values files for popular models acro
 - **GPT OSS 20B** - Open-source GPT variant
 
 ### Diffusion Models
+
 - **FLUX.1 Schnell** - Fast text-to-image generation
 - **Stable Diffusion XL** - High-quality image generation
 - **Stable Diffusion 3.5** - Latest SD model with enhanced capabilities
@@ -88,6 +95,7 @@ The inference charts include pre-configured values files for popular models acro
 - **OmniGen** - Multi-modal generation
 
 ### Neuron-Optimized Models
+
 - **Llama 2 13B** - Optimized for AWS Inferentia
 - **Llama 3 70B** - Large model on Inferentia
 - **Llama 3.1 8B** - Efficient Inferentia deployment
@@ -136,6 +144,47 @@ helm install llama3-70b-neuron ./blueprints/inference/inference-charts \
   --values ./blueprints/inference/inference-charts/values-llama-3-70b-ray-vllm-neuron.yaml
 ```
 
+### S3 Model Copy
+
+The S3 Model Copy feature allows you to download models from Hugging Face Hub and upload them to S3 storage. This is
+useful for:
+
+- Pre-staging models in S3 for faster deployment
+- Creating model repositories in private S3 buckets
+- Reducing inference startup time by leveraging AWS internal network
+
+```bash
+# Copy Llama 3 8B model from Hugging Face to S3
+helm install s3-copy-llama3 ./blueprints/inference/inference-charts \
+  --values ./blueprints/inference/inference-charts/values-s3-copy-llama3-8b.yaml
+```
+
+#### Custom S3 Model Copy
+
+Create a custom values file for copying any model to S3:
+
+```yaml
+s3ModelCopy:
+  namespace: default
+  model: deepseek-ai/DeepSeek-R1
+  s3Path: my-models-bucket/ # Model will be copied as s3://my-models-bucket/deepseek-ai/DeepSeek-R1
+
+serviceAccountName: s3-copy-service-account  # Service account with S3 write permissions
+```
+
+Deploy the S3 copy job:
+
+```bash
+helm install custom-s3-copy ./blueprints/inference/inference-charts \
+  --values custom-s3-copy-values.yaml
+```
+
+:::info S3 Permissions
+The service account needs IAM permissions to write to your target S3 bucket. Consider
+using [Pod Identity](https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html) to grant the service account
+permission to S3.
+:::
+
 ## Configuration
 
 ### Key Parameters
@@ -151,6 +200,10 @@ helm install llama3-70b-neuron ./blueprints/inference/inference-charts \
 | `modelParameters.maxModelLen`               | Maximum model sequence length                                 | `8192`                      |
 | `modelParameters.tensorParallelSize`        | Tensor parallel size                                          | `1`                         |
 | `modelParameters.pipelineParallelSize`      | Pipeline parallel size                                        | `1`                         |
+| `s3ModelCopy.namespace`                     | Namespace for S3 model copy job                               | `default`                   |
+| `s3ModelCopy.model`                         | Hugging Face model ID to copy to S3                           | Not set                     |
+| `s3ModelCopy.s3Path`                        | S3 path where model should be uploaded                        | Not set                     |
+| `serviceAccountName`                        | Service account name                                          | `default`                   |
 
 ### Custom Configuration
 
@@ -185,17 +238,20 @@ helm install my-inference ./blueprints/inference/inference-charts \
 The deployed services expose different API endpoints based on the framework:
 
 ### VLLM/Ray-VLLM
+
 - `/v1/models` - List available models
 - `/v1/chat/completions` - Chat completion API
 - `/v1/completions` - Text completion API
 - `/metrics` - Prometheus metrics
 
 ### Triton-VLLM
+
 - `/v2/models` - List available models
 - `/v2/models/vllm_model/generate` - Model inference
 - `/v2/health/ready` - Health checks
 
 ### Diffusers
+
 - `/v1/generations` - Image generation API
 
 ### Example Usage
@@ -229,33 +285,34 @@ curl -X POST http://localhost:8000/v1/generations \
 ### Common Issues
 
 1. **Pod stuck in Pending state**
-   - Check if GPU/Neuron nodes are available
-   - Verify resource requests match available hardware
-   - For LeaderWorkerSet deployments: Ensure LeaderWorkerSet CRD is installed
+    - Check if GPU/Neuron nodes are available
+    - Verify resource requests match available hardware
+    - For LeaderWorkerSet deployments: Ensure LeaderWorkerSet CRD is installed
 
 2. **Model download failures**
-   - Ensure Hugging Face token is correctly configured as secret `hf-token`
-   - Check network connectivity to Hugging Face Hub
-   - Verify model ID is correct and accessible
+    - Ensure Hugging Face token is correctly configured as secret `hf-token`
+    - Check network connectivity to Hugging Face Hub
+    - Verify model ID is correct and accessible
 
 3. **Out of memory errors**
-   - Adjust `gpuMemoryUtilization` parameter (try reducing from 0.8 to 0.7)
-   - Consider using tensor parallelism for larger models
-   - For large models, use LeaderWorkerSet or Ray deployments with multiple GPUs
+    - Adjust `gpuMemoryUtilization` parameter (try reducing from 0.8 to 0.7)
+    - Consider using tensor parallelism for larger models
+    - For large models, use LeaderWorkerSet or Ray deployments with multiple GPUs
 
 4. **Ray deployment issues**
-   - Ensure KubeRay infrastructure is installed
-   - Check Ray cluster status and worker connectivity
-   - Verify Ray version compatibility
+    - Ensure KubeRay infrastructure is installed
+    - Check Ray cluster status and worker connectivity
+    - Verify Ray version compatibility
 
 5. **Triton deployment issues**
-   - Check Triton server logs for model loading errors
-   - Verify model repository configuration
-   - Ensure proper health check endpoints are accessible
+    - Check Triton server logs for model loading errors
+    - Verify model repository configuration
+    - Ensure proper health check endpoints are accessible
 
 ### Logs
 
 Check deployment logs based on framework:
+
 ### Check Logs
 
 ```bash

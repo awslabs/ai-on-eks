@@ -1,14 +1,7 @@
 model: NousResearch/Llama-3.2-1B
 
 modelParameters:
-  gpuMemoryUtilization: 0.8
   maxModelLen: 8192
-  maxNumSeqs: 4
-  maxNumBatchedTokens: 8192
-  tokenizerPoolSize: 4
-  maxParallelLoadingWorkers: 2
-  pipelineParallelSize: 1
-  tensorParallelSize: 1
 
 inference:
   serviceName: llama-32-1b-vllm
@@ -19,4 +12,4 @@ inference:
   modelServer:
     image:
       repository: vllm/vllm-openai
-      tag: v0.9.1
+      tag: v0.10.2

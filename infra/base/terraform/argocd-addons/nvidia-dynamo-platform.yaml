@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dynamo-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://helm.ngc.nvidia.com/nvidia/ai-dynamo
+    chart: dynamo-platform
+    targetRevision: ${trimprefix(dynamo_version, "v")}
+    helm:
+      values: |
+        # NVIDIA Dynamo Platform Configuration for ai-on-eks using NGC
+        # Using minimal config - NGC chart defaults should work
+
+        # NGC authentication (required)
+        dynamo-operator:
+          imagePullSecrets:
+            - name: docker-imagepullsecret
+
+        # NATS configuration - use EFS for JetStream persistence
+        # Note: etcd inherits from global.storageClass, but NATS needs explicit setting
+        nats:
+          config:
+            jetstream:
+              fileStore:
+                pvc:
+                  storageClassName: efs-sc-dynamic
+
+        # etcd configuration - disable JWT auth and pre-upgrade hook
+        etcd:
+          auth:
+            token:
+              enabled: false
+          preUpgradeJob:
+            enabled: false
+
+        # Use EFS for shared storage (etcd inherits this, other components may too)
+        global:
+          storageClass: efs-sc-dynamic
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dynamo-cloud
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    # Ignore differences in webhook configurations during upgrades
+    - group: admissionregistration.k8s.io
+      kind: ValidatingAdmissionWebhook
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingAdmissionWebhook
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle

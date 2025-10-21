@@ -1,0 +1,13 @@
+dcgmExporter:
+  serviceMonitor:
+    enabled: true
+devicePlugin:
+  enabled: true
+driver:
+  enabled: true
+gfd:
+  enabled: true
+nfd:
+  enabled: true
+toolkit:
+  enabled: false

@@ -28,6 +28,7 @@ fluentbit:
       memory: 128Mi
 
 vllm:
+  loadFormat: # runai_streamer
   logLevel: debug
   port: 8004
 
@@ -46,7 +47,7 @@ inference:
   accelerator: gpu
 
   # Framework type: vllm, ray-vllm, triton-vllm, aibrix, or lws-vllm
-  framework: vllm
+  framework:
 
   #Ray Specific Options
   rayOptions:
@@ -119,8 +120,22 @@ inference:
               topologyKey: topology.kubernetes.io/zone
               labelSelector:
                 matchLabels: {} # Will be populated with deployment labels
+      startupProbe:
+        failureThreshold: 60
+        periodSeconds: 10
+        httpGet:
+          path: /health
+          port: 8000
     env: {}
 
+s3ModelCopy:
+  model:
+  s3Path:
+  namespace:
+  serviceAccountName: # serviceAccountName to be used for model uploading to S3
+
+# serviceAccountName to use for deployments
+serviceAccountName: default
 
 # Service configuration
 service:

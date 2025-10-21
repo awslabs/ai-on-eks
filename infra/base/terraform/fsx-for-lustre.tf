@@ -21,7 +21,7 @@ resource "aws_fsx_lustre_file_system" "this" {
   tags = merge({ "Name" : "${local.name}-static" }, local.tags)
 }
 
-# This process can take up to 7 mins
+# This process can take up to 20 mins
 resource "aws_fsx_data_repository_association" "this" {
   count                = var.deploy_fsx_volume ? 1 : 0
   file_system_id       = aws_fsx_lustre_file_system.this[0].id
@@ -36,6 +36,10 @@ resource "aws_fsx_data_repository_association" "this" {
     auto_import_policy {
       events = ["NEW", "CHANGED", "DELETED"]
     }
+  }
+
+  timeouts {
+    create = "20m"
   }
 }
 

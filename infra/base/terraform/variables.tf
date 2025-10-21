@@ -248,7 +248,7 @@ variable "enable_aibrix_stack" {
 variable "aibrix_stack_version" {
   description = "AIBrix default version"
   type        = string
-  default     = "v0.2.1"
+  default     = "v0.4.1"
 }
 
 variable "enable_leader_worker_set" {
@@ -395,6 +395,104 @@ variable "oauth_username_key" {
 # List of role ARNs to add to the KMS policy
 variable "kms_key_admin_roles" {
   description = "list of role ARNs to add to the KMS policy"
+  type        = list(string)
+  default     = []
+}
+
+# NVIDIA Dynamo Stack Variables
+variable "enable_dynamo_stack" {
+  description = "Enable NVIDIA Dynamo Stack addon"
+  type        = bool
+  default     = false
+}
+
+variable "dynamo_stack_version" {
+  description = "NVIDIA Dynamo Stack version"
+  type        = string
+  default     = "v0.4.0"
+}
+
+# Enable SOCI snapshotter parallel pull/unpack mode
+variable "enable_soci_snapshotter" {
+  description = "Enable SOCI snapshotter parallel pull/unpack mode"
+  type        = bool
+  default     = false
+}
+
+# SOCI snapshotter root dir bind to instance store
+variable "soci_snapshotter_use_instance_store" {
+  description = <<-EOF
+    When disabled (default) - Configure the EBS volume used by Bottlerocket's container resources to be fully optimized: IOPs: 16K, Throughput: 1000MiB/s
+    When enabled - Configure SOCI snapshotter root dir to bind to ephemeral storage / instance store"
+  EOF
+  type        = bool
+  default     = false
+}
+
+# Configure kernel max_user_namespaces
+variable "max_user_namespaces" {
+  description = "Configure kernel max_user_namespaces"
+  type        = number
+  default     = 0
+}
+
+# Configure Karpenter NodePool AMI Family
+variable "ami_family" {
+  description = "Configure the AMI family to be used with Karpenter NodePools"
+  type        = string
+  default     = "bottlerocket"
+
+  validation {
+    condition     = var.ami_family == "bottlerocket" || var.ami_family == "al2023"
+    error_message = "The ami_family must be set to either \"bottlerocket\" or \"al2023\"."
+  }
+}
+
+# S3 Model Storage Variables
+variable "enable_s3_models_storage" {
+  description = "Enable S3 model storage infrastructure"
+  type        = bool
+  default     = false
+}
+
+variable "s3_models_bucket_create" {
+  description = "Whether to create a new S3 bucket. If true, creates new bucket. If false, uses existing bucket specified in s3_models_bucket_name"
+  type        = bool
+  default     = true
+}
+
+variable "s3_models_bucket_name" {
+  description = "Name of the S3 bucket for storing ML models. If empty, will use naming pattern: {var.name}-models-{account_id}-{region}"
+  type        = string
+  default     = ""
+}
+
+variable "s3_models_sync_sa" {
+  description = "Name of the service account for model sync operations (upload/download/delete)"
+  type        = string
+  default     = "s3-models-sync-sa"
+}
+
+variable "s3_models_inference_sa" {
+  description = "Name of the service account for model inference operations (read-only)"
+  type        = string
+  default     = "inference-sa"
+}
+
+variable "s3_models_sync_sa_namespace" {
+  description = "Namespace for model sync service account"
+  type        = string
+  default     = "default"
+}
+
+variable "s3_models_inference_sa_namespace" {
+  description = "Namespace for model inference service account"
+  type        = string
+  default     = "default"
+}
+
+variable "s3_models_additional_buckets" {
+  description = "List of additional S3 bucket names that both service accounts should have access to"
   type        = list(string)
   default     = []
 }

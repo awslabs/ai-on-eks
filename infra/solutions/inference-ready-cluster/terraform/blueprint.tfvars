@@ -6,6 +6,7 @@ enable_leader_worker_set         = true
 solution_description             = "Guidance for Deploying an Inference ready Amazon EKS Cluster"
 solution_id                      = "SO9615"
 availability_zones_count         = 4
+enable_soci_snapshotter          = true
 # region                           = "us-west-2"
 # eks_cluster_version              = "1.33"
 

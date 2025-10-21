@@ -42,6 +42,7 @@ local_tf_state/
 .gitallowed
 site
 .env*
+.kiro
 
 # Checks
 .tfsec

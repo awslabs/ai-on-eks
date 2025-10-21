@@ -67,6 +67,7 @@ resource "random_bytes" "this" {
 }
 
 resource "aws_cloudformation_stack" "guidance_deployment_metrics" {
+  count         = var.solution_id != null && var.solution_description != null ? 1 : 0
   name          = "tracking-stack-${random_bytes.this.hex}"
   on_failure    = "DO_NOTHING"
   template_body = <<STACK

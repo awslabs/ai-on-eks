@@ -91,3 +91,35 @@ module "vpc" {
 
   tags = local.tags
 }
+
+################################################################################
+# VPC Endpoints
+################################################################################
+
+module "vpc_endpoints" {
+  source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+  version = "~> 5.21"
+
+  vpc_id = module.vpc.vpc_id
+
+  endpoints = {
+    s3 = {
+      service         = "s3"
+      service_type    = "Gateway"
+      route_table_ids = module.vpc.private_route_table_ids
+      tags = {
+        Name = "${var.name}-s3-vpc-endpoint"
+      }
+    }
+    s3express = {
+      service         = "s3express"
+      service_type    = "Gateway"
+      route_table_ids = module.vpc.private_route_table_ids
+      tags = {
+        Name = "${var.name}-s3express-vpc-endpoint"
+      }
+    }
+  }
+
+  tags = local.tags
+}

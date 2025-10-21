@@ -159,53 +159,51 @@ Verify the deployment status the Slurm Cluster:
 kubectl get all -n slurm
 ```
 ```
-NAME                                  READY   STATUS    RESTARTS   AGE
-pod/slurm-accounting-0                1/1     Running   0          40m
-pod/slurm-compute-node-0              2/2     Running   0          40m
-pod/slurm-compute-node-1              2/2     Running   0          40m
-pod/slurm-compute-node-2              2/2     Running   0          40m
-pod/slurm-compute-node-3              2/2     Running   0          40m
-pod/slurm-controller-0                3/3     Running   0          40m
-pod/slurm-exporter-79c5896fbc-wrgv9   1/1     Running   0          40m
-pod/slurm-login-65bc775dbf-qwtpv      1/1     Running   0          40m
-pod/slurm-mariadb-0                   1/1     Running   0          40m
-pod/slurm-restapi-859879fbc9-89gjw    1/1     Running   0          40m
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/mariadb-0                             1/1     Running   0          9m21s
+pod/slurm-accounting-0                    1/1     Running   0          9m14s
+pod/slurm-controller-0                    3/3     Running   0          9m14s
+pod/slurm-exporter-6ddbf6fcc5-xnxmg       1/1     Running   0          9m14s
+pod/slurm-login-slinky-5f56cdb67c-rjmnf   1/1     Running   0          9m13s
+pod/slurm-restapi-545ffcccb5-qqsgv        1/1     Running   0          9m13s
+pod/slurm-worker-slinky-0                 2/2     Running   0          9m13s
+pod/slurm-worker-slinky-1                 2/2     Running   0          9m13s
+pod/slurm-worker-slinky-2                 2/2     Running   0          9m13s
+pod/slurm-worker-slinky-3                 2/2     Running   0          9m13s
 
-NAME                             TYPE           CLUSTER-IP       EXTERNAL-IP                                                                  PORT(S)        AGE
-service/slurm-accounting         ClusterIP      None             <none>                                                                       6819/TCP       40m
-service/slurm-compute            ClusterIP      None             <none>                                                                       6818/TCP       40m
-service/slurm-controller         ClusterIP      None             <none>                                                                       6817/TCP       40m
-service/slurm-exporter           ClusterIP      None             <none>                                                                       8080/TCP       40m
-service/slurm-login              LoadBalancer   172.20.58.220    k8s-slurm-slurmlog-40c37c19f0-8dcdb95fe5ccfb8b.elb.us-west-2.amazonaws.com   22:31720/TCP   40m
-service/slurm-mariadb            ClusterIP      172.20.229.199   <none>                                                                       3306/TCP       40m
-service/slurm-mariadb-headless   ClusterIP      None             <none>                                                                       3306/TCP       40m
-service/slurm-restapi            ClusterIP      172.20.167.17    <none>                                                                       6820/TCP       40m
+NAME                         TYPE           CLUSTER-IP       EXTERNAL-IP                                                                  PORT(S)        AGE
+service/mariadb              ClusterIP      172.20.181.87    <none>                                                                       3306/TCP       9m22s
+service/mariadb-internal     ClusterIP      None             <none>                                                                       3306/TCP       9m22s
+service/slurm-accounting     ClusterIP      172.20.207.118   <none>                                                                       6819/TCP       9m15s
+service/slurm-controller     ClusterIP      172.20.157.64    <none>                                                                       6817/TCP       9m15s
+service/slurm-exporter       ClusterIP      None             <none>                                                                       8080/TCP       9m15s
+service/slurm-login-slinky   LoadBalancer   172.20.191.71    k8s-slurm-slurmlog-a06325b7ab-221460a1f496bf88.elb.us-west-2.amazonaws.com   22:31786/TCP   9m15s
+service/slurm-restapi        ClusterIP      172.20.145.217   <none>                                                                       6820/TCP       9m14s
 
-NAME                             READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/slurm-exporter   1/1     1            1           40m
-deployment.apps/slurm-login      1/1     1            1           40m
-deployment.apps/slurm-restapi    1/1     1            1           40m
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/slurm-exporter       1/1     1            1           9m15s
+deployment.apps/slurm-login-slinky   1/1     1            1           9m14s
+deployment.apps/slurm-restapi        1/1     1            1           9m14s
 
-NAME                                        DESIRED   CURRENT   READY   AGE
-replicaset.apps/slurm-exporter-79c5896fbc   1         1         1       40m
-replicaset.apps/slurm-login-65bc775dbf      1         1         1       40m
-replicaset.apps/slurm-restapi-859879fbc9    1         1         1       40m
+NAME                                            DESIRED   CURRENT   READY   AGE
+replicaset.apps/slurm-exporter-6ddbf6fcc5       1         1         1       9m15s
+replicaset.apps/slurm-login-slinky-5f56cdb67c   1         1         1       9m14s
+replicaset.apps/slurm-restapi-545ffcccb5        1         1         1       9m14s
 
 NAME                                READY   AGE
-statefulset.apps/slurm-accounting   1/1     40m
-statefulset.apps/slurm-controller   1/1     40m
-statefulset.apps/slurm-mariadb      1/1     40m
+statefulset.apps/mariadb            1/1     9m22s
+statefulset.apps/slurm-accounting   1/1     9m15s
+statefulset.apps/slurm-controller   1/1     9m15s
 ```
 **1. Access the Slurm login Pod:**
 
 SSH into the login pod:
 :::info
-For this demonstration, the `slurm-login` service has been dynamically annotated using `service.beta.kubernetes.io/load-balancer-source-ranges` to restrict access to the Network Load Balancer with your IP address only. The AWS Load Balancer Controller achieves this by modifying inbound security group rules. For more information see the documentation on [access control annotations](https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.13/guide/ingress/annotations/#access-control).
+For this demonstration, the `slurm-login-slinky` service has been dynamically annotated using `service.beta.kubernetes.io/load-balancer-source-ranges` to restrict access to the Network Load Balancer with your IP address only. The AWS Load Balancer Controller achieves this by modifying inbound security group rules. For more information see the documentation on [access control annotations](https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.13/guide/ingress/annotations/#access-control).
 :::
 ```
-SLURM_LOGIN_HOSTNAME="$(kubectl get services \
- -n slurm -l app.kubernetes.io/instance=slurm,app.kubernetes.io/name=login \
- -o jsonpath="{.items[0].status.loadBalancer.ingress[0].hostname}")"
+SLURM_LOGIN_HOSTNAME="$(kubectl get svc slurm-login-slinky -n slurm \
+ -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")"
 
 ssh -i ~/.ssh/id_ed25519_slurm -p 22 root@$SLURM_LOGIN_HOSTNAME
 ```
@@ -215,8 +213,8 @@ sinfo
 ```
 ```
 PARTITION AVAIL  TIMELIMIT  NODES  STATE NODELIST
-node         up   infinite      4   idle node-[0-3]
-all*         up   infinite      4   idle node-[0-3]
+slinky       up   infinite      4   idle slinky-[0-3]
+all*         up   infinite      4   idle slinky-[0-3]
 ```
 Verify that the Amazon FSx for Lustre shared file system is mounted to the login pod:
 ```
@@ -243,7 +241,7 @@ exit
 
 Open an interactive terminal session with one of the slurm compute nodes:
 ```
-kubectl -n slurm exec -it pod/slurm-compute-node-0 -- bash --login
+kubectl -n slurm exec -it pod/slurm-worker-slinky-0 -- bash --login
 ```
 Verify that the Amazon FSx for Lustre shared file system is mounted to the login pod:
 ```
@@ -332,9 +330,8 @@ exit
 
 SSH into the login pod:
 ```
-SLURM_LOGIN_HOSTNAME="$(kubectl get services \
- -n slurm -l app.kubernetes.io/instance=slurm,app.kubernetes.io/name=login \
- -o jsonpath="{.items[0].status.loadBalancer.ingress[0].hostname}")"
+SLURM_LOGIN_HOSTNAME="$(kubectl get svc slurm-login-slinky -n slurm \
+ -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")"
 
 ssh -i ~/.ssh/id_ed25519_slurm -p 22 root@$SLURM_LOGIN_HOSTNAME
 ```
@@ -414,9 +411,9 @@ tail -f logs/llama2_7b-FSDP_${JOB_ID}.out
 3: node-2:278:278 [0] NCCL INFO Broadcast: opCount 1608 sendbuff 0x302287400 recvbuff 0x302287400 count 1 datatype 4 op 0 root 0 comm 0x5611d45babf0 [nranks=4] stream 0x5611d3327480
 1: node-3:278:278 [0] NCCL INFO Broadcast: opCount 1609 sendbuff 0x302287600 recvbuff 0x302287600 count 3145 datatype 1 op 0 root 0 comm 0x555e2c6387e0 [nranks=4] stream 0x555e2b3a4370
 ```
-Watch the error logs from `slurm-compute-node-0` (in a new terminal window):
+Watch the error logs from `slurm-worker-slinky-0` (in a new terminal window):
 ```
-kubectl -n slurm exec -it pod/slurm-compute-node-0 -- bash --login
+kubectl -n slurm exec -it pod/slurm-worker-slinky-0 -- bash --login
 ```
 ```
 cd /fsx/awsome-distributed-training/3.test_cases/pytorch/FSDP/slurm
@@ -436,9 +433,9 @@ watch "grep 'Batch.*Loss' logs/llama2_7b-FSDP_${JOB_ID}.err"
 2: 2025-07-17 13:14:21 I [train.py:103] Batch 8 Loss: 9.61180, Speed: 5.90 samples/sec, lr: 0.000100
 2: 2025-07-17 13:14:22 I [train.py:103] Batch 9 Loss: 9.34421, Speed: 5.83 samples/sec, lr: 0.000100
 ```
-Watch squeue from `slurm-compute-node-1` (in a new terminal window):
+Watch squeue from `slurm-worker-slinky-1` (in a new terminal window):
 ```
-kubectl -n slurm exec -it pod/slurm-compute-node-1 -- bash --login
+kubectl -n slurm exec -it pod/slurm-worker-slinky-1 -- bash --login
 ```
 ```
 # 1 second updates
@@ -450,9 +447,9 @@ Every 1.0s: squeue                                                              
              JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
                  1       all llama2_7     root  R       4:47      4 node-[0-3]
 ```
-Watch checkpoints from `slurm-compute-node-2` (in a new terminal window):
+Watch checkpoints from `slurm-worker-slinky-2` (in a new terminal window):
 ```
-kubectl -n slurm exec -it pod/slurm-compute-node-2 -- bash --login
+kubectl -n slurm exec -it pod/slurm-worker-slinky-2 -- bash --login
 ```
 ```
 cd /fsx/awsome-distributed-training/3.test_cases/pytorch/FSDP/slurm
