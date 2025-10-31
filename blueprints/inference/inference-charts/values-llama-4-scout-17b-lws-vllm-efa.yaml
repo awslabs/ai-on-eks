@@ -1,0 +1,37 @@
+model: meta-llama/Llama-4-Scout-17B-16E-Instruct
+
+modelParameters:
+  gpuMemoryUtilization: 0.9
+  maxModelLen: 1024
+  maxNumSeqs: 1
+  maxNumBatchedTokens: 8192
+  pipelineParallelSize: 2
+  tensorParallelSize: 4
+
+inference:
+  serviceName: llama-4-scout-17b-lws-vllm
+  serviceNamespace: default
+  accelerator: gpu
+  awsEfa: true
+  framework: lws-vllm
+  modelServer:
+    image:
+      # refer to https://github.com/aws/deep-learning-containers/blob/master/vllm/CHANGELOG.md#0110---2025-10-08
+      repository: 763104351884.dkr.ecr.us-east-1.amazonaws.com/vllm
+      tag: 0.11.0-gpu-py312-cu128-ubuntu22.04-ec2
+    deployment:
+      resources:
+        gpu:
+          requests:
+            nvidia.com/gpu: 4
+          limits:
+            nvidia.com/gpu: 4
+        efa:
+          requests:
+            vpc.amazonaws.com/efa: 1            
+          limits:
+            vpc.amazonaws.com/efa: 1                        
+
+      instanceType: g6.24xlarge 
+
+# test via helm template my-release <folder>/ai-on-eks/blueprints/inference/inference-charts -f <folder>/ai-on-eks/blueprints/inference/inference-charts/values-llama-4-scout-17b-lws-vllm-efa.yaml

@@ -69,15 +69,30 @@ spec:
               - -c
               - "bash /vllm-workspace/examples/online_serving/multi-node-serving.sh worker --ray_address=$(LWS_LEADER_ADDRESS)"
             resources:
-            {{- if eq .Values.inference.accelerator "gpu" }}
+            {{- if and (eq .Values.inference.accelerator "gpu") ( eq .Values.inference.awsEfa true ) }}
+            {{- $resources := dict "requests" (dict) "limits" (dict) }}
+            {{- $_ := merge $resources.requests .Values.inference.modelServer.deployment.resources.gpu.requests }}
+            {{- $_ := merge $resources.requests .Values.inference.modelServer.deployment.resources.efa.requests }}
+            {{- $_ := merge $resources.limits .Values.inference.modelServer.deployment.resources.gpu.limits }}
+            {{- $_ := merge $resources.limits .Values.inference.modelServer.deployment.resources.efa.limits }}
+            {{- toYaml $resources | nindent 14 }}
+            {{- else if eq .Values.inference.accelerator "gpu" }}
             {{- toYaml .Values.inference.modelServer.deployment.resources.gpu | nindent 14 }}
-            {{- end }}
+            {{- end }}            
+
             env:
               - name: HUGGING_FACE_HUB_TOKEN
                 valueFrom:
                   secretKeyRef:
                     name: hf-token
                     key: token
+              {{- if and ( eq .Values.inference.accelerator "gpu" ) ( eq .Values.inference.awsEfa true ) }}
+              - name: FI_PROVIDER
+                value: "efa"
+              - name: FI_EFA_USE_DEVICE_RDMA
+                value: "1"  
+              {{- end }}
+
             volumeMounts:
               - mountPath: /dev/shm
                 name: dshm

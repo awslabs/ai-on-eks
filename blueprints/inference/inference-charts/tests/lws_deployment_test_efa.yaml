@@ -1,0 +1,40 @@
+# make sure you have helm test installed helm plugin install https://github.com/helm-unittest/helm-unittest.git
+# run test with helm unittest ai-on-eks/blueprints/inference/inference-charts
+suite: Test LWS Deployment with AWS EFA
+templates:
+  - templates/lws-deployment.yaml
+values:
+  - ../values-llama-4-scout-17b-lws-vllm-efa.yaml
+tests:
+  - it: should render a Service for the leader
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: llama-4-scout-17b-lws-vllm-leader
+
+  - it: should render a LeaderWorkerSet resource
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: LeaderWorkerSet
+      - equal:
+          path: metadata.name
+          value: llama-4-scout-17b-lws-vllm
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.leaderWorkerTemplate.size
+          value: 2
+      - equal:
+          path: spec.leaderWorkerTemplate.leaderTemplate.spec.containers[0].image
+          value: 763104351884.dkr.ecr.us-east-1.amazonaws.com/vllm:0.11.0-gpu-py312-cu128-ubuntu22.04-ec2
+      - equal:
+          path: spec.leaderWorkerTemplate.workerTemplate.spec.containers[0].env[1].name
+          value: FI_PROVIDER
+      - equal:
+          path: spec.leaderWorkerTemplate.workerTemplate.spec.containers[0].env[1].value
+          value: efa

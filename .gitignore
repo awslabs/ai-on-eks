@@ -65,3 +65,5 @@ blueprints/inference/nvidia-dynamo/dynamo_venv/
 blueprints/inference/nvidia-dynamo/dynamo_env.sh
 blueprints/inference/nvidia-dynamo/venv/
 tmp/
+
+__snapshot__/

@@ -46,6 +46,9 @@ inference:
   # Accelerator type: gpu or neuron
   accelerator: gpu
 
+  # use AWS EFA for distributed inferencing. The Chart will check to apply this only for gpu accelerator
+  awsEfa: true
+
   # Framework type: vllm, ray-vllm, triton-vllm, aibrix, or lws-vllm
   framework:
 
@@ -88,6 +91,11 @@ inference:
             nvidia.com/gpu: 1
           limits:
             nvidia.com/gpu: 1
+        efa:
+          requests:
+            vpc.amazonaws.com/efa: 1            
+          limits:
+            vpc.amazonaws.com/efa: 1                        
         neuron:
           requests:
             aws.amazon.com/neuron: 1
