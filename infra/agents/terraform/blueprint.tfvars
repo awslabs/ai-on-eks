@@ -2,7 +2,6 @@ name                    = "aioeks-agents"
 enable_langfuse         = true
 enable_gitlab           = true
 enable_external_dns     = true
-enable_external_ingress = true
 max_user_namespaces     = 16384 # Enables docker builds on bottlerocket
 acm_certificate_domain  = ""    # Update with domain
 

@@ -15,9 +15,11 @@ spec:
     helm:
       values: |
         installCertmanager: false
+        nginx-ingress:
+          enabled: false
         gitlab:
           ingress:
-            className: nginx
+            className: alb
             tls:
               enabled: false
           kas:
@@ -28,14 +30,20 @@ spec:
           hosts:
             domain: ${domain}
           ingress:
+            annotations:
+              alb.ingress.kubernetes.io/target-type: 'ip'
+              alb.ingress.kubernetes.io/scheme: 'internet-facing'
+              alb.ingress.kubernetes.io/success-codes: 200,302
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+              alb.ingress.kubernetes.io/ssl-redirect: '443'
             configureCertmanager: false
-            class: nginx
+            class: alb
             tls:
               enabled: false
         ingress:
           enabled: false
           class:
-            name: nginx
+            name: alb
           configureCertmanager: false
           tls:
             enabled: false
