@@ -107,11 +107,7 @@ module "eks_blueprints_addons" {
   enable_ingress_nginx = var.enable_ingress_nginx
   ingress_nginx = {
     version = "4.12.1"
-    values = [
-      var.enable_external_ingress ? templatefile("${path.module}/helm-values/ingress-nginx-external-values.yaml", {
-        acm_certificate_arn = data.aws_acm_certificate.issued[0].arn
-      }) : templatefile("${path.module}/helm-values/ingress-nginx-values.yaml", {})
-    ]
+    values  = [templatefile("${path.module}/helm-values/ingress-nginx-values.yaml", {})]
   }
 
   #---------------------------------------

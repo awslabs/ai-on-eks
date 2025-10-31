@@ -146,11 +146,6 @@ variable "enable_external_dns" {
   type        = bool
   default     = false
 }
-variable "enable_external_ingress" {
-  description = "Enable external ingress"
-  type        = bool
-  default     = false
-}
 variable "enable_kubecost" {
   description = "Enable Kubecost addon"
   type        = bool
