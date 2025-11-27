@@ -47,7 +47,7 @@ trainium_env = flyte.TaskEnvironment(
         cpu=110,
         memory="400Gi",
         # Trainium accelerator configuration
-        gpu="Trn2:16",
+        gpu="Trn1:16",
     ),
     plugin_config=Elastic(
         nnodes=1,  # 1 Trainium instance (trn1.32xlarge)
