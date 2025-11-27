@@ -33,7 +33,8 @@ trainium_env = flyte.TaskEnvironment(
         image_uri="public.ecr.aws/neuron/pytorch-training-neuronx:2.8.0-neuronx-py311-sdk2.26.0-ubuntu22.04"
     )
     .clone(name="bert-trainium-training")
-    .with_env_vars({"UV_PYTHON": "/usr/local/bin/python3.11"}).with_apt_packages("git")
+    .with_env_vars({"UV_PYTHON": "/usr/local/bin/python3.11"})
+    .with_apt_packages("git")
     .with_pip_packages(
         "git+https://github.com/flyteorg/flyte-sdk@a70370bbe348d52351beb6c2f4684efa5f387d46",
         "flyteplugins-pytorch==2.0.0b29",
@@ -46,7 +47,7 @@ trainium_env = flyte.TaskEnvironment(
         cpu=110,
         memory="400Gi",
         # Trainium accelerator configuration
-        gpu="Trn1:16",
+        gpu="Trn2:16",
     ),
     plugin_config=Elastic(
         nnodes=1,  # 1 Trainium instance (trn1.32xlarge)
@@ -477,7 +478,6 @@ def train_bert_on_trainium(
             print(f"[Rank 0] Compilation cache restored to {cache_dir}")
         else:
             print(f"[Rank 0] No compilation cache provided, will compile from scratch")
-
 
     # Wait for rank 0 to set up cache completely
     xm.rendezvous("cache_setup_complete")
@@ -1015,12 +1015,10 @@ async def bert_two_phase_pipeline(
     dataset_config: DatasetConfig = DatasetConfig(),
     phase1_config: QuickTrainingConfig = QuickTrainingConfig(),
     phase2_config: QuickPhase2TrainingConfig = QuickPhase2TrainingConfig(),
-    phase1_compilation_cache: Optional[Dir] = Dir(
-        path="s3://bert-trainium-aws/rrw52bnwpzn47lfd6cds/neuron-compile-cache/phase-1/step-30"
-    ),
-    phase2_compilation_cache: Optional[Dir] = Dir(path="s3://bert-trainium-aws/rrw52bnwpzn47lfd6cds/neuron-compile-cache/phase-2/step-16"),
-    phase1_checkpoint: Optional[Dir] = Dir(path="s3://bert-trainium-aws/rrw52bnwpzn47lfd6cds/checkpoints/phase-1/step-30"),
-    phase2_checkpoint: Optional[Dir] = Dir(path="s3://bert-trainium-aws/rrw52bnwpzn47lfd6cds/checkpoints/phase-2/step-16"),
+    phase1_compilation_cache: Optional[Dir] = None,
+    phase2_compilation_cache: Optional[Dir] = None,
+    phase1_checkpoint: Optional[Dir] = None,
+    phase2_checkpoint: Optional[Dir] = None,
 ) -> tuple[Optional[Dir], Optional[Dir], Optional[Dir]]:
     """
     Complete two-phase BERT pre-training pipeline.
