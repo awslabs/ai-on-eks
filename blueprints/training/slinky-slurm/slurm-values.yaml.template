@@ -19,11 +19,22 @@ commonAffinity: &commonAffinity
             values: ["slurmdbd", "slurmctld", "slurm-exporter", "login", "mariadb", "slurmrestd"]
         topologyKey: "kubernetes.io/hostname"
 
+epilogScripts:
+  00-noop.sh: |
+    #!/bin/bash
+    exit 0
+prologScripts:
+  00-noop.sh: |
+    #!/bin/bash
+    exit 0
 
 # Slurm controller (slurmctld) configurations.
 controller:
+  prologScriptRefs: []
+  epilogScriptRefs: []
   persistence:
     storageClassName: gp3
+    existingClaim: null
   podSpec:
     affinity: *commonAffinity
 

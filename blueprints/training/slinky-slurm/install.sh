@@ -78,7 +78,7 @@ helm install mariadb-operator mariadb-operator/mariadb-operator \
 # Wait for MariaDB operator webhook to be ready
 echo "Waiting for MariaDB operator webhook to be ready..."
 kubectl wait --for=condition=available --timeout=300s deployment/mariadb-operator -n mariadb
-sleep 30
+sleep 60
 
 # Create MariaDB instance in Slurm namespace
 kubectl apply -f mariadb.yaml
