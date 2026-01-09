@@ -78,12 +78,26 @@ echo "SLURM_JOB_NODELIST: $SLURM_JOB_NODELIST"
 echo "LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 echo "======================="
 
+# Get the head node IP address using the official PyTorch Slurm approach
+# Reference: https://github.com/pytorch/examples/tree/main/distributed/ddp-tutorial-series/slurm
+# This bypasses hostname resolution issues in Slinky v0.4.x by using IP addresses directly
+nodes=( $( scontrol show hostnames $SLURM_JOB_NODELIST ) )
+nodes_array=($nodes)
+head_node=${nodes_array[0]}
+# Get the first IP address only (hostname may return multiple IPs separated by space)
+head_node_ip=$(srun --nodes=1 --ntasks=1 -w "$head_node" hostname --ip-address | awk '{print $1}')
+
+echo "=== Rendezvous Configuration ==="
+echo "Head node: $head_node"
+echo "Head node IP: $head_node_ip"
+echo "================================"
+
 declare -a TORCHRUN_ARGS=(
     --nproc_per_node=$GPUS_PER_NODE
     --nnodes=$SLURM_JOB_NUM_NODES
     --rdzv_id=$SLURM_JOB_ID
     --rdzv_backend=c10d
-    --rdzv_endpoint=$(hostname)
+    --rdzv_endpoint=${head_node_ip}:29500
 )
 
 export PATH="/usr/local/bin:$PATH"
