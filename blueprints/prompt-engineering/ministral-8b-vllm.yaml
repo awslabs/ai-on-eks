@@ -1,0 +1,122 @@
+# Ministral 8B vLLM Deployment for EKS
+#
+# Prerequisites:
+#   - EKS cluster with GPU nodes (g5.2xlarge or larger with 24GB+ VRAM)
+#   - NVIDIA GPU Operator installed
+#   - Hugging Face token (for gated model access)
+#
+# Usage:
+#   1. Create the secret with your HF token:
+#      kubectl create secret generic hf-token --from-literal=token=<your-hf-token> -n ministral
+#
+#   2. Deploy:
+#      kubectl apply -f ministral-8b-vllm.yaml
+#
+#   3. Port-forward to access locally:
+#      kubectl port-forward service/ministral-8b 8000:8000 -n ministral
+#
+#   4. Test:
+#      curl http://localhost:8000/v1/models
+#
+# API Endpoint: http://<service>:8000/v1/chat/completions (OpenAI-compatible)
+#
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ministral
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ministral-8b
+  namespace: ministral
+  labels:
+    app: ministral-8b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ministral-8b
+  template:
+    metadata:
+      labels:
+        app: ministral-8b
+    spec:
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.7.3
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              vllm serve $MODEL_ID \
+                --served-model-name $MODEL_ID \
+                --host 0.0.0.0 \
+                --port 8000 \
+                --max-model-len 8192 \
+                --tokenizer-mode mistral
+          env:
+            - name: MODEL_ID
+              value: "mistralai/Ministral-8B-Instruct-2410"
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+            - name: VLLM_LOGGING_LEVEL
+              value: "INFO"
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: cache
+              mountPath: /root/.cache
+      volumes:
+        - name: cache
+          emptyDir: {}
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+      # Note: No nodeSelector needed - the nvidia.com/gpu resource request
+      # ensures Karpenter provisions a GPU node automatically
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ministral-8b
+  namespace: ministral
+  labels:
+    app: ministral-8b
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app: ministral-8b
