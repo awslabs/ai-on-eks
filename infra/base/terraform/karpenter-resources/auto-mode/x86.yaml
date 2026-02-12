@@ -9,19 +9,21 @@ spec:
     cpu: 512
     memory: 4096Gi
   disruption:
+    budgets:
+      - nodes: 10%
     consolidationPolicy: WhenEmptyOrUnderutilized
     consolidateAfter: 30s
   template:
     metadata:
       labels:
-        model-inferencing: "x86-general"
-        ray-control-plane: "false"
+         model-inferencing: "x86-general"
+         amiFamily: ${ami_family}
     spec:
       nodeClassRef:
         group: eks.amazonaws.com
         kind: NodeClass
         name: x86-general
-      expireAfter: 8h
+      expireAfter: 336h
       taints:
         - key: "model-inferencing"
           value: "x86-general"
@@ -64,9 +66,9 @@ metadata:
 spec:
   #ephemeral storage spec below
   ephemeralStorage:
-    iops: 16000
+    iops: 3000
     size: 100Gi
-    throughput: 512
+    throughput: 125
   networkPolicy: DefaultAllow
   networkPolicyEventLogs: Disabled
   role: ${role}

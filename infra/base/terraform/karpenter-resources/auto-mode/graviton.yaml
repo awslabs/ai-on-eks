@@ -9,19 +9,20 @@ spec:
     cpu: 512
     memory: 4096Gi
   disruption:
+    budgets:
+      - nodes: 10%
     consolidationPolicy: WhenEmptyOrUnderutilized
-    consolidateAfter: 30m
+    consolidateAfter: 30s
   template:
     metadata:
       labels:
-        model-inferencing: "graviton"
-        ray-control-plane: "false"
+        amiFamily: ${ami_family}
     spec:
       nodeClassRef:
         group: eks.amazonaws.com
         kind: NodeClass
         name: graviton  
-      expireAfter: 8h
+      expireAfter: 336h
       requirements:
         - key: eks.amazonaws.com/instance-category
           operator: In
@@ -61,9 +62,9 @@ metadata:
 spec:
   #ephemeral storage spec below
   ephemeralStorage:
-    iops: 10000
+    iops: 3000
     size: 300Gi
-    throughput: 256
+    throughput: 125
   networkPolicy: DefaultAllow
   networkPolicyEventLogs: Disabled
   role: ${role}
