@@ -3,7 +3,7 @@ title: Llama-3-8B with vLLM on Inferentia2
 sidebar_position: 1
 description: Serving Meta-Llama-3-8B-Instruct model on AWS Inferentia2 using Ray and vLLM for optimized inference performance.
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 :::warning
 Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
@@ -65,7 +65,7 @@ While Llama-3 can achieve high-performance inference on GPUs, Neuron accelerator
 
 In this section, we will delve into the architecture of our solution, which combines Llama-3 model, [Ray Serve](https://docs.ray.io/en/latest/serve/index.html) and [Inferentia2](https://aws.amazon.com/ec2/instance-types/inf2/) on Amazon EKS.
 
-![Llama-3-inf2](../img/ray-vllm-inf2.png)
+![Llama-3-inf2](../../img/ray-vllm-inf2.png)
 
 ## Deploying the Solution
 
@@ -240,11 +240,11 @@ kubectl -n vllm port-forward svc/vllm 8265:8265
 
 You can then access the web UI at [http://localhost:8265](http://localhost:8265), which displays the deployment of jobs and actors within the Ray ecosystem.
 
-![RayServe Deployment](../img/ray-dashboard-vllm-llama3-inf2.png)
+![RayServe Deployment](../../img/ray-dashboard-vllm-llama3-inf2.png)
 
 Once the deployment is complete, the Controller and Proxy status should be `HEALTHY` and Application status should be `RUNNING`
 
-![RayServe Deployment Logs](../img/ray-logs-vllm-llama3-inf2.png)
+![RayServe Deployment Logs](../../img/ray-logs-vllm-llama3-inf2.png)
 
 ### To Test the Llama3 Model
 
@@ -342,7 +342,7 @@ This blueprint deploys the CloudWatch Observability Agent as a managed add-on, p
 
 All metrics, including container insights and Neuron metrics such as Neuron Core utilization, NeuronCore memory usage are sent to Amazon CloudWatch, where you can monitor and analyze them in real-time. After the deployment is complete, you should be able to access these metrics directly from the CloudWatch console, allowing you to manage and optimize your workloads effectively.
 
-![CloudWatch-neuron-monitor](../img/neuron-monitor-cwci.png)
+![CloudWatch-neuron-monitor](../../img/neuron-monitor-cwci.png)
 
 ## Open WebUI Deployment
 
@@ -383,13 +383,13 @@ Sign up using your name, email, and a dummy password.
 
 Click on New Chat and select the model from the dropdown menu, as shown in the screenshot below:
 
-![alt text](../img/openweb-ui-ray-vllm-inf2-1.png)
+![alt text](../../img/openweb-ui-ray-vllm-inf2-1.png)
 
 **6. Enter Test Prompt**
 
 Enter your prompt, and you will see the streaming results, as shown below:
 
-![alt text](../img/openweb-ui-ray-vllm-inf2-2.png)
+![alt text](../../img/openweb-ui-ray-vllm-inf2-2.png)
 
 ## Performance Benchmarking with LLMPerf Tool
 

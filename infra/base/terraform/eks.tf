@@ -424,7 +424,7 @@ resource "kubectl_manifest" "automode_ingressclass_params" {
 apiVersion: eks.amazonaws.com/v1
 kind: IngressClassParams
 metadata:
-  name: auto-alb
+  name: alb
 spec:
   scheme: internet-facing
 YAML
@@ -436,7 +436,7 @@ YAML
 resource "kubernetes_ingress_class_v1" "automode" {
   count = var.enable_eks_auto_mode ? 1 : 0
   metadata {
-    name = "auto-alb"
+    name = "alb"
     annotations = {
       "ingressclass.kubernetes.io/is-default-class" = "true"
     }
@@ -446,10 +446,11 @@ resource "kubernetes_ingress_class_v1" "automode" {
     parameters {
       api_group = "eks.amazonaws.com"
       kind      = "IngressClassParams"
-      name      = "auto-alb"
+      name      = "alb"
     }
   }
   depends_on = [
-    kubectl_manifest.automode_ingressclass_params
+    kubectl_manifest.automode_ingressclass_params,
+    module.eks
   ]
 }

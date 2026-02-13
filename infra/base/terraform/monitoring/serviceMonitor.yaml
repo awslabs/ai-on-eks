@@ -2,7 +2,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: ray-head-monitor
-  namespace: kube-prometheus-stack
+  namespace: monitoring
   labels:
     # `release: $HELM_RELEASE`: Prometheus can only detect ServiceMonitor with this label.
     release: kube-prometheus-stack

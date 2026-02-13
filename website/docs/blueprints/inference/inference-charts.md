@@ -1,5 +1,5 @@
 ---
-sidebar_label: Inference Charts
+sidebar_position: 1
 ---
 
 # AI on EKS Inference Charts
@@ -32,7 +32,7 @@ Both GPU and AWS Neuron (Inferentia/Trainium) accelerators are supported across 
 Before deploying the inference charts, ensure you have:
 
 - Amazon EKS cluster with GPU or AWS Neuron
-  nodes ([inference-ready cluster](../../infra/inference-ready-cluster.md) for a quick start)
+  nodes ([inference-ready cluster](../../infra/inference/inference-ready-cluster.md) for a quick start)
 - Helm 3.0+
 - For GPU deployments: NVIDIA device plugin installed
 - For Neuron deployments: AWS Neuron device plugin installed

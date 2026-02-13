@@ -146,6 +146,32 @@ variable "enable_kube_prometheus_stack" {
   type        = bool
   default     = false
 }
+variable "enable_grafana_operator" {
+  description = "Enable Grafana Operator addon"
+  type        = bool
+  default     = false
+}
+variable "grafana_operator_version" {
+  description = "Grafana Operator chart version"
+  type        = string
+  default     = "5.16.0"
+}
+variable "grafana_service_port" {
+  description = "Grafana service port"
+  type        = number
+  default     = 80
+}
+variable "grafana_admin_password" {
+  description = "Grafana admin password. If not set, a random password will be generated."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+variable "kube_prometheus_stack_namespace" {
+  description = "Namespace for kube-prometheus-stack"
+  type        = string
+  default     = "kube-prometheus-stack"
+}
 variable "enable_ai_ml_observability_stack" {
   description = "Enable AI/ML observability addon"
   type        = bool

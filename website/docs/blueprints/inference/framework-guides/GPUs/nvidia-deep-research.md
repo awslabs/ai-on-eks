@@ -3,7 +3,7 @@ title: NVIDIA Enterprise RAG and AI-Q Research Assistant on EKS
 sidebar_position: 9
 ---
 
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 :::warning
 Deployment of Enterprise RAG and AI-Q on EKS requires access to GPU instances (g5, p4, or p5 families). This blueprint relies on [Karpenter](https://karpenter.sh/) autoscaling for dynamic GPU provisioning.
@@ -206,12 +206,12 @@ While this implementation involves multiple steps, it provides several advantage
 
 The deployment uses Amazon EKS with [Karpenter](https://karpenter.sh/)-based dynamic provisioning:
 
-![NVIDIA AI-Q on EKS](../img/nvidia-deep-research-arch.png)
+![NVIDIA AI-Q on EKS](../../img/nvidia-deep-research-arch.png)
 
 
 ### Enterprise RAG Blueprint Architecture
 
-![RAG Pipeline with OpenSearch](../img/nvidia-rag-opensearch-arch.png)
+![RAG Pipeline with OpenSearch](../../img/nvidia-rag-opensearch-arch.png)
 
 The [RAG pipeline](https://github.com/NVIDIA-AI-Blueprints/rag) processes documents through multiple specialized NIM microservices:
 

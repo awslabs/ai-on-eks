@@ -120,7 +120,7 @@ resource "kubectl_manifest" "nvidia_gpu_operator" {
 
 # NVIDIA Device Plugin (standalone - GPU scheduling only)
 resource "kubectl_manifest" "nvidia_device_plugin" {
-  count     = !var.enable_nvidia_gpu_operator && var.enable_nvidia_device_plugin ? 1 : 0
+  count     = !var.enable_nvidia_gpu_operator && var.enable_nvidia_device_plugin && !var.enable_eks_auto_mode ? 1 : 0
   yaml_body = templatefile("${path.module}/argocd-addons/nvidia-device-plugin.yaml", {})
 
   depends_on = [

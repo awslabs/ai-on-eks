@@ -1,0 +1,8 @@
+{
+  "label": "Framework-Specific Deployment Guides",
+  "position": 2,
+  "link": {
+    "type": "generated-index",
+    "description": "Deployment guides for specific inference frameworks on GPU and Neuron hardware"
+  }
+}

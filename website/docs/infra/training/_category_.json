@@ -1,0 +1,8 @@
+{
+  "label": "Training",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Infrastructure for AI/ML training workloads"
+  }
+}

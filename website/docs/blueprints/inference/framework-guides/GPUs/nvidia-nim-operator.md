@@ -2,7 +2,7 @@
 title: NVIDIA NIM Operator on EKS
 sidebar_position: 4
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 
 # NVIDIA NIM Operator on Amazon EKS
@@ -15,7 +15,7 @@ import CollapsibleContent from '../../../../src/components/CollapsibleContent';
 
 The **NVIDIA NIM Operator** is a Kubernetes operator that automates the deployment, scaling, and management of NVIDIA NIM microservices on a Kubernetes cluster.
 
-![NVIDIA NIM Operator Architecture](../img/NIMOperatorArchitecture.png)
+![NVIDIA NIM Operator Architecture](../../img/NIMOperatorArchitecture.png)
 
 Instead of manually pulling containers, provisioning GPU nodes, or writing YAML for every model, the NIM Operator introduces three primary [Custom Resource Definitions (CRDs)](https://docs.nvidia.com/nim-operator/latest/crds.html):
 
@@ -76,7 +76,7 @@ If `NIMCache` is not used, the model will be downloaded each time a pod starts, 
 
 This deployment blueprint demonstrates how to run the **Meta Llama 3.1 8B Instruct** model on **Amazon EKS** using the **NVIDIA NIM Operator** with multi-GPU support and optimized model caching for fast startup times.
 
-![NVIDIA NIM Operator Architecture](../img/NIMOperatoronEKS.png)
+![NVIDIA NIM Operator Architecture](../../img/NIMOperatoronEKS.png)
 
 The model is served using:
 - **G5 instances (g5.12xlarge)**: These instances come with **4 NVIDIA A10G GPUs**
@@ -133,7 +133,7 @@ Before getting started with NVIDIA NIM, ensure you have the following:
     - Ensure that at least "NGC Catalog" is selected from the "Services Included" dropdown
     - Copy and securely store your API key, the key should have a prefix with `nvapi-`
 
-    ![NGC API KEY](../img/nim-ngc-api-key.png)
+    ![NGC API KEY](../../img/nim-ngc-api-key.png)
 
 **Validate NGC API Key and Test Image Pull**
 
@@ -430,13 +430,13 @@ Sign up using your name, email, and a dummy password.
 
 Click on New Chat and select the model from the dropdown menu, as shown in the screenshot below:
 
-![alt text](../img/openweb-ui-nim-1.png)
+![alt text](../../img/openweb-ui-nim-1.png)
 
 **6. Enter Test Prompt**
 
 Enter your prompt, and you will see the streaming results, as shown below:
 
-![alt text](../img/openweb-ui-nim-2.png)
+![alt text](../../img/openweb-ui-nim-2.png)
 
 ## Performance Testing with NVIDIA GenAI-Perf Tool
 
@@ -475,7 +475,7 @@ genai-perf profile -m meta/llama-3.1-8b-instruct \
 
 You should see similar output like the following
 
-![NIM Operator genai-perf result](../img/nim-operator-genaiperf.png)
+![NIM Operator genai-perf result](../../img/nim-operator-genaiperf.png)
 
 You should be able to see the [metrics](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/perf_analyzer/genai-perf/README.html#metrics) that genai-perf collects, including Request latency, Out token throughput, Request throughput.
 
@@ -493,11 +493,11 @@ NVIDIA provided a Grafana [dashboard](https://docs.nvidia.com/nim/large-language
 
 You can find more metrics description from this [document](https://docs.nvidia.com/nim/large-language-models/latest/observability.html).
 
-![NVIDIA LLM Server](../img/nim-dashboard.png)
+![NVIDIA LLM Server](../../img/nim-dashboard.png)
 
 You can monitor metrics such as Time-to-First-Token, Inter-Token-Latency, KV Cache Utilization metrics.
 
-![NVIDIA NIM Metrics](../img/nim-dashboard-2.png)
+![NVIDIA NIM Metrics](../../img/nim-dashboard-2.png)
 
 To view the Grafana dashboard to monitor these metrics, follow the steps below:
 

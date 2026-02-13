@@ -22,6 +22,48 @@ blueprints in the `blueprints` folder.
 Other blueprints use the same base infrastructure and selectively enable other components based on the needs of the
 blueprint.
 
+## Overview
+
+AI on EKS provides comprehensive infrastructure solutions for deploying AI/ML workloads on Amazon EKS. Choose from pre-configured solutions optimized for training, inference, or general-purpose AI/ML workloads.
+
+### Training Infrastructure
+
+Infrastructure solutions optimized for AI/ML model training workloads:
+
+- **[JARK Stack on EKS](./training/jark.md)** - Complete stack for AI workloads with NVIDIA GPUs, including JupyterHub, Ray, and Kubeflow
+- **[JupyterHub on EKS](./training/jupyterhub.md)** - Interactive development environment for data science and ML
+
+### Inference Infrastructure
+
+Infrastructure solutions optimized for AI/ML model inference workloads:
+
+- **[Inference-Ready Cluster](./inference/inference-ready-cluster.md)** - Pre-configured EKS cluster for inference workloads
+- **[Nvidia NIM on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-nim-llama3.md)** - Nvidia NIM deployment sample
+- **[Nvidia Dynamo on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-dynamo.md)** - Nvidia Dyanmo deployment sample
+
+### Miscellaneous
+
+Additional infrastructure solutions and utilities:
+
+- **[EMR Spark Rapids](./misc/emr-spark-rapids.md)** - GPU-accelerated Apache Spark on Amazon EMR
+- **[Troubleshooting](./misc/troubleshooting/troubleshooting.md)** - Common issues and solutions
+
+### Getting Started
+
+1. **Choose Your Use Case**: Select training or inference based on your workload requirements
+2. **Deploy Infrastructure**: Follow the deployment guide for your chosen solution
+3. **Deploy Workloads**: Use the [Blueprints](../blueprints/index.md) to deploy your AI/ML workloads
+4. **Optimize**: Apply [Guidance](../guidance/index.md) best practices for production readiness
+
+### Architecture Patterns
+
+All infrastructure solutions follow these core principles:
+
+- **Modular Design**: Compose solutions from reusable modules
+- **Best Practices**: Built-in security, observability, and scalability
+- **Cloud Native**: Leverage Kubernetes and AWS services
+- **Production Ready**: Tested and validated for enterprise workloads
+
 ## Resources
 
 Each stack inherits the `base` stack's components. These components include:

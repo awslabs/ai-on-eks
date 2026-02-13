@@ -1,7 +1,7 @@
 ---
 sidebar_label: EMR NVIDIA Spark-RAPIDS
 ---
-import CollapsibleContent from '../../src/components/CollapsibleContent';
+import CollapsibleContent from '../../../src/components/CollapsibleContent';
 
 
 # EMR on EKS NVIDIA RAPIDS Accelerator for Apache Spark
@@ -11,7 +11,7 @@ The NVIDIA RAPIDS Accelerator for Apache Spark is a powerful tool that builds on
 With the invention of the RAPIDS Accelerator for Spark 3, NVIDIA has successfully revolutionized extract, transform, and load pipelines by significantly enhancing the efficiency of Spark SQL and DataFrame operations. By merging the capabilities of the RAPIDS cuDF library and the extensive reach of the Spark distributed computing ecosystem, the RAPIDS Accelerator for Apache Spark provides a robust solution to handle large-scale computations.
 Moreover, the RAPIDS Accelerator library incorporates an advanced shuffle optimized by UCX, which can be configured to support GPU-to-GPU communication and RDMA capabilities, hence further boosting its performance.
 
-![Alt text](img/nvidia.png)
+![Alt text](../img/nvidia.png)
 
 ### EMR support for NVIDIA RAPIDS Accelerator for Apache Spark
 Integration of Amazon EMR with NVIDIA RAPIDS Accelerator for Apache Spark​ Amazon EMR on EKS now extends its support to include the use of GPU instance types with the NVIDIA RAPIDS Accelerator for Apache Spark. As the use of artificial intelligence (AI) and machine learning (ML) continues to expand in the realm of data analytics, there's an increasing demand for rapid and cost-efficient data processing, which GPUs can provide. The NVIDIA RAPIDS Accelerator for Apache Spark enables users to harness the superior performance of GPUs, leading to substantial infrastructure cost savings.
@@ -218,7 +218,7 @@ chmod +x execute_spark_rapids_xgboost.sh
 
 Verify the pod status
 
-![Alt text](img/spark-rapids-pod-status.png)
+![Alt text](../img/spark-rapids-pod-status.png)
 
 
 :::info
@@ -277,7 +277,7 @@ The following is a sample output from the above log file:
 **Step7**: Finally, with a trained and validated XGBoost model, you can use it to make predictions on new, unseen loan data. These predictions can help in identifying potential risks associated with loan default or evaluating loan performance.
 
 
-![Alt text](img/emr-spark-rapids-fannie-mae.png)
+![Alt text](../img/emr-spark-rapids-fannie-mae.png)
 
 ###  GPU Monitoring with DCGM Exporter, Prometheus and Grafana
 
@@ -313,7 +313,7 @@ aws secretsmanager get-secret-value --secret-id emr-spark-rapids-grafana --regio
 
 Once logged in, add the AMP datasource to Grafana and import the Open Source GPU monitoring dashboard. You can then explore the metrics and visualize them using the Grafana dashboard, as shown in the screenshot below.
 
-![Alt text](img/gpu-dashboard.png)
+![Alt text](../img/gpu-dashboard.png)
 
 <CollapsibleContent header={<h2><span>Cleanup</span></h2>}>
 

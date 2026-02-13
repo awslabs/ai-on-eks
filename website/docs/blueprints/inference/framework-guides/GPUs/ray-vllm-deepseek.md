@@ -2,13 +2,13 @@
 title: DeepSeek-R1 on EKS
 sidebar_position: 5
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # DeepSeek-R1 on EKS with Ray and vLLM
 
 In this guide, we'll explore deploying [DeepSeek-R1-Distill-Llama-8B](https://huggingface.co/deepseek-ai/DeepSeek-R1-Distill-Llama-8B) model inference using [Ray](https://docs.ray.io/en/latest/serve/getting_started.html) with a [vLLM](https://github.com/vllm-project/vllm) backend on [Amazon EKS](https://aws.amazon.com/eks/).
 
-![alt text](../img/dseek0.png)
+![alt text](../../img/dseek0.png)
 
 ## Understanding the GPU Memory Requirements
 
@@ -272,11 +272,11 @@ Model deploymen takes around 4 mins
 
 :::
 
-![alt text](../img/dseek1.png)
+![alt text](../../img/dseek1.png)
 
-![alt text](../img/dseek2.png)
+![alt text](../../img/dseek2.png)
 
-![alt text](../img/dseek3.png)
+![alt text](../../img/dseek3.png)
 
 
 ## Test the DeepSeek-R1 Model
@@ -339,19 +339,19 @@ Then, open a browser and navigate to: [http://localhost:8080](http://localhost:8
 
 You will see a registration page. Register with your name, email, and password.
 
-![alt text](../img/dseek4.png)
+![alt text](../../img/dseek4.png)
 
-![alt text](../img/dseek5.png)
+![alt text](../../img/dseek5.png)
 
-![alt text](../img/dseek6.png)
+![alt text](../../img/dseek6.png)
 
-![alt text](../img/dseek7.png)
+![alt text](../../img/dseek7.png)
 
-![alt text](../img/dseek8.png)
+![alt text](../../img/dseek8.png)
 
 After submitting a request, you can monitor the GPU and CPU usage returning to normal:
 
-![alt text](../img/dseek9.png)
+![alt text](../../img/dseek9.png)
 
 
 ## Key Takeaways

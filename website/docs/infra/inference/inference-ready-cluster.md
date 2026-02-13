@@ -1,5 +1,5 @@
 ---
-sidebar_label: Inference-Ready Cluster
+sidebar_position: 2
 ---
 
 # Inference-Ready EKS Cluster
@@ -102,7 +102,7 @@ This infrastructure deploys the following AWS resources:
 
 ### Architecture Diagram
 
-![architecture](../../../infra/solutions/inference-ready-cluster/image/architecture.png)
+![architecture](pathname://../../../infra/solutions/inference-ready-cluster/image/architecture.png)
 
 ### Prerequisites
 
@@ -358,7 +358,7 @@ You should see the following output (expand the section to see the output)
 ## Inference on EKS
 
 EKS is a powerful platform for running AI/ML inference. For a deep dive on many of the inference possibilities on EKS,
-please check the [inference](../blueprints/inference/index.md) section.
+please check the [inference](../../blueprints/inference/) section.
 
 ### Inference Charts Integration
 
@@ -430,7 +430,7 @@ Access Grafana dashboard:
 kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 ```
 
-Please see the [observability](../guidance/observability.md) for an in-depth look at using the observability
+Please see the [observability](../../guidance/observability.md) for an in-depth look at using the observability
 features.
 
 ### Cost Optimization

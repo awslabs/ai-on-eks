@@ -1,7 +1,7 @@
 ---
 sidebar_label: JupyterHub on EKS
 ---
-import CollapsibleContent from '../../src/components/CollapsibleContent';
+import CollapsibleContent from '../../../src/components/CollapsibleContent';
 
 :::warning
 Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
@@ -64,18 +64,18 @@ When creating the certificate use a wildcard, so that it can secure a domain and
 The service generates the private key and self-signed certificate.
 Sample prompts to generate a certificate :
 
-![](img/Cert_Install.png)
+![](../img/Cert_Install.png)
 
 
 6. Import the certificate into AWS Certificate Manager
 
 Open the private key(`key.pem`) in a text editor and copy the contents into the private key section of ACM. Similarly, copy the contents of the `certificate.pem` file into the certificate body section and submit.
 
-   ![](img/ACM.png)
+   ![](../img/ACM.png)
 
    Verify certificate is installed correctly in the console in ACM.
 
-   ![](img/Cert_List.png)
+   ![](../img/Cert_List.png)
 
 </CollapsibleContent>
 
@@ -177,13 +177,13 @@ kubectl port-forward svc/proxy-public 8080:80 -n jupyterhub
 ```
 
 **Sign-in:** Navigate to [http://localhost:8080/](http://localhost:8080/) in your web browser. Input `user-1` as the username and choose any password.
-![alt text](img/image.png)
+![alt text](../img/image.png)
 
-Select server options: Upon sign-in, you’ll be presented with a variety of Notebook instance profiles to choose from. The `Data Engineering (CPU)` server is for traditional, CPU based notebook work. The `Elyra` server provides [Elyra](https://github.com/elyra-ai/elyra) functionality, allowing you to quickly develop pipelines: ![workflow](img/elyra-workflow.png). `Trainium` and `Inferentia` servers will deploy the notebook server onto Trainium and Inferentia nodes, allowing accelerated workloads. `Time Slicing` and `MIG` are two different strategies for GPU sharing. Finally, the `Data Science (GPU)` server is a traditional server running on an NVIDIA GPU.
+Select server options: Upon sign-in, you’ll be presented with a variety of Notebook instance profiles to choose from. The `Data Engineering (CPU)` server is for traditional, CPU based notebook work. The `Elyra` server provides [Elyra](https://github.com/elyra-ai/elyra) functionality, allowing you to quickly develop pipelines: ![workflow](../img/elyra-workflow.png). `Trainium` and `Inferentia` servers will deploy the notebook server onto Trainium and Inferentia nodes, allowing accelerated workloads. `Time Slicing` and `MIG` are two different strategies for GPU sharing. Finally, the `Data Science (GPU)` server is a traditional server running on an NVIDIA GPU.
 
 For this time-slicing feature demonstration, we’ll be using the **Data Science (GPU + Time-Slicing – G5)** profile. Go ahead and select this option and choose the Start button.
 
-![alt text](img/notebook-server-list.png)
+![alt text](../img/notebook-server-list.png)
 
 The new node created by Karpenter with the `g5.2xlarge` instance type has been configured to leverage the timeslicing feature provided by the [NVIDIA device plugin](https://github.com/NVIDIA/k8s-device-plugin). This feature allows for efficient GPU utilization by dividing a single GPU into multiple allocatable units. In this case, we have defined `4` allocatable GPUs in the NVIDIA device plugin Helm chart config map. Below is the status of the node:
 
@@ -218,7 +218,7 @@ Open JupyterHub in an Incognito browser window: Navigate to http://localhost:808
 
 Choose server options: After logging in, you’ll see the server options page. Ensure that you select the **Data Science (GPU + Time-Slicing – G5)** radio button and select Start.
 
-![alt text](img/image-2.png)
+![alt text](../img/image-2.png)
 
 Verify pod placement: Notice that this pod placement takes only few seconds unlike the `user-1`. It’s because the Kubernetes scheduler is able to place the pod on the existing `g5.2xlarge` node created by the `user-1` pod. `user-2` is also using the same docker image so there is no delay in pulling the docker image and it leveraged local cache.
 
@@ -241,7 +241,7 @@ Checkout the [AWS blog: Building multi-tenant JupyterHub Platforms on Amazon EKS
 
 Add the `CNAME` DNS record in ChangeIP for the JupyterHub domain with the load balancer DNS name.
 
-![](img/CNAME.png)
+![](../img/CNAME.png)
 
 :::info
 When adding the load balancer DNS name in the value field of CNAME in ChangeIP make sure to add a dot(`.`) at the end of the load-balancer DNS name.
@@ -249,21 +249,21 @@ When adding the load balancer DNS name in the value field of CNAME in ChangeIP m
 
 Now typing the domain url in the browser should redirect to the Jupyterhub login page.
 
-![](img/Cognito-Sign-in.png)
+![](../img/Cognito-Sign-in.png)
 
 
 Follow the Cognito sign-up and sign-in process to login.
 
-![](img/Cognito-Sign-up.png)
+![](../img/Cognito-Sign-up.png)
 
 Successful sign-in will open up the JupyterHub environment for the logged in user.
 
-![](img/jupyter_launcher.png)
+![](../img/jupyter_launcher.png)
 
 To test the setup of the shared and personal directories in JupyterHub, you can follow these steps:
 1. Open a terminal window from the launcher dashboard.
 
-![](img/jupyter_env.png)
+![](../img/jupyter_env.png)
 
 2.  execute the command
 
@@ -278,7 +278,7 @@ Note: This will look a little different depending on your OAuth provider.
 
 Add the `CNAME` DNS record in ChangeIP for the JupyterHub domain with the load balancer DNS name.
 
-![](img/CNAME.png)
+![](../img/CNAME.png)
 
 :::info
 When adding the load balancer DNS name in the value field of CNAME in ChangeIP make sure to add a dot(`.`) at the end of the load-balancer DNS name.
@@ -286,15 +286,15 @@ When adding the load balancer DNS name in the value field of CNAME in ChangeIP m
 
 Now typing the domain url in the browser should redirect to the Jupyterhub login page.
 
-![](img/oauth.png)
+![](../img/oauth.png)
 
 Follow the Keycloak sign-up and sign-in process to login.
 
-![](img/keycloak-login.png)
+![](../img/keycloak-login.png)
 
 Successful sign-in will open up the JupyterHub environment for the logged in user.
 
-![](img/jupyter_launcher.png)
+![](../img/jupyter_launcher.png)
 
 
 <CollapsibleContent header={<h3><span>Cleanup</span></h3>}>

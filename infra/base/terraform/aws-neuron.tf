@@ -4,6 +4,7 @@ resource "kubectl_manifest" "neuron_monitor" {
 }
 
 resource "kubectl_manifest" "aws_neuron_device_plugin" {
+  count = !var.enable_eks_auto_mode ? 1 : 0
   yaml_body = templatefile("${path.module}/argocd-addons/aws-neuron-device-plugin.yaml", {
   })
 

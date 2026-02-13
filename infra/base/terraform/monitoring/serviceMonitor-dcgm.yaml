@@ -4,7 +4,7 @@ metadata:
   labels:
     release: kube-prometheus-stack
   name: dcgm-exporter
-  namespace: nvidia-device-plugin
+  namespace: monitoring
 spec:
   endpoints:
     - honorLabels: false

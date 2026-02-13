@@ -3,7 +3,7 @@
 #------------------------------------------
 locals {
   amp_ingest_service_account = "amp-iamproxy-ingest-service-account"
-  amp_namespace              = "kube-prometheus-stack"
+  amp_namespace              = var.kube_prometheus_stack_namespace
 }
 
 

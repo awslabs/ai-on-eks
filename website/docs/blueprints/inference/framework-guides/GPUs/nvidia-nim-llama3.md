@@ -2,7 +2,7 @@
 title: NVIDIA NIM LLM on Amazon EKS
 sidebar_position: 4
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 :::warning
 Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it’s often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
@@ -48,7 +48,7 @@ This pattern combines the capabilities of NVIDIA NIM, Amazon Elastic Kubernetes 
 
 By combining these components, our proposed solution delivers a powerful and cost-effective model serving infrastructure tailored for large language models. With NVIDIA NIM's seamless integration, Amazon EKS's scalability with Karpenter, customers can achieve high performance while minimizing infrastructure costs.
 
-![NIM on EKS Architecture](../img/nim-on-eks-arch.png)
+![NIM on EKS Architecture](../../img/nim-on-eks-arch.png)
 
 ## Deploying the Solution
 
@@ -73,7 +73,7 @@ Before getting started with NVIDIA NIM, ensure you have the following:
     - Ensure that at least "NGC Catalog" is selected from the "Services Included" dropdown
     - Copy and securely store your API key, the key should have a prefix with `nvapi-`
 
-    ![NGC API KEY](../img/nim-ngc-api-key.png)
+    ![NGC API KEY](../../img/nim-ngc-api-key.png)
 
 **Validate NGC API Key and Test Image Pull**
 
@@ -358,13 +358,13 @@ Sign up using your name, email, and a dummy password.
 
 Click on New Chat and select the model from the dropdown menu, as shown in the screenshot below:
 
-![alt text](../img/openweb-ui-nim-1.png)
+![alt text](../../img/openweb-ui-nim-1.png)
 
 **6. Enter Test Prompt**
 
 Enter your prompt, and you will see the streaming results, as shown below:
 
-![alt text](../img/openweb-ui-nim-2.png)
+![alt text](../../img/openweb-ui-nim-2.png)
 
 ## Performance Testing with NVIDIA GenAI-Perf Tool
 
@@ -467,11 +467,11 @@ We provides a pre-configured Grafana dashboard to better visualize NIM status. I
 
 You can find more metrics description from this [document](https://docs.nvidia.com/nim/large-language-models/latest/observability.html).
 
-![NVIDIA LLM Server](../img/nim-dashboard.png)
+![NVIDIA LLM Server](../../img/nim-dashboard.png)
 
 You can monitor metrics such as Time-to-First-Token, Inter-Token-Latency, KV Cache Utilization metrics.
 
-![NVIDIA NIM Metrics](../img/nim-dashboard-2.png)
+![NVIDIA NIM Metrics](../../img/nim-dashboard-2.png)
 
 To view the Grafana dashboard to monitor these metrics, follow the steps below:
 

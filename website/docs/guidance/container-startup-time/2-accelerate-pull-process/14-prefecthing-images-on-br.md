@@ -88,4 +88,4 @@ spec:
 
 # End-to-End deployment example
 
-An end-to-end deployment example can be found in [Stable Diffusion on GPU](../../../blueprints/inference/GPUs/stablediffusion-gpus).
+An end-to-end deployment example can be found in [Stable Diffusion on GPU](/docs/blueprints/inference/framework-guides/GPUs/stablediffusion-gpus).

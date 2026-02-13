@@ -17,7 +17,7 @@ spec:
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-prometheus-stack
+    namespace: ${namespace}
   syncPolicy:
     syncOptions:
       - CreateNamespace=true

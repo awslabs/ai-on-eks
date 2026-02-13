@@ -108,6 +108,8 @@ grafana:
     existingSecret: "grafana-admin-secret"
     userKey: admin-user
     passwordKey: admin-password
+  service:
+    port: ${grafana_service_port}
   defaultDashboardsEnabled: true
   dashboardProviders:
     dashboardproviders.yaml:

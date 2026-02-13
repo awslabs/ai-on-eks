@@ -1,0 +1,8 @@
+{
+  "label": "Infrastructure",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Infrastructure solutions for AI/ML workloads on Amazon EKS"
+  }
+}

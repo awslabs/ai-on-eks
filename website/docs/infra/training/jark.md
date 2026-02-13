@@ -2,7 +2,7 @@
 sidebar_label: JARK on EKS
 sidebar_position: 1
 ---
-import CollapsibleContent from '../../src/components/CollapsibleContent';
+import CollapsibleContent from '../../../src/components/CollapsibleContent';
 
 # JARK on EKS
 
@@ -32,14 +32,14 @@ JARK comes enabled with [AI/ML Observability](https://github.com/awslabs/ai-ml-o
 The JARK stack is ideal for teams and organizations looking to simplify the complex process of deploying and managing AI models. Whether you're working on cutting-edge generative models or scaling existing AI workloads, JARK on Amazon EKS offers the flexibility, scalability, and control you need to succeed.
 
 
-![alt text](img/jark.png)
+![alt text](../img/jark.png)
 
 
 ### Ray on Kubernetes
 
 [Ray](https://www.ray.io/) is an open-source framework for building scalable and distributed applications. It is designed to make it easy to write parallel and distributed Python applications by providing a simple and intuitive API for distributed computing. It has a growing community of users and contributors, and is actively maintained and developed by the Ray team at Anyscale, Inc.
 
-![RayCluster](img/ray-cluster.svg)
+![RayCluster](../img/ray-cluster.svg)
 
 *Source: https://docs.ray.io/en/latest/cluster/key-concepts.html*
 
@@ -63,7 +63,7 @@ Overall, deploying Ray on Kubernetes can simplify the deployment and management 
 
 Before moving forward with the deployment please make sure you have read the pertinent sections of the official [documentation](https://docs.ray.io/en/latest/cluster/kubernetes/index.html).
 
-![RayonK8s](img/ray_on_kubernetes.webp)
+![RayonK8s](../img/ray_on_kubernetes.webp)
 
 *Source: https://docs.ray.io/en/latest/cluster/kubernetes/index.html*
 
@@ -71,7 +71,7 @@ Before moving forward with the deployment please make sure you have read the per
 
 In this [example](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/terraform), you will provision JARK Cluster on Amazon EKS.
 
-![JARK](img/jark-stack.png)
+![JARK](../img/jark-stack.png)
 
 
 ### Prerequisites
