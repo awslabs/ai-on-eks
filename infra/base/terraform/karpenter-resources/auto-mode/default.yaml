@@ -40,15 +40,7 @@ spec:
         - key: kubernetes.io/os
           operator: In
           values:
-            - linux
-        - key: eks.amazonaws.com/instance-size
-          operator: In
-          values:
-            - 2xlarge
-            - 4xlarge
-            - 8xlarge
-            - 12xlarge
-            - 16xlarge      
+            - linux   
       terminationGracePeriod: 24h0m0s
 ---
 apiVersion: karpenter.sh/v1
