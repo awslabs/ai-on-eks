@@ -36,10 +36,19 @@ spec:
           operator: In
           values:
             - amd64
+            - arm64
         - key: kubernetes.io/os
           operator: In
           values:
             - linux
+        - key: eks.amazonaws.com/instance-size
+          operator: In
+          values:
+            - 2xlarge
+            - 4xlarge
+            - 8xlarge
+            - 12xlarge
+            - 16xlarge      
       terminationGracePeriod: 24h0m0s
 ---
 apiVersion: karpenter.sh/v1
