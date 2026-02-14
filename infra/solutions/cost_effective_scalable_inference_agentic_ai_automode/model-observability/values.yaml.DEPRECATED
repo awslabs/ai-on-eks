@@ -1,0 +1,68 @@
+# FOR DEMO USE ONY
+langfuse: 
+  additionalEnv:
+    - name : REDIS_PORT
+      value: "6379"
+    # - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+    #   value: "changeme"
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: langfuse-s3
+      #     key: root-password
+    # - name: LANGFUSE_S3_BATCH_EXPORT_SECRET_ACCESS_KEY
+    #   value: "changeme"
+      # valueFrom:
+      #   secretKeyRef:
+      #     name: langfuse-s3
+      #     key: root-password
+  salt:
+    value: TOO_SALTY
+  nextauth:
+    secret:
+      value: "changeme"
+
+postgresql:
+  auth:
+    password: "changeme"
+
+clickhouse:
+  auth:
+    password: "changeme"
+
+redis:
+  auth:
+    password: "changeme"
+
+s3:
+  secretAccessKey:
+    value: "changeme"
+
+# FOR NON DEMO USE YOU SHYLD DEFINE THE SENSITIVE DATA IN SECRETS and/or use cloud storage services such as S3
+# langfuse: 
+#   salt:
+#     secretKeyRef:
+#       name: langfuse-general
+#       key: salt
+#   nextauth:
+#     secret:
+#       secretKeyRef:
+#         name: langfuse-nextauth-secret
+#         key: nextauth-secret
+
+# postgresql:
+#   auth:
+#     existingSecret: langfuse-postgresql-auth
+#     secretKeys:
+#       userPasswordKey: password
+
+# clickhouse:
+#   auth:
+#     existingSecret: langfuse-clickhouse-auth
+#     secretKeys:
+#       userPasswordKey: password
+
+# redis:
+#   auth:
+#     existingSecret: langfuse-redis-auth
+#     secretKeys:
+#       userPasswordKey: password    

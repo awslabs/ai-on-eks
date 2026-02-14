@@ -1,0 +1,59 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: vllm
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  endpoints:
+  - path: '/metrics/'
+    port: metrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberay
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    release: prometheus
+  name: kuberay-cluster
+  namespace: monitoring  # ns where prometheus is deployed
+spec:
+  podMetricsEndpoints:
+    - port: metrics
+      path: '/metrics/'
+  namespaceSelector:
+    matchNames:
+      - kuberay-system               # ns where Ray cluster is deployed
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kuberay
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: ray-workers-monitor
+  namespace: monitoring
+  labels:
+    # `release: $HELM_RELEASE`: Prometheus can only detect PodMonitor with this label.
+    release: prometheus
+spec:
+  jobLabel: ray-workers
+  # Only select Kubernetes Pods in the "default" namespace.
+  namespaceSelector:
+    matchNames:
+      - kuberay-system
+  # Only select Kubernetes Pods with "matchLabels".
+  selector:
+    matchLabels:
+      ray.io/node-type: worker
+  # A list of endpoints allowed as part of this PodMonitor.
+  podMetricsEndpoints:
+  - port: metrics
+    path: '/metrics/'
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_label_ray_io_cluster]
+      targetLabel: ray_io_cluster

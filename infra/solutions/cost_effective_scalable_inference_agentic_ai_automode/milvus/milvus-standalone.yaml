@@ -1,0 +1,55 @@
+# kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.3/cert-manager.yaml
+# kubectl get pods -n cert-manager
+# kubectl apply -f https://raw.githubusercontent.com/zilliztech/milvus-operator/main/deploy/manifests/deployment.yaml
+# kubectl get pods -n milvus-operator
+# deploy Milvus in standalone mode
+# kubectl apply -f milvus-standalone.yaml
+# Uninstall milvus
+# kubectl delete milvus my-release
+# This is a sample to deploy a standalone milvus in milvus-operator's default configurations.
+# kubectl port-forward service/my-release-milvus 19530:19530
+# kubectl port-forward service/llama-cpp 8080:8080
+# curl --request POST --url http://localhost:8080/completion --header "Content-Type: application/json" --data '{"prompt": "What is llama3.2?","n_predict": 128}'
+apiVersion: milvus.io/v1beta1
+kind: Milvus
+metadata:
+  name: my-release
+spec:
+  mode: standalone
+  components:
+    nodeSelector:
+      kubernetes.io/arch: arm64
+    resources:
+      requests:
+        cpu: "1"
+  dependencies:
+    etcd:
+      inCluster:
+        deletionPolicy: Delete
+        pvcDeletion: true
+        values:
+          nodeSelector:
+            kubernetes.io/arch: arm64
+          resources:
+            requests: 
+              cpu: '1'
+    pulsar:
+      inCluster:
+        deletionPolicy: Delete
+        pvcDeletion: true
+        values:
+          nodeSelector:
+            kubernetes.io/arch: arm64
+          resources:
+            requests: 
+              cpu: '1'
+    storage:
+      inCluster:
+        deletionPolicy: Delete
+        pvcDeletion: true
+        values:
+          nodeSelector:
+            kubernetes.io/arch: arm64
+          resources:
+            requests: 
+              cpu: '1'

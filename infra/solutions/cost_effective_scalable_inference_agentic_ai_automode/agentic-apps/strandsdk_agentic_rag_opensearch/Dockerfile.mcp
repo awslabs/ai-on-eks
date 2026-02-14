@@ -1,0 +1,51 @@
+# Dockerfile for MCP Server (Tavily Search Server)
+FROM python:3.11-slim as base
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Install only minimal dependencies needed for MCP server
+RUN pip install --no-cache-dir \
+    fastmcp>=0.9.0 \
+    python-dotenv>=1.0.0 \
+    httpx>=0.25.0 \
+    requests>=2.31.0 \
+    pydantic>=2.0.0
+
+# Copy the entire application
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p logs
+
+# Set proper permissions
+RUN chmod +x scripts/*.py 2>/dev/null || true
+
+# Copy startup and health check scripts
+COPY startup-mcp.sh /app/startup-mcp.sh
+COPY healthcheck-mcp.sh /app/healthcheck-mcp.sh
+
+# Make startup and health check scripts executable
+RUN chmod +x /app/startup-mcp.sh /app/healthcheck-mcp.sh
+
+# Expose the MCP server port
+EXPOSE 8001
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /app/healthcheck-mcp.sh
+
+# Set the default command
+CMD ["/app/startup-mcp.sh"]

@@ -1,0 +1,5 @@
+llama_cpp_python==0.3.2
+transformers==4.46.0
+fastapi[all]
+ray==2.39.0
+starlette==0.41.3

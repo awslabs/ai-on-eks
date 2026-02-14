@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tavily-mcp-server
+  labels:
+    app: tavily-mcp-server
+    component: mcp-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tavily-mcp-server
+  template:
+    metadata:
+      labels:
+        app: tavily-mcp-server
+        component: mcp-server
+    spec:
+      containers:
+      - name: tavily-mcp-server
+        image: 354918380621.dkr.ecr.us-east-1.amazonaws.com/strandsdk-agentic-rag-mcp:latest
+        # Fixed command to run MCP server directly with proper host binding
+        command:
+        - python
+        - -c
+        - |
+          from dotenv import load_dotenv
+          import os
+          # Load environment variables from ConfigMap or local file
+          if os.path.exists('/app/config/.env'):
+              load_dotenv('/app/config/.env')
+              print('Loaded environment from ConfigMap')
+          elif os.path.exists('/app/.env'):
+              load_dotenv('/app/.env')
+              print('Loaded environment from local file')
+          # Import and run MCP server with host binding to 0.0.0.0
+          from src.mcp_servers.tavily_search_server import mcp
+          mcp.run(transport='streamable-http', port=8001, host='0.0.0.0')
+        ports:
+        - containerPort: 8001
+          name: http
+        env:
+        # Tavily Configuration
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: tavily-api-key
+        # LiteLLM Configuration (for potential future use)
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: litellm-api-key
+        - name: LITELLM_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: litellm-base-url
+        # AWS Configuration
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: aws-region
+        # Server Configuration
+        - name: PORT
+          value: "8001"
+        - name: HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        # Health checks removed as not needed for MCP server
+        volumeMounts:
+        - name: app-config
+          mountPath: /app/config
+          readOnly: true
+      volumes:
+      - name: app-config
+        configMap:
+          name: app-config
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tavily-mcp-service
+  labels:
+    app: tavily-mcp-server
+    component: mcp-server
+spec:
+  selector:
+    app: tavily-mcp-server
+  ports:
+  - name: http
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  type: ClusterIP

@@ -1,0 +1,8 @@
+Configuration Summary:
+• OpenSearch Endpoint: https://search-strandsdk-rag-opensearch-rqn5uejl7pr4fxyaljzpj47yxq.us-east-1.es.amazonaws.com
+• LiteLLM Base URL: http://k8s-default-litellmi-41c6b61ad7-1926408778.us-east-1.elb.amazonaws.com/v1
+• Embedding Base URL: http://k8s-default-litellmi-41c6b61ad7-1926408778.us-east-1.elb.amazonaws.com/v1/embeddings
+• Langfuse Host: http://k8s-default-langfuse-57f572181c-920708869.us-east-1.elb.amazonaws.com
+• Application Load Balancer: http://k8s-default-strandsd-68c6191426-2087950212.us-east-1.elb.amazonaws.com
+
+

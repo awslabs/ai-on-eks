@@ -1,0 +1,204 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: strandsdk-rag-app
+  labels:
+    app: strandsdk-rag-app
+    component: main-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: strandsdk-rag-app
+  template:
+    metadata:
+      labels:
+        app: strandsdk-rag-app
+        component: main-app
+    spec:
+      serviceAccountName: strandsdk-rag-service-account
+      containers:
+      - name: strandsdk-rag-app
+        image: 354918380621.dkr.ecr.us-east-1.amazonaws.com/strandsdk-agentic-rag-main:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        # LiteLLM Configuration
+        - name: LITELLM_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: litellm-api-key
+        - name: LITELLM_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: litellm-base-url
+        - name: REASONING_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: reasoning-model
+        # Embedding Configuration
+        - name: EMBEDDING_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: embedding-api-key
+        - name: EMBEDDING_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: embedding-base-url
+        - name: EMBEDDING_MODEL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: embedding-model
+        # AWS Configuration
+        - name: OPENSEARCH_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: opensearch-endpoint
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: aws-region
+        # Tavily Configuration
+        - name: TAVILY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: tavily-api-key
+        - name: TAVILY_MCP_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: tavily-mcp-service-url
+        # Langfuse Configuration
+        - name: LANGFUSE_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: langfuse-host
+        - name: LANGFUSE_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: langfuse-public-key
+        - name: LANGFUSE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: app-secrets
+              key: langfuse-secret-key
+        # Application Settings
+        - name: VECTOR_INDEX_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: vector-index-name
+        - name: KNOWLEDGE_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: knowledge-dir
+        - name: OUTPUT_DIR
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: output-dir
+        - name: TOP_K_RESULTS
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: top-k-results
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 60  # Increased from 30 to 60 seconds
+          timeoutSeconds: 15  # Increased from 10 to 15 seconds
+          failureThreshold: 5  # Increased from 3 to 5 failures
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30  # Increased from 10 to 30 seconds
+          timeoutSeconds: 10  # Increased from 5 to 10 seconds
+          failureThreshold: 5  # Increased from 3 to 5 failures
+        volumeMounts:
+        - name: app-config
+          mountPath: /app/config
+          readOnly: true
+        - name: knowledge-volume
+          mountPath: /app/knowledge
+          readOnly: true
+      volumes:
+      - name: app-config
+        configMap:
+          name: app-config
+      - name: knowledge-volume
+        configMap:
+          name: knowledge-base
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: strandsdk-rag-service
+  labels:
+    app: strandsdk-rag-app
+    component: main-app
+spec:
+  selector:
+    app: strandsdk-rag-app
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: strandsdk-rag-ingress-alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-port: "8000"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    # Increase ALB idle timeout to 15 minutes for long-running agentic queries
+    alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=900
+    # Increase target group timeout and health check settings for better handling
+    alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30,slow_start.duration_seconds=0,stickiness.enabled=false
+    # Add health check configuration for better reliability
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "10"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: strandsdk-rag-service
+                port:
+                  number: 80

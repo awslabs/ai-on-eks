@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  labels:
+    app: strandsdk-rag
+data:
+  .env: |
+    # LiteLLM Configuration for Reasoning Models
+    LITELLM_BASE_URL=http://your-litellm-loadbalancer.us-east-1.elb.amazonaws.com/v1
+    REASONING_MODEL=vllm-server-qwen3
+    
+    # Embedding Configuration (separate from reasoning)
+    EMBEDDING_BASE_URL=http://your-litellm-loadbalancer.us-east-1.elb.amazonaws.com/v1/embeddings
+    EMBEDDING_MODEL=llamacpp-embedding
+    
+    # AWS Configuration  
+    AWS_REGION=us-east-1
+    OPENSEARCH_ENDPOINT=https://your-opensearch-domain.us-east-1.es.amazonaws.com
+    
+    # Tavily MCP Service Configuration
+    TAVILY_MCP_SERVICE_URL=http://tavily-mcp-service:8001/mcp
+    
+    # Optional: Langfuse for observability
+    LANGFUSE_HOST=http://your-langfuse-loadbalancer.us-east-1.elb.amazonaws.com
+    
+    # Application Settings
+    KNOWLEDGE_DIR=knowledge
+    OUTPUT_DIR=output
+    VECTOR_INDEX_NAME=knowledge-embeddings
+    TOP_K_RESULTS=3
+  
+  # Individual config values for environment variables
+  litellm-base-url: "http://your-litellm-loadbalancer.us-east-1.elb.amazonaws.com/v1"
+  reasoning-model: "vllm-server-qwen3"
+  embedding-base-url: "http://your-litellm-loadbalancer.us-east-1.elb.amazonaws.com/v1/embeddings"
+  embedding-model: "llamacpp-embedding"
+  opensearch-endpoint: "https://your-opensearch-domain.us-east-1.es.amazonaws.com"
+  aws-region: "us-east-1"
+  vector-index-name: "knowledge-embeddings"
+  tavily-mcp-service-url: "http://tavily-mcp-service:8001/mcp"
+  langfuse-host: "http://your-langfuse-loadbalancer.us-east-1.elb.amazonaws.com"
+  knowledge-dir: "knowledge"
+  output-dir: "output"
+  top-k-results: "3"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  labels:
+    app: strandsdk-rag
+type: Opaque
+data:
+  # Base64 encoded secrets - replace with your actual base64 encoded values
+  # To encode: echo -n "your-api-key" | base64
+  litellm-api-key: <BASE64_ENCODED_LITELLM_API_KEY>
+  embedding-api-key: <BASE64_ENCODED_EMBEDDING_API_KEY>
+  tavily-api-key: <BASE64_ENCODED_TAVILY_API_KEY>
+  langfuse-public-key: <BASE64_ENCODED_LANGFUSE_PUBLIC_KEY>
+  langfuse-secret-key: <BASE64_ENCODED_LANGFUSE_SECRET_KEY>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledge-base
+  labels:
+    app: strandsdk-rag
+data:
+  q_c_data.csv: |
+    question,context
+    What were the surgical complications observed in patients who underwent excision of limbal dermoids?,"Excision of limbal dermoids. We reviewed the clinical files of 10 patients who had undergone excision of unilateral epibulbar limbal dermoids. Preoperatively, all of the affected eyes had worse visual acuity (P less than .02) and more astigmatism (P less than .01) than the contralateral eyes. Postoperatively, every patient was cosmetically improved. Of the eight patients for whom both preoperative and postoperative visual acuity measurements had been obtained, in six it had changed minimally (less than or equal to 1 line), and in two it had improved (less than or equal to 2 lines). Surgical complications included persistent epithelial defects (40%) and peripheral corneal vascularization and opacity (70%). These complications do not outweigh the cosmetic and visual benefits of dermoid excision in selected patients."
+    What is the most important aspect of initial treatment for Bell's palsy?,"Bell's palsy. A diagnosis of exclusion. In cases of acute unilateral facial weakness, a careful and systematic evaluation is necessary to identify the cause. Idiopathic facial paralysis (Bell's palsy) is a diagnosis of exclusion. It is also the most common cause of unilateral facial weakness seen by primary care physicians. The most important aspect of initial treatment is eye protection. Administration of systemic oral corticosteroids may lessen severity and duration of symptoms."
+    How did steroid therapy help in the removal of the retained foreign body in the endobronchial region?,"Retained endobronchial foreign body removal facilitated by steroid therapy of an obstructing, inflammatory polyp. Oral and topical steroids were used to induce regression in an inflammatory, obstructing endobronchial polyp caused by a retained foreign body. The FB (a peanut half), which had been present for over six months, was then able to be easily and bloodlessly retrieved with fiberoptic bronchoscopy."
+    What unusual complication of Crohn's disease was observed in the patient described in this case report?,"Recurrent buccal space abscesses: a complication of Crohn's disease. A patient is described with generalized gastrointestinal involvement by Crohn's disease. Symptoms of recurrent ulceration and mucosal tags are well-described oral manifestations of Crohn's disease; however, in our patient recurrent facial abscesses, which required extraoral drainage, also developed. This complication has not previously been reported."
+    What are the key characteristics and management recommendations for intracranial fibromatosis based on the given context?,"Intracranial fibromatosis. Fibromatoses are uncommon infiltrative lesions affecting musculoaponeurotic structures, most often of the limbs and trunk. Lesions involving the cranial cavity are rare and require the same aggressive surgical management as elsewhere in the body. This case illustrates their clinical and neuroradiological features and underscores the necessity for aggressive resection to avoid recurrence. The literature is reviewed."
+    What was the effect of intrathecally administered morphine sulfate on posterior tibial nerve somatosensory cortical evoked potentials (PTSCEPs) in awake patients?,"The effect of intrathecal morphine on somatosensory evoked potentials in awake humans. Although the effect of systemic opioids on somatosensory evoked potentials has been well described, little is known about the interaction between intrathecally administered opioid analgesics and somatosensory evoked potentials. Accordingly, the influence of intrathecally administered morphine on posterior tibial nerve somatosensory cortical evoked potentials (PTSCEPs) was investigated in 22 unpremedicated, awake, neurologically normal patients scheduled to undergo elective abdominal or pelvic procedures. Patients were randomly assigned to receive either preservation-free intrathecal morphine sulfate (ITMS) or placebo. After baseline PTSCEP, heart rate and, mean blood pressure were recorded, ITMS (15 micrograms.kg-1) was injected via standard dural puncture with the patient in the lateral position. PTSCEPs, heart rate, and mean blood pressure were recorded again at 5, 10, 20, 30, 60, 90, and 120 min. Control patients were treated identically (including position, sterile preparation, and subcutaneous tissue infiltration with local anesthetic), except for lumbar puncture, and were unaware of their randomization. Before administration of ITMS, PTSCEP P1, N1, P2, N2, and P3 latencies were 39.4 +/- 3.2, 47.6 +/- 3.9, 59.2 +/- 3.2, 70.4 +/- 3.7, and 84.6 +/- 5.5 ms, (mean +/- standard deviation), respectively. The corresponding P1-N1, N1-P2, and P2-N2 amplitudes were 2.4 +/- 1.1, 2.4 +/- 1.1, and 2.3 +/- 0.9 microV, respectively. There were no significant changes over time between the control and ITMS groups. PTSCEPs resulting from left-sided stimulation were not different from those elicited by right-sided stimulation. All ITMS patients had intense postoperative analgesia for at least 24 h. It is concluded that ITMS does not affect PTSCEP waveforms in the 35-90 ms latency range during the awake state."
+    What is the key message of the 29th Rovenstine lecture regarding the ongoing education and approach of anesthesiologists?,"The 29th Rovenstine lecture: clinical challenges for the anesthesiologist. In conclusion, I hope that my comments have reaffirmed your biases or, even more importantly, stimulated you to think in a different way about the information explosion in our specialty and medicine in general. I believe our specialty is in a golden era that will benefit from the past and be nourished by new discoveries and understanding. We as clinicians must accept the challenge of recognizing what new information deserves incorporation into our practice, what old information deserves to be sustained, and what merits new scrutiny and perhaps should be discarded. If I had one wish, it would be that anesthesiologists would never lose their zeal to be students--their thirst for new information--as the continuum of anesthesia education is indeed a life-long process. That wish, ladies and gentlemen, is my challenge to all anesthesiologists."
+    What was the purpose of the study on encainide and flecainide in patients with supraventricular arrhythmias?,"Mortality in patients treated with flecainide and encainide for supraventricular arrhythmias. In a recent clinical trial, the class Ic antiarrhythmic drugs encainide and flecainide were found to be associated with an increased mortality risk in patients with new myocardial infarction and ventricular arrhythmias. The purpose of this study was to assess whether an increased mortality risk also accompanied the use of these drugs to treat patients with supraventricular arrhythmias. Data were obtained from the respective pharmaceutical sponsors on the mortality observed with each drug in United States and foreign protocols enrolling patients with supraventricular arrhythmias. Mortality in the encainide population (343 patients) and the flecainide population (236 patients) was compared with that in a research arrhythmia clinic, the Duke population (154 patients). Nine deaths occurred in the combined encainide-flecainide population and 10 deaths occurred in the Duke population; the follow-up periods averaged 488 days and 1,285 days, respectively. The 6-year survival functions of these 2 populations, estimated by the Kaplan-Meier technique, did not differ significantly (p = 0.62). The hazard ratio for the combined encainide-flecainide population relative to the Duke population was estimated to be 0.6 with a 95% confidence interval of 0.2, 1.7. These descriptive comparisons did not demonstrate any excess mortality when flecainide and encainide were used in patients with supraventricular arrhythmias."
+    How do lymphokines contribute to the potential immunotherapy of cancer?,"Approaches to immunotherapy of cancer: characterization of lymphokines as second signals for cytotoxic T-cell generation. Lymphokines, the soluble molecules produced by cells of the immune system, regulate cell-cell interactions and, consequently, the functional status of the immune system. Altering immunoregulatory pathways with lymphokines in vivo may provide a mechanism for controlling a variety of immunologic disorders. Although normally produced in vivo in very small quantities, the widespread availability of recombinant lymphokines has made it possible to study the molecular signals involved in production of lymphocyte effectors with activity against tumor. For example, interleukin-2-based cancer immunotherapy programs have, in certain clinical situations, suggested that immunologic intervention can influence the regression of metastatic cancer. Ultimately the successful application of these biologic agents requires an understanding of the interaction between the immune system and tumor on a molecular level. To induce a given biologic effect, it is necessary both to classify the required lymphokines and to identify the relevant effector cell populations. This review will examine the progress made in identifying the requirements for lymphokine-induced cytotoxic T-lymphocyte function."
+  README.md: |
+    # Knowledge Base ConfigMap
+    This ConfigMap contains the top 10 lines from q_c_data.csv for the RAG application.
+    
+    ## Contents:
+    - q_c_data.csv: Medical Q&A dataset with questions and context pairs
+    
+    ## Usage:
+    This data will be mounted as a volume in the application pods and used by the 
+    knowledge agent for RAG-based question answering.
+    
+    ## Data Format:
+    CSV format with two columns:
+    - question: Medical questions
+    - context: Detailed medical context and answers

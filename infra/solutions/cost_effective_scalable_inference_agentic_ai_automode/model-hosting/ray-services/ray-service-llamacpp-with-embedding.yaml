@@ -1,0 +1,304 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-token
+stringData:
+  token: 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
+  llm_api_key: sk-1234
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-app-code-embedding
+data:
+  app.py: |
+    import multiprocessing
+    import os
+    import logging
+    import time
+    from fastapi import FastAPI, HTTPException
+    from starlette.requests import Request
+    from starlette.responses import JSONResponse
+    from ray import serve
+    from llama_cpp import Llama
+
+    logger = logging.getLogger("ray.serve")
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    app = FastAPI()
+
+    @serve.deployment(
+        name="LLamaCPPDeployment", 
+        ray_actor_options={"num_cpus": 29}, 
+        autoscaling_config={
+            "min_replicas": 1, 
+            "max_replicas": 10, 
+            "initial_replicas": 1, 
+            "upscale_delay_s": 5
+        }, 
+        max_ongoing_requests=100, 
+        graceful_shutdown_timeout_s=600
+    )
+    @serve.ingress(app)
+    class LLamaCPPDeployment:
+        def __init__(self, parallelism: str):
+            os.environ["OMP_NUM_THREADS"] = parallelism
+            self.model_id = os.getenv("MODEL_ID", default="ChristianAzinn/snowflake-arctic-embed-s-gguf")
+            self.filename = os.getenv("MODEL_FILENAME", default="snowflake-arctic-embed-s-f16.GGUF")
+            self.n_ctx = int(os.getenv("N_CTX"))
+            self.n_threads = int(os.getenv("N_THREADS"))
+            self.api_key = os.getenv("LLM_API_KEY", default="sk-1234")
+            self.llm = Llama.from_pretrained(
+                repo_id=self.model_id,
+                filename=self.filename,
+                n_ctx=self.n_ctx,
+                n_threads=self.n_threads,
+                embedding=True
+            )
+            logger.info(f"Embedding model {self.model_id} loaded successfully with {self.n_threads} threads")
+            print("__init__ Complete")
+
+        @app.post("/v1/embeddings")
+        async def create_embeddings(self, request: Request):
+            try:
+                start_time = time.time()
+                body = await request.json()
+                
+                # Check for API key in request headers
+                auth_header = request.headers.get("Authorization", "")
+                if auth_header.startswith("Bearer "):
+                    api_key = auth_header.replace("Bearer ", "")
+                    if api_key != self.api_key:
+                        return JSONResponse(
+                            status_code=401,
+                            content={"error": "Invalid API key"}
+                        )
+                
+                # Extract parameters from request
+                input_text = body.get("input", "")
+                model = body.get("model", self.model_id)
+                encoding_format = body.get("encoding_format", "float")
+                
+                # Handle different input formats
+                if isinstance(input_text, list):
+                    texts = input_text
+                elif isinstance(input_text, str):
+                    texts = [input_text]
+                else:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Input must be a string or array of strings"}
+                    )
+                
+                logger.info(f"Creating embeddings for {len(texts)} text(s)")
+                
+                # Generate embeddings
+                embeddings_data = []
+                total_tokens = 0
+                
+                for i, text in enumerate(texts):
+                    # Create embedding using llama-cpp-python
+                    embedding = self.llm.create_embedding(text)
+                    
+                    # Extract the embedding vector
+                    embedding_vector = embedding["data"][0]["embedding"]
+                    
+                    embeddings_data.append({
+                        "object": "embedding",
+                        "index": i,
+                        "embedding": embedding_vector
+                    })
+                    
+                    # Estimate token count (rough approximation)
+                    total_tokens += len(text.split())
+                
+                # Prepare the response in OpenAI format
+                response = {
+                    "object": "list",
+                    "data": embeddings_data,
+                    "model": model,
+                    "usage": {
+                        "prompt_tokens": total_tokens,
+                        "total_tokens": total_tokens
+                    }
+                }
+                
+                duration = time.time() - start_time
+                logger.info(f"Generated {len(embeddings_data)} embeddings in {duration:.2f} seconds")
+                
+                return JSONResponse(content=response)
+                
+            except Exception as e:
+                logger.error(f"Error creating embeddings: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": str(e)}
+                )
+
+        @app.get("/health")
+        async def health_check(self):
+            return {"status": "healthy", "model": self.model_id, "type": "embedding"}
+
+    host_cpu_count = multiprocessing.cpu_count()
+
+    model = LLamaCPPDeployment.bind("host_cpu_count")
+---
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: ray-service-llamacpp
+spec:
+  serveConfigV2: |
+    applications:
+    - name: llmcpp-arm
+      route_prefix: /
+      import_path: app:model
+      deployments:
+      - name: LLamaCPPDeployment
+        ray_actor_options:
+          num_cpus: 29
+      runtime_env:
+        pip: ["llama_cpp_python", "transformers"]
+        env_vars:
+          LD_LIBRARY_PATH: "/home/ray/anaconda3/lib:$LD_LIBRARY_PATH"
+          MODEL_ID: "ChristianAzinn/snowflake-arctic-embed-s-gguf" 
+          MODEL_FILENAME: "snowflake-arctic-embed-s-f16.GGUF"
+          N_CTX: "0"
+          N_THREADS : "28"
+          FORCE_CMAKE: "1"
+          CMAKE_ARGS: "-DCMAKE_CXX_FLAGS='-mcpu=native -fopenmp' -DCMAKE_C_FLAGS='-mcpu=native -fopenmp'"
+          CMAKE_CXX_COMPILER: "/usr/bin/g++"  
+          CMAKE_C_COMPILER: "/usr/bin/gcc"  
+          CXX: "/usr/bin/g++"  
+          CC: "/usr/bin/gcc" 
+          PYTHONPATH: "/home/ray/anaconda3/lib/python3.11/site-packages:$PYTHONPATH" 
+  rayClusterConfig:
+    rayVersion: '2.33.0'
+    enableInTreeAutoscaling: true
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+        num-cpus: '0'
+      template:
+        metadata:
+          labels:
+            ray-control-plane: "true"
+        spec:
+          nodeSelector:
+            kubernetes.io/arch: arm64
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64           
+          restartPolicy: Always
+          containers:
+          - name: ray-head
+            image: rayproject/ray:2.39.0-py312-cpu-aarch64
+            volumeMounts:
+              - name: app-code
+                mountPath: /home/ray/app.py
+                subPath: app.py
+            resources:
+              limits:
+                cpu: "10"
+                memory: "20Gi"
+              requests:
+                cpu: "10"
+                memory: "20Gi"
+            ports:
+            - containerPort: 6379
+              name: gcs-server
+            - containerPort: 8265
+              name: dashboard
+            - containerPort: 10001
+              name: client
+            - containerPort: 8000
+              name: serve
+            env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: llm_api_key
+            - name: RAY_enable_autoscaler_v2
+              value: "1"
+            - name: RAY_num_heartbeats_timeout
+              value: "300" 
+          volumes:
+              - name: app-code
+                configMap:
+                  name: llama-app-code-embedding
+    workerGroupSpecs:
+    - replicas: 1
+      minReplicas: 1
+      maxReplicas: 10
+      groupName: cpu-group
+      rayStartParams: 
+        num-cpus: "29"
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/arch: arm64
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64           
+          restartPolicy: Always
+          containers:
+          - name: llm
+            image: rayproject/ray:2.39.0-py312-cpu-aarch64
+            volumeMounts:
+              - name: app-code
+                mountPath: /home/ray/app.py
+                subPath: app.py           
+            env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+            - name: LLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: llm_api_key
+            - name: CMAKE_ARGS
+              value: "-DCMAKE_CXX_FLAGS=-fopenmp"  
+            - name: "CC"
+              value: "/usr/bin/gcc"   
+            - name: "CXX"
+              value: "/usr/bin/g++"   
+            - name: CMAKE_CXX_COMPILER
+              value: "/usr/bin/g++"  
+            - name: CMAKE_C_COMPILER
+              value: "/usr/bin/gcc" 
+            - name: PYTHONPATH
+              value: "/home/ray/anaconda3/lib/python3.11/site-packages:$PYTHONPATH" 
+            resources:
+              limits:
+                cpu: "30"
+                memory: "55Gi"        
+              requests:
+                cpu: "30"
+                memory: "55Gi"
+          volumes:
+              - name: app-code
+                configMap:
+                  name: llama-app-code-embedding

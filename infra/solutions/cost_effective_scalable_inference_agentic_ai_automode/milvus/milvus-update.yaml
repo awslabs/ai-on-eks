@@ -1,0 +1,8 @@
+apiVersion: milvus.io/v1beta1
+kind: Milvus
+metadata:
+  name: my-release
+  namespace: default
+spec:
+  components:
+    image: milvusdb/milvus:v2.5.12

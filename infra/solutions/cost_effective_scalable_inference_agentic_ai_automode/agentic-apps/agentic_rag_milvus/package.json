@@ -1,0 +1,36 @@
+{
+  "name": "agentic-rag-opensearch",
+  "version": "1.0.0",
+  "description": "Agentic RAG system with MCP and custom embedding",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "embed-knowledge": "tsx src/embedKnowledge.ts",
+    "embed-csv": "tsx src/embedCSV.ts",
+    "update-rag": "tsx src/updateRAG.ts",
+    "rebuild-collection": "tsx src/rebuildCollection.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "rag",
+    "mcp",
+    "llm",
+    "agent"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.525.0",
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "@modelcontextprotocol/server-filesystem": "^2025.3.28",
+    "@zilliz/milvus2-sdk-node": "^2.5.8",
+    "chalk": "^5.4.1",
+    "csv-parse": "^5.5.5",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

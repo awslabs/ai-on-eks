@@ -1,0 +1,97 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: llamacpp-embedding-server
+  annotations:
+    kubernetes.io/pvc-protection: "false"  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
+  storageClassName: gp3  # Uses ebs.csi.eks.amazonaws.com provisioner for EKS Auto Mode
+  volumeMode: Filesystem
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llamacpp-embedding-server
+  labels:
+    app: llamacpp-embedding-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llamacpp-embedding-server
+  template:
+    metadata:
+      labels:
+        app: llamacpp-embedding-server
+    spec:
+      nodeSelector:
+            kubernetes.io/arch: arm64
+      affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                    - arm64 
+      volumes:
+      - name: cache-volume
+        persistentVolumeClaim:
+          claimName: llamacpp-embedding-server
+      containers:
+      - name: llamacpp-embedding-server
+        image: ghcr.io/ggml-org/llama.cpp:server
+        args: [
+          "--model-url https://huggingface.co/ChristianAzinn/snowflake-arctic-embed-s-gguf/blob/main/snowflake-arctic-embed-s-f16.GGUF --port 8000 --host 0.0.0.0 --embedding --threads 16"
+        ]
+        env:
+        - name: OMP_NUM_THREADS
+          value: "16"
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            memory: 32Gi
+          requests:
+            cpu: "16"
+            memory: 32Gi
+        volumeMounts:
+        - mountPath: /models
+          name: cache-volume
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          failureThreshold: 15
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 120
+          periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: llamacpp-embedding-server
+spec:
+  ports:
+  - name: http-llamacpp-embedding-server
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: llamacpp-embedding-server
+  sessionAffinity: None
+  type: ClusterIP

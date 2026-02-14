@@ -1,0 +1,10 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: '(SO9150) - Guidance for Scalable Model Inference and Agentic AI on Amazon EKS'
+Resources: 
+  EmptyResource: 
+    Type: 'AWS::CloudFormation::WaitConditionHandle'
+    
+Outputs:
+  ProjectStatus:
+    Description: 'Project initialization status'
+    Value: 'Starting the Agentic AI project'

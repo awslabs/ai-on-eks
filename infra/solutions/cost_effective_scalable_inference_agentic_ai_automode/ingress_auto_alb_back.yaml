@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+  creationTimestamp: "2025-10-13T02:47:05Z"
+  generation: 1
+  name: auto-alb
+  resourceVersion: "1454"
+  uid: 6d87277d-345e-42be-9561-8a63ad712391
+spec:
+  controller: eks.amazonaws.com/alb
+  parameters:
+    apiGroup: eks.amazonaws.com
+    kind: IngressClassParams
+    name: auto-alb
+    scope: Cluster

@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-web
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+      - name: langfuse-web
+        env:
+        - name: REDIS_PORT
+          value: "6379"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-worker
+  namespace: default
+spec:
+  template:
+    spec:
+      containers:
+      - name: langfuse-worker
+        env:
+        - name: REDIS_PORT
+          value: "6379"

@@ -1,0 +1,50 @@
+# Strands SDK and core dependencies
+strands-agents>=0.1.0
+strands-agents-tools>=0.1.0
+strands-agents[litellm]>=0.1.0
+
+# OpenAI and LLM dependencies
+openai>=1.0.0
+litellm>=1.0.0
+
+# MCP dependencies
+mcp>=1.0.0
+fastmcp>=0.9.0
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# AWS and OpenSearch dependencies
+boto3>=1.34.0
+opensearch-py>=2.4.0
+aws-requests-auth>=0.4.3
+langchain-aws>=0.1.0
+
+# Fix dependency conflicts by using older compatible versions
+dill==0.3.7
+datasets==2.14.0
+pyarrow>=12.0.0,<15.0.0
+
+# RAGAs evaluation dependencies - use compatible versions
+ragas>=0.1.0,<0.2.0
+langchain>=0.1.0,<0.3.0
+langchain-core>=0.1.0,<0.3.0
+
+# Vector embeddings and ML
+numpy>=1.24.0,<2.0.0
+scikit-learn>=1.3.0
+
+# Data processing
+pandas>=2.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+httpx>=0.25.0
+
+# Observability
+langfuse>=2.0.0
+
+# Utilities
+pydantic>=2.0.0
+aiofiles>=23.0.0
+
+# Additional FastAPI server dependencies
+python-multipart>=0.0.6

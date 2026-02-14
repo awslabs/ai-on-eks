@@ -1,0 +1,327 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-guardrail-config
+data:
+  custom_guardrail.py: |
+    from typing import Any, Dict, List, Literal, Optional, Union
+
+    import litellm
+    from litellm._logging import verbose_proxy_logger
+    from litellm.caching.caching import DualCache
+    from litellm.integrations.custom_guardrail import CustomGuardrail
+    from litellm.proxy._types import UserAPIKeyAuth
+    from litellm.proxy.guardrails.guardrail_helpers import should_proceed_based_on_metadata
+    from litellm.types.guardrails import GuardrailEventHooks
+    import json
+
+    import re,logging
+
+    # logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+
+    class myCustomGuardrail(CustomGuardrail):
+        def __init__(
+            self,
+            **kwargs,
+        ):
+            # store kwargs as optional_params
+            self.optional_params = kwargs
+
+            super().__init__(**kwargs)
+
+        async def async_post_call_success_hook(
+                self,
+                data: dict,
+                user_api_key_dict: UserAPIKeyAuth,
+                response,
+            ):
+                """
+                Runs on response from LLM API call
+
+                It can be used to reject a response
+
+                If a response contains invalid JSON -> we will raise an exception
+                """
+                if isinstance(response, litellm.ModelResponse):
+                    for choice in response.choices:
+                        if isinstance(choice, litellm.Choices):
+                            if isinstance(choice.message.content, str):
+                                detected_pii = self.detect_pii(choice.message.content)
+                                logger.log(logging.CRITICAL, msg=f"detect_pii: {detected_pii}")
+                                if detected_pii:
+                                    raise ValueError(f"Guardrail failed PII Detected: {detected_pii}")
+                                                          
+                                # try:
+                                #     json_content = json.loads(choice.message.content)
+                                # except json.JSONDecodeError as e:
+                                #     raise ValueError(f"Invalid JSON in response content: {e}")
+                                
+        def detect_pii(self, content: str) -> List[str]:
+            """
+            Detects PII data in the given content.
+            
+            Args:
+                content (str): The content to check for PII data.
+            
+            Returns:
+                List[str]: A list of detected PII data.
+            """
+            pii_patterns = {
+                "email": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+                "phone": r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
+                "ssn": r"\b\d{3}-\d{2}-\d{4}\b"
+            }
+            
+            detected_pii = []
+            
+            for pii_type, pattern in pii_patterns.items():
+                matches = re.findall(pattern, content)
+                if matches:
+                    return True
+                    # detected_pii.extend(matches)
+            
+            return False     
+
+
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+data:
+  config.yaml: |
+    model_list:
+    - model_name: vllm-server-qwen3
+      litellm_params:
+        model: hosted_vllm/Qwen/Qwen3-14B
+        api_base: http://vllm-qwen-server:8000/v1
+    - model_name: llamacpp-embedding
+      litellm_params:
+        model: hosted_vllm/ChristianAzinn/snowflake-arctic-embed-s-gguf
+        api_base: http://ray-service-llamacpp-serve-svc:8000/v1
+        api_key: sk-1234
+    - model_name: vllm-server-qwen-vision
+      litellm_params:
+        model: hosted_vllm/Qwen/Qwen2.5-VL-7B-Instruct
+        api_base: http://vllm-qwen-server-vision:8000/v1
+        stream: false
+      model_info:
+        supports_function_calling: true
+
+    # guardrails:
+    #   - guardrail_name: "custom-post-guard"
+    #     litellm_params:
+    #       guardrail: custom_guardrail.myCustomGuardrail
+    #       mode: "post_call" 
+    #       default_on: true
+
+    litellm_settings:
+      cache: true
+      cache_params:
+        type: redis
+        # redis_startup_nodes: [{"host": "redis", "port": "6379"}] 
+        ttl: 10
+      drop_parmas: false
+      forward_to_langfuse: true
+      success_callback: ["langfuse"]
+      failure_callback: ["langfuse"]
+      langfuse_public_key: os.environ/LANGFUSE_PUBLIC_KEY
+      langfuse_secret: os.environ/LANGFUSE_SECRET_KEY
+      langfuse_host: os.environ/LANGFUSE_HOST
+
+      default_team_settings: 
+        - team_id: team-1
+          success_callback: ["langfuse"]
+          failure_callback: ["langfuse"]
+          langfuse_public_key: os.environ/LANGFUSE_PUBLIC_KEY
+          langfuse_secret: os.environ/LANGFUSE_SECRET_KEY
+          langfuse_host: os.environ/LANGFUSE_HOST
+
+    # https://docs.litellm.ai/docs/proxy/configs  
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  labels:
+    app: litellm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      nodeSelector:
+        kubernetes.io/arch: arm64
+      containers:
+      - name: litellm
+        # image: ghcr.io/berriai/litellm:main-latest
+        image:  public.ecr.aws/p7b6k2h9/fmamazon/genai-eks:litellm-main-latest
+        ports:
+        - containerPort: 4000
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: 4000
+          initialDelaySeconds: 10
+          periodSeconds: 15
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          successThreshold: 1
+          failureThreshold: 3
+          timeoutSeconds: 10        
+        args: [ "--config", "/app/config.yaml"]  
+        # args: [ "--config", "/app/config.yaml", "--detailed_debug"]  
+        env:
+        - name: DATABASE_URL
+          value: postgres://myuser:mypassword@postgres:5432/mydatabase      
+
+        - name: LANGFUSE_SECRET_KEY
+          value: "sk-lf-ddbd65c8-ebca-4080-aeeb-fc93075638d6"
+        - name: LANGFUSE_PUBLIC_KEY
+          value: "pk-lf-a08f395f-d231-4567-be04-a8a8a7b045ce"
+        - name: LANGFUSE_HOST
+          value: "http://k8s-default-langfuse-565b67a37d-183670618.us-west-2.elb.amazonaws.com"
+        - name: REDIS_HOST
+          value: redis
+        - name: REDIS_PORT
+          value: "6379"  
+        - name: LITELLM_MASTER_KEY
+          value: sk-123456
+        - name: LITELLM_SALT_KEY
+          value: abcd1234
+        - name: STORE_MODEL_IN_DB
+          value: "true"      
+        volumeMounts:
+        - name: config-volume
+          readOnly: true
+          mountPath: /app/config.yaml
+          subPath: config.yaml
+        - name: guardrail-volume
+          mountPath: /app/custom_guardrail.py
+          subPath: custom_guardrail.py          
+      volumes:
+      - name: config-volume
+        configMap:
+          name: litellm-config
+      - name: guardrail-volume
+        configMap:
+          name: custom-guardrail-config          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+spec:
+  selector:
+    app: litellm
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: "postgres"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15.12-bookworm
+        ports:
+        - containerPort: 5432
+          name: postgres
+        env:
+        - name: POSTGRES_DB
+          value: "mydatabase"
+        - name: POSTGRES_USER
+          value: "myuser"
+        - name: POSTGRES_PASSWORD
+          value: "mypassword"
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gp3  # Uses ebs.csi.eks.amazonaws.com provisioner for EKS Auto Mode
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  ports:
+  - port: 5432
+    name: postgres
+  clusterIP: None
+  selector:
+    app: postgres  
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:6.2.6
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+spec:
+  selector:
+    app: redis
+  ports:
+    - protocol: TCP
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP

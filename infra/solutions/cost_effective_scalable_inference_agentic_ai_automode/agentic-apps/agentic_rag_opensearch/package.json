@@ -1,0 +1,37 @@
+{
+  "name": "agentic-rag-opensearch",
+  "version": "1.0.0",
+  "description": "Multi-Agent RAG system with MCP and OpenSearch",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "embed-knowledge": "tsx src/scripts/embedKnowledge.ts",
+    "test-agents": "tsx src/test-agents.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "rag",
+    "mcp",
+    "llm",
+    "agent",
+    "opensearch",
+    "multi-agent"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "@modelcontextprotocol/server-filesystem": "^2025.3.28",
+    "@opensearch-project/opensearch": "^3.5.1",
+    "aws-sdk": "^2.1574.0",
+    "chalk": "^5.4.1",
+    "csv-parse": "^5.5.5",
+    "dotenv": "^16.4.5",
+    "langfuse": "^3.30.0",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.28.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.3.3"
+  }
+}

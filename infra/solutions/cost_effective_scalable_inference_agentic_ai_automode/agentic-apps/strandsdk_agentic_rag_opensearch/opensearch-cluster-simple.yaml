@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'OpenSearch cluster for Scalable Model Inference and Agentic AI on Amazon EKS Solution'
+
+Parameters:
+  ClusterName:
+    Type: String
+    Default: 'strandsdk-rag-opensearch'
+    Description: 'Name of the OpenSearch cluster'
+  
+  ServiceAccountName:
+    Type: String
+    Default: 'strandsdk-rag-service-account'
+    Description: 'Name of the service account that needs access'
+  
+  EKSClusterName:
+    Type: String
+    Default: 'graviton-cluster'
+    Description: 'Name of the EKS cluster for Pod Identity mapping'
+  
+  KubernetesNamespace:
+    Type: String
+    Default: 'default'
+    Description: 'Kubernetes namespace for the service account'
+  
+  OpenSearchVersion:
+    Type: String
+    Default: 'OpenSearch_2.11'
+    Description: 'OpenSearch version'
+    AllowedValues:
+      - 'OpenSearch_2.11'
+      - 'OpenSearch_2.9'
+      - 'OpenSearch_2.7'
+
+Resources:
+  # IAM Role for the service account with full OpenSearch and Bedrock access
+  ServiceAccountRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # RoleName: !Sub '${ServiceAccountName}-newest'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: pods.eks.amazonaws.com
+            Action: 
+              - sts:AssumeRole
+              - sts:TagSession
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess
+
+  # Secrets Manager for OpenSearch master password
+  OpenSearchMasterPassword:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      # Name: !Sub '${ClusterName}-master-password'
+      Description: 'Master password for OpenSearch cluster'
+      GenerateSecretString:
+        SecretStringTemplate: '{"username": "admin"}'
+        GenerateStringKey: 'password'
+        PasswordLength: 16
+        ExcludeCharacters: '"@/\'
+
+  # EKS Pod Identity Association
+  PodIdentityAssociation:
+    Type: AWS::EKS::PodIdentityAssociation
+    Properties:
+      ClusterName: !Ref EKSClusterName
+      Namespace: !Ref KubernetesNamespace
+      ServiceAccount: !Ref ServiceAccountName
+      RoleArn: !GetAtt ServiceAccountRole.Arn
+    DependsOn: ServiceAccountRole
+
+  # OpenSearch Domain
+  OpenSearchDomain:
+    Type: AWS::OpenSearchService::Domain
+    Properties:
+      DomainName: !Ref ClusterName
+      EngineVersion: !Ref OpenSearchVersion
+      
+      # Cluster Configuration
+      ClusterConfig:
+        InstanceType: m7g.large.search
+        InstanceCount: 3
+        DedicatedMasterEnabled: false
+        ZoneAwarenessEnabled: true
+        ZoneAwarenessConfig:
+          AvailabilityZoneCount: 3
+      
+      # EBS Configuration
+      EBSOptions:
+        EBSEnabled: true
+        VolumeType: gp3
+        VolumeSize: 100
+        Iops: 3000
+        Throughput: 125
+      
+      # Network Configuration (Public access)
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+        TLSSecurityPolicy: Policy-Min-TLS-1-2-2019-07
+      
+      # Access Policy - Allow public access with IAM authentication
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt ServiceAccountRole.Arn
+            Action: 'es:*'
+            Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ClusterName}/*'
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: 
+              - 'es:ESHttpGet'
+              - 'es:ESHttpPost'
+              - 'es:ESHttpPut'
+              - 'es:ESHttpDelete'
+              - 'es:ESHttpHead'
+            Resource: !Sub 'arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${ClusterName}/*'
+            Condition:
+              IpAddress:
+                'aws:SourceIp': '0.0.0.0/0'
+      
+      # Advanced Security Options
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions:
+          MasterUserName: 'admin'
+          MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref OpenSearchMasterPassword, ':SecretString:password}}']]
+
+      # Node-to-node encryption
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      
+      # Encryption at rest
+      EncryptionAtRestOptions:
+        Enabled: true
+      
+      Tags:
+        - Key: Name
+          Value: !Ref ClusterName
+        - Key: Environment
+          Value: 'production'
+        - Key: Application
+          Value: 'strandsdk-rag'
+    DependsOn: OpenSearchMasterPassword
+
+Outputs:
+  OpenSearchDomainEndpoint:
+    Description: 'OpenSearch domain endpoint'
+    Value: !GetAtt OpenSearchDomain.DomainEndpoint
+    Export:
+      Name: !Sub '${AWS::StackName}-OpenSearchEndpoint'
+  
+  OpenSearchDomainArn:
+    Description: 'OpenSearch domain ARN'
+    Value: !GetAtt OpenSearchDomain.DomainArn
+    Export:
+      Name: !Sub '${AWS::StackName}-OpenSearchArn'
+  
+  ServiceAccountRoleArn:
+    Description: 'Service account role ARN'
+    Value: !GetAtt ServiceAccountRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ServiceAccountRoleArn'
+  
+  OpenSearchDashboardsURL:
+    Description: 'OpenSearch Dashboards URL'
+    Value: !Sub 'https://${OpenSearchDomain.DomainEndpoint}/_dashboards'
+  
+  MasterPasswordSecretArn:
+    Description: 'ARN of the secret containing the master password'
+    Value: !Ref OpenSearchMasterPassword
+    Export:
+      Name: !Sub '${AWS::StackName}-MasterPasswordSecret'
+
+  PodIdentityAssociationArn:
+    Description: 'EKS Pod Identity Association ARN'
+    Value: !Ref PodIdentityAssociation
+    Export:
+      Name: !Sub '${AWS::StackName}-PodIdentityAssociation'
+
+  ConfigurationForApp:
+    Description: 'Configuration values for your application'
+    Value: !Sub |
+      Add these to your .env file:
+      OPENSEARCH_ENDPOINT=https://${OpenSearchDomain.DomainEndpoint}
+      AWS_REGION=${AWS::Region}
+      SERVICE_ACCOUNT_ROLE_ARN=${ServiceAccountRole.Arn}

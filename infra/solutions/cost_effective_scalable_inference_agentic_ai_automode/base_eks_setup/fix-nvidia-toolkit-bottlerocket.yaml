@@ -1,0 +1,12 @@
+apiVersion: nvidia.com/v1
+kind: ClusterPolicy
+metadata:
+  name: cluster-policy
+spec:
+  toolkit:
+    installDir: /opt/nvidia
+  hostPaths:
+    # Use /opt instead of /usr/local for BottleRocket compatibility
+    # BottleRocket has /usr/local as read-only, but /opt is writable
+    rootFS: /
+    driverInstallDir: /run/nvidia/driver
