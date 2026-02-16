@@ -7,9 +7,10 @@ solution_description             = "Guidance for Automated Deployment of Inferen
 solution_id                      = "SO9615"
 availability_zones_count         = 4
 enable_soci_snapshotter          = true
+# AWS region and API version seetings below
 # region                           = "us-west-2"
 # eks_cluster_version              = "1.34"
-# to enable automode uncomment the setting below
+# to enable AutoMode, uncomment the setting below
 # enable_eks_auto_mode             = true
 
 # -------------------------------------------------------------------------------------
