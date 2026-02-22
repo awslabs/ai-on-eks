@@ -10,7 +10,7 @@ spec:
   source:
     chart: k8s-nim-operator
     repoURL: https://helm.ngc.nvidia.com/nvidia
-    targetRevision: "v1.0.1"
+    targetRevision: "v3.0.2"
   destination:
     server: https://kubernetes.default.svc
     namespace: nim-operator
