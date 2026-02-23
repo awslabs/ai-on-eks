@@ -2,8 +2,15 @@ name                      = "nvidia-nim-eks"
 enable_aws_efs_csi_driver = true
 enable_argocd             = true
 enable_nvidia_nim_stack   = true
-# region                    = "us-west-2"
-# eks_cluster_version       = "1.34"
+# region                    = "us-west-2"  #set to appropriate region
+# eks_cluster_version       = "1.34" #set appropriate eks cluster version
+
+# -------------------------------------------------------------------------------------
+# Enable this to NVIDIA K8s DRA Driver with NVIDIA GPU Opeator
+#   Check infra/base/terraform/variables.tf for more details
+# -------------------------------------------------------------------------------------
+enable_nvidia_dra_driver   = true
+enable_nvidia_gpu_operator = true
 
 # -------------------------------------------------------------------------------------
 # EKS Addons Configuration
