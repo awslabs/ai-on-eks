@@ -1,7 +1,7 @@
 ---
 sidebar_label: Llama 3 Fine-tuning with LoRA
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 :::warning
 To deploy this example for fine-tuning a LLM on EKS, you need access to AWS Trainium ec2 instance. If deployment fails, check if you have access to this instance type. If nodes aren't starting, check Karpenter or Node group logs.

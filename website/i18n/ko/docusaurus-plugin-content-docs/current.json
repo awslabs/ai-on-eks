@@ -1,0 +1,58 @@
+{
+  "version.label": {
+    "message": "Next",
+    "description": "The label for version current"
+  },
+  "sidebar.blueprints.category.Training on EKS": {
+    "message": "EKS에서의 학습",
+    "description": "The label for category Training on EKS in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.GPUs": {
+    "message": "GPU",
+    "description": "The label for category GPUs in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.Neuron": {
+    "message": "Neuron",
+    "description": "The label for category Neuron in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.Inference on EKS": {
+    "message": "EKS에서의 추론",
+    "description": "The label for category Inference on EKS in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.GPU Inference on EKS": {
+    "message": "EKS에서의 GPU 추론",
+    "description": "The label for category GPU Inference on EKS in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.Neuron Inference on EKS": {
+    "message": "EKS에서의 Neuron 추론",
+    "description": "The label for category Neuron Inference on EKS in sidebar blueprints"
+  },
+  "sidebar.blueprints.category.gateways": {
+    "message": "게이트웨이",
+    "description": "The label for category gateways in sidebar blueprints"
+  },
+  "sidebar.guidance.category.Benchmarking LLM Inference Performance on Amazon EKS": {
+    "message": "Amazon EKS에서의 LLM 추론 성능 벤치마킹",
+    "description": "The label for category Benchmarking LLM Inference Performance on Amazon EKS in sidebar guidance"
+  },
+  "sidebar.guidance.category.benchmarking-with-inference-perf": {
+    "message": "inference-perf를 사용한 벤치마킹",
+    "description": "The label for category benchmarking-with-inference-perf in sidebar guidance"
+  },
+  "sidebar.guidance.category.Test Scenarios": {
+    "message": "테스트 시나리오",
+    "description": "The label for category Test Scenarios in sidebar guidance"
+  },
+  "sidebar.guidance.category.Solving cold start challenges for AI/ML inference applications on Amazon EKS": {
+    "message": "Amazon EKS에서의 AI/ML 추론 애플리케이션 콜드 스타트 문제 해결",
+    "description": "The label for category Solving cold start challenges for AI/ML inference applications on Amazon EKS in sidebar guidance"
+  },
+  "sidebar.guidance.category.Reducing container image size": {
+    "message": "컨테이너 이미지 크기 줄이기",
+    "description": "The label for category Reducing container image size in sidebar guidance"
+  },
+  "sidebar.guidance.category.Accelerating pull process": {
+    "message": "풀(Pull) 프로세스 가속화",
+    "description": "The label for category Accelerating pull process in sidebar guidance"
+  }
+}

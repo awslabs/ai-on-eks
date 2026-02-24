@@ -2,7 +2,7 @@
 sidebar_position: 1
 sidebar_label: BioNeMo on EKS
 ---
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # BioNeMo on EKS
 

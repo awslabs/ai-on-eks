@@ -2,7 +2,7 @@
 sidebar_label: Slurm on EKS
 ---
 
-import CollapsibleContent from '../../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # Slurm on EKS
 

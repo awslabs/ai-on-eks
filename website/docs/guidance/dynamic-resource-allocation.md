@@ -845,14 +845,14 @@ Standard GPU allocation without sharing - each workload gets exclusive access to
 <TabItem value="template" label="ResourceClaimTemplate">
 
 <CodeBlock language="yaml" title="basic-gpu-claim-template.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/basic/basic-gpu-claim-template.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/basic/basic-gpu-claim-template.yaml').default}
 </CodeBlock>
 
 </TabItem>
 <TabItem value="pod" label="Basic Pod">
 
 <CodeBlock language="yaml" title="basic-gpu-pod.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/basic/basic-gpu-pod.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/basic/basic-gpu-pod.yaml').default}
 </CodeBlock>
 
 </TabItem>
@@ -896,14 +896,14 @@ Time-slicing is a GPU sharing mechanism where multiple workloads take turns usin
 <TabItem value="template" label="ResourceClaimTemplate">
 
 <CodeBlock language="yaml" title="timeslicing-claim-template.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-claim-template.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-claim-template.yaml').default}
 </CodeBlock>
 
 </TabItem>
 <TabItem value="pod" label="Pod Configuration">
 
 <CodeBlock language="yaml" title="timeslicing-pod.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-pod.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-pod.yaml').default}
 </CodeBlock>
 
 </TabItem>
@@ -952,14 +952,14 @@ NVIDIA Multi-Process Service (MPS) is a GPU sharing technology that allows multi
 <TabItem value="template" label="ResourceClaimTemplate">
 
 <CodeBlock language="yaml" title="mps-claim-template.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/mps/mps-claim-template.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/mps/mps-claim-template.yaml').default}
 </CodeBlock>
 
 </TabItem>
 <TabItem value="pod" label="Multi-Container Pod">
 
 <CodeBlock language="yaml" title="mps-pod.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/mps/mps-pod.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/mps/mps-pod.yaml').default}
 </CodeBlock>
 
 </TabItem>
@@ -1008,14 +1008,14 @@ Multi-Instance GPU (MIG) is a hardware-level GPU partitioning technology availab
 <TabItem value="template" label="ResourceClaimTemplate">
 
 <CodeBlock language="yaml" title="mig-claim-template.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/mig/mig-claim-template.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/mig/mig-claim-template.yaml').default}
 </CodeBlock>
 
 </TabItem>
 <TabItem value="pod" label="MIG Pod">
 
 <CodeBlock language="yaml" title="mig-pod.yaml" showLineNumbers>
-{require('!!raw-loader!../../../infra/jark-stack/examples/k8s-dra/mig/mig-pod.yaml').default}
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/mig/mig-pod.yaml').default}
 </CodeBlock>
 
 </TabItem>

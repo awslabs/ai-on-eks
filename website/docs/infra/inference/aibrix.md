@@ -1,7 +1,7 @@
 ---
 sidebar_label: AIBrix on EKS
 ---
-import CollapsibleContent from '../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # AIBrix on EKS
 

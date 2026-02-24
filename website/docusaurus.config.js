@@ -11,7 +11,7 @@ const config = {
     url: 'https://awslabs.github.io',
     baseUrl: '/ai-on-eks/',
     trailingSlash: false,
-    onBrokenLinks: 'throw',
+    onBrokenLinks: 'warn',
     onBrokenMarkdownLinks: 'warn',
     favicon: 'img/header-icon.png',
 
@@ -21,7 +21,17 @@ const config = {
 
     i18n: {
         defaultLocale: 'en',
-        locales: ['en'],
+        locales: ['en', 'ko'],
+        localeConfigs: {
+            en: {
+                label: 'English',
+                htmlLang: 'en-US',
+            },
+            ko: {
+                label: '한국어',
+                htmlLang: 'ko-KR',
+            },
+        },
     },
 
     presets: [
@@ -77,6 +87,7 @@ const config = {
                     {type: 'doc', docId: 'blueprints/index', position: 'left', label: 'Blueprints'},
                     {type: 'doc', docId: 'guidance/index', position: 'left', label: 'Guidance'},
                     {href: 'https://github.com/awslabs/ai-on-eks', label: 'GitHub', position: 'right'},
+                    {type: 'localeDropdown', position: 'right'},
                 ],
             },
             colorMode: {

@@ -5,7 +5,7 @@ sidebar_label: Introduction
 
 # Introduction
 
-The AIoEKS foundational infrastructure lives in the `infra/base` directory. This directory contains the base
+The AI on EKS foundational infrastructure lives in the `infra/base` directory. This directory contains the base
 infrastructure and all its modules that allow composing an environment that supports experimentation, AI/ML training,
 LLM inference, model tracking, and more.
 
