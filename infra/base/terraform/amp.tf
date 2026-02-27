@@ -138,3 +138,25 @@ module "amp_ingest_pod_identity" {
   }
   tags = local.tags
 }
+
+module "grafana_pod_identity" {
+  count = var.enable_amazon_prometheus ? 1 : 0
+
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "~> 2.2"
+
+  name = "grafana"
+
+  additional_policy_arns = {
+    amp_policy = aws_iam_policy.grafana[0].arn
+  }
+
+  associations = {
+    grafana = {
+      cluster_name    = module.eks.cluster_name
+      namespace       = local.amp_namespace
+      service_account = "grafana-sa"
+    }
+  }
+  tags = local.tags
+}
