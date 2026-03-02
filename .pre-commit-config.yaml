@@ -31,13 +31,13 @@ repos:
           - --args=--only=terraform_required_providers
           - --args=--only=terraform_unused_required_providers
           - --args=--only=terraform_workspace_remote
-        exclude: (nvidia-dynamo|nvidia-deep-research)
+        exclude: (nvidia-dynamo|nvidia-deep-research|workshops)
       - id: terraform_validate
         args:
           # Parallel terraform init can cause problems when using a cache: https://github.com/hashicorp/terraform/issues/31964
           # this task is running across all of the blueprints in the github checks and can cause failures for missing/corrupted dependencies
           - --hook-config=--parallelism-limit=1
-        exclude: (docs|modules|nvidia-dynamo|nvidia-triton-server|nvidia-deep-research)
+        exclude: (docs|modules|nvidia-dynamo|nvidia-triton-server|nvidia-deep-research|workshops)
   # https://github.com/trufflesecurity/trufflehog?tab=readme-ov-file#floppy_disk-installation
   - repo: local
     hooks:
