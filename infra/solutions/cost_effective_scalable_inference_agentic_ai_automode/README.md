@@ -6,6 +6,7 @@
 - [Architecture](#architecture)
 - [Architecture Steps](#architecture-steps)
 - [Plan Your Deployment](#plan-your-deployment)
+  - [Services in this Guidance](#aws-services-in-this-guidance)
   - [Cost](#cost)
   - [Sample Cost Table](#sample-cost-table)
   - [Security](#security)
@@ -88,16 +89,36 @@ This architecture provides flexibility to choose between cost-optimized CPU infe
 
 ## Plan your deployment
 
+### AWS services in this Guidance
+
+| **AWS Service** | **Role** | **Description** |
+|-----------------|----------|-----------------|
+| [Amazon Elastic Kubernetes Service (EKS)](https://aws.amazon.com/eks/) | Core service | Manages the Kubernetes control plane and worker nodes for container orchestration. |
+| [Amazon Elastic Compute Cloud (EC2)](https://aws.amazon.com/ec2/) | Core service | Provides the compute instances for EKS worker nodes and runs containerized applications. |
+| [Amazon Virtual Private Cloud (VPC)](https://aws.amazon.com/vpc/) | Core Service | Creates an isolated network environment with public and private subnets across multiple Availability Zones. |
+| [Amazon Elastic Container Registry (ECR)](http://aws.amazon.com/ecr/) | Supporting service | Stores and manages Docker container images for EKS deployments. |
+| [AWS Elastic Load Balancing (ELB)](https://aws.amazon.com/elasticloadbalancing/)| Supporting service | Distributes incoming traffic across multiple targets in the EKS cluster. |
+| [Amazon Elastic Block Store (EBS)](https://aws.amazon.com/ebs)| Supporting service | Provides persistent block storage volumes for EC2 instances in the EKS cluster. |
+| [AWS Identity and Access Management (IAM)](https://aws.amazon.com/iam/)| Supporting service | Manages access to AWS services and resources securely, including EKS cluster access. |
+| [Amazon Managed Service for Grafana (AMG)](https://aws.amazon.com/grafana/) | Observability service | Provides fully managed  service for metrics visualization and monitoring. |
+| [Amazon Managed Service for Prometheus (AMP)](https://aws.amazon.com/prometheus/)| Observability service | Offers managed Prometheus-compatible monitoring for container metrics. |
+| [AWS Certificate Manager (ACM)](https://aws.amazon.com/certificate-manager/) | Security service | Manages SSL/TLS certificates for secure communication within the cluster. |
+| [Amazon CloudWatch](https://aws.amazon.com/cloudwatch/)| Monitoring service | Collects and tracks metrics, logs, and events from EKS and other AWS resources provisioned in the guidance |
+| [AWS Systems Manager](https://aws.amazon.com/systems-manager/)| Management service | Provides operational insights and takes action on AWS resources. |
+| [AWS Key Management Service (KMS)](https://aws.amazon.com/kms/)| Security service | Manages encryption keys for securing data in EKS and other AWS services. |
+| [Amazon Open Search](https://aws.amazon.com/opensearch-service/)| Supporting Service| Simplify AI-powered search, observability, and vector database operations with a secure, cost-effective managed service |
+| [Amazon Bedrock](https://aws.amazon.com/bedrock)| Supporting Service| Provides foundation models and agent capabilities for natural language processing and multi-agent orchestration.|
+
 ### Cost
 
-You are responsible for the cost of the AWS services used while running this guidance. 
-As of November 2025, the cost for running this guidance with the default settings in the US East (N. Virginia) Region is approximately **$447.47/month**.
+You are responsible for the cost of the AWS services deployed with this guidance. 
+As of March 2026, the cost for running this guidance with the default settings in the `us-east-1` (N. Virginia) Region is approximately **$447.47/month**.
 
 We recommend creating a [budget](https://alpha-docs-aws.amazon.com/awsaccountbilling/latest/aboutv2/budgets-create.html) through [AWS Cost Explorer](http://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this guidance.
 
 ### Sample Cost Table
 
-The following table provides a sample cost breakdown for deploying this guidance with the default parameters in the `us-east-1` (N. Virginia) Region for one month. This estimate is based on the AWS Pricing Calculator output for the full deployment as per the guidance and as of November, 2025 was around **$447.47/mo** in the `us-east-1` region.
+The following table provides a sample cost breakdown for deploying this guidance with the default parameters in the `us-east-1` (N. Virginia) Region for one month. This estimate is based on the AWS Pricing Calculator output for the full deployment as per the guidance and as of March, 2026 was around **$447.47/mo** in the `us-east-1` region.
 
 | **AWS service** | Dimensions | Cost, month [USD] |
 |-----------------|------------|-------------------|
@@ -170,7 +191,7 @@ This follows the principle of least privilege, ensuring users and services have 
 
 ## Supported AWS Regions
 
-Guidance for Scalable Model Inference and Agentic AI  on Amazon EKS is supported in the following AWS Regions:
+Guidance for Scalable Model Inference and Agentic AI on Amazon EKS is supported in the following AWS Regions (as of March 2026):
 
 | Region Name | Region Code |
 |-------------|-------------|
@@ -195,7 +216,7 @@ Service quotas, also referred to as limits, are the maximum number of service re
 
 ### Quotas for AWS services in this Guidance
 
-Make sure you have sufficient quota for each of the AWS services implemented in this solution (see [AWS Services in this guidance](#aws-services-in-this-Guidance)).
+Make sure you have sufficient quota for each of the AWS services implemented in this solution (see [AWS Services in this Guidance](#aws-services-in-this-Guidance)).
 For more information, see [AWS service quotas](https://docs.aws.amazon.com/general/latest/gr/aws_service_limits.html).
 
 To view the service quotas for all AWS services in the documentation without switching pages, view the information in the 
@@ -253,8 +274,7 @@ aws service-quotas get-service-quota --service-code ec2 --quota-code L-1216C47A
 
 **Cost Awareness:** This solution will incur AWS charges. Review the cost breakdown section below and set up billing alerts before deployment.
 
->NOTE: For detailed instructions on Deployment options for this guidance, running model infrenece and Agentic AI workflows and uninstallation please see 
-this [Detailed Installation Guide](https://aws-solutions-library-samples.github.io/compute/scalabale-model-inference-and-agentic-ai-on-amazon-eks.html)
+>NOTE: For detailed instructions on Deployment options for this project, running model inference and Agentic AI workflows and uninstallation please see  [Detailed Installation Guide](https://aws-solutions-library-samples.github.io/compute/scalabale-model-inference-and-agentic-ai-on-amazon-eks.html)
 
 
 ## Important Notes
