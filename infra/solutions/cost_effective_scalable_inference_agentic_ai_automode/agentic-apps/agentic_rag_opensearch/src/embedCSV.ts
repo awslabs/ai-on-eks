@@ -73,3 +73,4 @@ async function processCSVFile(filePath: string) {
         process.exit(1);
     }
 })();
+

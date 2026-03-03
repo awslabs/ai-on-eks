@@ -118,6 +118,7 @@ spec:
   selector:
     app: vllm-qwen-server
   sessionAffinity: None
-  type: ClusterIP          
+  type: ClusterIP
+        
 
 

@@ -161,3 +161,4 @@ def run_single_query(query: str) -> Optional[str]:
 
 if __name__ == "__main__":
     main()
+

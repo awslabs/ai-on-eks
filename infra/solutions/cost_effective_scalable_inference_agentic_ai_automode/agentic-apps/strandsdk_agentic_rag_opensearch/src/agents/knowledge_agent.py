@@ -215,3 +215,4 @@ Your goal is to ensure the knowledge base is current, properly indexed, and read
 
 # Export the agent
 __all__ = ["knowledge_agent"]
+

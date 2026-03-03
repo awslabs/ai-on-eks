@@ -114,3 +114,4 @@ export default class EmbeddingRetriever {
         return this.vectorStore.search(queryEmbedding, topK);
     }
 }
+

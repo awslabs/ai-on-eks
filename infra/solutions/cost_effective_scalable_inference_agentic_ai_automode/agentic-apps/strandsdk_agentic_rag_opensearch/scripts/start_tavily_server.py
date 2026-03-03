@@ -111,3 +111,4 @@ if __name__ == "__main__":
     else:
         print("\n❌ Failed to start Tavily MCP Server")
         sys.exit(1)
+

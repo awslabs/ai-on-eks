@@ -172,3 +172,4 @@ async function retrieveContext(query: string) {
     
     return context;
 }
+

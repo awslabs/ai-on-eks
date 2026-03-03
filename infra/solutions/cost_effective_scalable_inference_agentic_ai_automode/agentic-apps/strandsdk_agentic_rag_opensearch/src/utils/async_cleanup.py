@@ -86,3 +86,4 @@ def setup_async_environment():
     # Set global warning filters
     warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*async generator ignored GeneratorExit.*")
     warnings.filterwarnings("ignore", category=RuntimeWarning, message=".*coroutine.*was never awaited.*")
+    

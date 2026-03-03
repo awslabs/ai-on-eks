@@ -77,3 +77,4 @@ async function updateRAGWithCSV() {
         process.exit(1);
     }
 })();
+

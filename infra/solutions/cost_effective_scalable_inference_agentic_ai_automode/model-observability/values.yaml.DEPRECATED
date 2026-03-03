@@ -65,4 +65,4 @@ s3:
 #   auth:
 #     existingSecret: langfuse-redis-auth
 #     secretKeys:
-#       userPasswordKey: password    
+#       userPasswordKey: password

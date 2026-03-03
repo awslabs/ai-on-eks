@@ -94,3 +94,4 @@ async function rebuildCollection() {
         process.exit(1);
     }
 })();
+

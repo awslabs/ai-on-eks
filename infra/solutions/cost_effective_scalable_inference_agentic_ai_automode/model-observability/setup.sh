@@ -148,3 +148,4 @@ kubectl get ingress langfuse-web-ingress-alb 2>/dev/null || warn "Langfuse ingre
 
 success "Model observability setup completed!"
 log "Refer to README.md to access Langfuse and define Public/Private Keys"
+

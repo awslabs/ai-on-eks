@@ -63,3 +63,4 @@ async function embedKnowledgeFiles() {
         process.exit(1);
     }
 })();
+

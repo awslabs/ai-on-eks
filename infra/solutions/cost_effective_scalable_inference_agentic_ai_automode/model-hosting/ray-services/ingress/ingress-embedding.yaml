@@ -28,3 +28,4 @@ spec:
             name: ray-service-llamacpp-serve-svc
             port:
               number: 8000
+

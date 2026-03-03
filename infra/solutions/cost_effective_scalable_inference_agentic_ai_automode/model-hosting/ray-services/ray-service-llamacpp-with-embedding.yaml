@@ -3,7 +3,7 @@ kind: Secret
 metadata:
   name: hf-token
 stringData:
-  token: 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
+  token: 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
   llm_api_key: sk-1234
 ---
 apiVersion: v1

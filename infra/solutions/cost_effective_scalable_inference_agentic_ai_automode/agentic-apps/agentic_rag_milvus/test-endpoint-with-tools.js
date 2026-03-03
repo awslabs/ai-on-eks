@@ -88,3 +88,4 @@ async function testEndpointWithTools() {
 testEndpointWithTools()
   .then(() => console.log('Test completed successfully'))
   .catch(err => console.error('Test failed:', err.message));
+

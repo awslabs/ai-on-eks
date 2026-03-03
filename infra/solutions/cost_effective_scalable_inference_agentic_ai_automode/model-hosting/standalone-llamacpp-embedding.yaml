@@ -95,3 +95,4 @@ spec:
     app: llamacpp-embedding-server
   sessionAffinity: None
   type: ClusterIP
+

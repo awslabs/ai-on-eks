@@ -142,3 +142,4 @@ export default class OpenSearchVectorStore implements VectorStore {
         }
     }
 }
+

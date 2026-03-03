@@ -88,3 +88,4 @@ class OpenSearchClient:
                 logger.info("OpenSearch connection closed")
             except Exception as e:
                 logger.error(f"Error closing OpenSearch connection: {e}")
+

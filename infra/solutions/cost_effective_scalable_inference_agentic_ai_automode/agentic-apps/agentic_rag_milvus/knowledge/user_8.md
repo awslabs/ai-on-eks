@@ -16,3 +16,4 @@
   - Name: Abernathy Group
   - Catchphrase: Implemented secondary concept
   - BS: e-enable extensible e-tailers
+  

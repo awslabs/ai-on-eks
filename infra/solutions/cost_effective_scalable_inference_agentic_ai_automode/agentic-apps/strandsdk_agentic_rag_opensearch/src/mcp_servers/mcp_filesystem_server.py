@@ -190,3 +190,4 @@ if __name__ == "__main__":
     mcp = FastMCP("my mcp", port=8001)
     # Run the server with Streamable HTTP transport
     mcp.run(transport="streamable-http")
+    

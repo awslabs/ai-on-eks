@@ -118,7 +118,8 @@ spec:
   selector:
     app: vllm-qwen-server-vision
   sessionAffinity: None
-  type: ClusterIP          
+  type: ClusterIP
+       
 
 
 

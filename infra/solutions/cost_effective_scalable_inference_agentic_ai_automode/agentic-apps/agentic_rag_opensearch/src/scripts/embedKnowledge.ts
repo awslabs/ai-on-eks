@@ -48,3 +48,4 @@ async function runKnowledgeEmbedding() {
 (async () => {
     await runKnowledgeEmbedding();
 })();
+

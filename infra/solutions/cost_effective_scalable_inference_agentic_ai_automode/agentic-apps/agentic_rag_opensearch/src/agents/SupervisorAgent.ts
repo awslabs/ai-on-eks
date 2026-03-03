@@ -247,3 +247,4 @@ export default class SupervisorAgent {
         return `Workflow Summary: ${successful} successful tasks, ${failed} failed tasks`;
     }
 }
+

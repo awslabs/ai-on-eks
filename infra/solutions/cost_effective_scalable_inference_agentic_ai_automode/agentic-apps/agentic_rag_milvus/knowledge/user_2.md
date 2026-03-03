@@ -16,3 +16,4 @@
   - Name: Deckow-Crist
   - Catchphrase: Proactive didactic contingency
   - BS: synergize scalable supply-chains
+  

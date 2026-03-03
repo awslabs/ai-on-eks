@@ -114,3 +114,4 @@ install_global_stderr_filter()
 # Ensure cleanup on exit
 import atexit
 atexit.register(remove_global_stderr_filter)
+
