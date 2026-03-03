@@ -448,7 +448,7 @@ To access Hugging Face models, you'll need to create an access token:
 
 - Keep your token secure and never share it publicly
 - You can revoke tokens at any time from the same settings page
-- For production environments, consider using organization tokens with appropriate permissions
+- Consider using organization tokens with appropriate permissions
 - Some models may require additional permissions or agreements before access
 
 #### Create the cluster secret

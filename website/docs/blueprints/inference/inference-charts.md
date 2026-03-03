@@ -19,7 +19,7 @@ The inference charts support multiple deployment frameworks:
 
 - **VLLM** - Single-node inference with fast startup
 - **Ray-VLLM** - Distributed inference with autoscaling capabilities
-- **Triton-VLLM** - Production-ready inference server with advanced features
+- **Triton-VLLM** - NVIDIA inference server
 - **AIBrix** - VLLM with AIBrix-specific configurations
 - **LeaderWorkerSet-VLLM** - Multi-node inference for large models
 - **Diffusers** - Hugging Face Diffusers for image generation

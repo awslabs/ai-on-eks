@@ -201,3 +201,79 @@ resource "kubectl_manifest" "nvidia_dynamo_platform_yaml" {
     helm_release.argocd
   ]
 }
+
+
+# Langfuse
+resource "kubectl_manifest" "langfuse_yaml" {
+  count     = var.enable_langfuse ? 1 : 0
+  yaml_body = file("${path.module}/argocd-addons/observability/langfuse/langfuse.yaml")
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# Langfuse Secret
+# TODO: Move this
+
+resource "random_bytes" "langfuse_secret" {
+  count  = var.enable_langfuse ? 8 : 0
+  length = 32
+}
+
+resource "kubectl_manifest" "langfuse_secret_yaml" {
+  count = var.enable_langfuse ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/observability/langfuse/langfuse-secret.yaml", {
+    salt                = random_bytes.langfuse_secret[0].hex
+    encryption-key      = random_bytes.langfuse_secret[1].hex
+    nextauth-secret     = random_bytes.langfuse_secret[2].hex
+    postgresql-password = random_bytes.langfuse_secret[3].hex
+    clickhouse-password = random_bytes.langfuse_secret[4].hex
+    redis-password      = random_bytes.langfuse_secret[5].hex
+    s3-user             = random_bytes.langfuse_secret[6].hex
+    s3-password         = random_bytes.langfuse_secret[7].hex
+  })
+
+  depends_on = [
+    kubectl_manifest.langfuse_yaml
+  ]
+}
+
+# Gitlab
+resource "kubectl_manifest" "gitlab_yaml" {
+  count = var.enable_gitlab ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/devops/gitlab/gitlab.yaml", {
+    proxy-real-ip-cidr    = local.vpc_cidr
+    acm_certificate_arn   = data.aws_acm_certificate.issued[0].arn
+    domain                = var.acm_certificate_domain
+    allowed_inbound_cidrs = var.allowed_inbound_cidrs
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# Milvus
+resource "kubectl_manifest" "milvus_yaml" {
+  count = var.enable_milvus ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/vector-databases/milvus/milvus.yaml", {
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# MCP Gateway Registry
+resource "kubectl_manifest" "mcp_gateway_registry_yaml" {
+  count = var.enable_mcp_gateway_registry ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/mcp-gateway-registry.yaml", {
+    domain                = var.acm_certificate_domain
+    allowed_inbound_cidrs = var.allowed_inbound_cidrs
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}

@@ -33,7 +33,7 @@ module "vpc" {
 
   # ------------------------------
   # Optional Public Subnets for NAT and IGW for PoC/Dev/Test environments
-  # Public Subnets can be disabled while deploying to Production and use Private NAT + TGW
+  # Public Subnets can be disabled while using Private NAT + TGW
   public_subnets     = local.public_subnets
   enable_nat_gateway = true
   single_nat_gateway = true

@@ -1,0 +1,22 @@
+{
+  "logo.alt": {
+    "message": "AIoEKS 로고",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.Infrastructure": {
+    "message": "인프라",
+    "description": "Navbar item with label Infrastructure"
+  },
+  "item.label.Blueprints": {
+    "message": "블루프린트",
+    "description": "Navbar item with label Blueprints"
+  },
+  "item.label.Guidance": {
+    "message": "가이드",
+    "description": "Navbar item with label Guidance"
+  },
+  "item.label.GitHub": {
+    "message": "GitHub",
+    "description": "Navbar item with label GitHub"
+  }
+}

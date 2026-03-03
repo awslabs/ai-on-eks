@@ -68,7 +68,7 @@ In this section, we will delve into the architecture of our solution, which comb
 
 ## Deploying the Solution
 
-To get started with deploying `Llama-4-8b-instruct` on [Amazon EKS](https://aws.amazon.com/eks/), we will cover the necessary prerequisites and guide you through the deployment process step by step.
+To get started with deploying `Llama-3-8B-Instruct` on [Amazon EKS](https://aws.amazon.com/eks/), we will cover the necessary prerequisites and guide you through the deployment process step by step.
 
 This includes setting up the infrastructure, deploying the **Ray cluster**, and creating the [Gradio](https://www.gradio.app/) WebUI app.
 
@@ -154,7 +154,7 @@ To deploy the llama3-8B-Instruct model, it's essential to configure your Hugging
 
 
 ```bash
-# set the Hugging Face Hub Token as an environment variable. This variable will be substituted when applying the ray-service-mistral.yaml file
+# set the Hugging Face Hub Token as an environment variable. This variable will be substituted when applying the ray-service-llama3.yaml file
 
 export  HUGGING_FACE_HUB_TOKEN=<Your-Hugging-Face-Hub-Token-Value>
 
@@ -231,13 +231,13 @@ The Gradio app interacts with the locally exposed service created solely for the
 First, execute a port forward to the Llama-3 Ray Service using kubectl:
 
 ```bash
-kubectl port-forward svc/llama2-service 8000:8000 -n llama3
+kubectl port-forward svc/llama3 8000:8000 -n llama3
 ```
 
 ## Deploying the Gradio WebUI App
 Discover how to create a user-friendly chat interface using [Gradio](https://www.gradio.app/) that integrates seamlessly with deployed models.
 
-Let's move forward with setting up the Gradio app as a Docker container running on localhost. This setup will enable interaction with the Stable Diffusion XL model, which is deployed using RayServe.
+Let's move forward with setting up the Gradio app as a Docker container running on localhost. This setup will enable interaction with the Llama-3-8B Instruct model, which is deployed using RayServe.
 
 ### Build the Gradio app docker container
 

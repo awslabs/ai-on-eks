@@ -4,7 +4,7 @@ sidebar_position: 1
 
 # Inference on EKS
 
-Deploy and run Large Language Models (LLMs) and other AI models on Amazon EKS with production-ready patterns and best practices.
+Deploy and run Large Language Models (LLMs) and other AI models on Amazon EKS.
 
 ## What's in This Section
 
@@ -20,10 +20,10 @@ Helm charts for deploying popular AI models on EKS with pre-configured values fo
 - Ready-to-deploy Helm charts for vLLM, Ray-vLLM, Triton, and Diffusers
 - Pre-configured values files for popular models (Llama, DeepSeek, Mistral, Stable Diffusion, and more)
 - Support for both GPU (NVIDIA) and Neuron (AWS Inferentia/Trainium) deployments
-- Production-ready configurations with health checks, autoscaling, and monitoring
+- Configurations with health checks, autoscaling, and monitoring
 
 **Use Cases:**
-- Quick deployment of open-source LLMs for testing or production
+- Quick deployment of open-source LLMs
 - Standardized deployment patterns across your organization
 - Reference implementations for custom model deployments
 
@@ -43,7 +43,7 @@ Step-by-step guides for deploying models on NVIDIA GPUs:
 - **[NVIDIA Dynamo](/docs/blueprints/inference/framework-guides/GPUs/nvidia-dynamo)** - Deploy models with NVIDIA's Dynamo framework
 - **[NVIDIA NIM Llama 3](/docs/blueprints/inference/framework-guides/GPUs/nvidia-nim-llama3)** - Deploy Llama 3 using NVIDIA NIM
 - **[NVIDIA NIM Operator](/docs/blueprints/inference/framework-guides/GPUs/nvidia-nim-operator)** - Kubernetes operator for NVIDIA NIM deployments
-- **[vLLM with NVIDIA Triton Server](/docs/blueprints/inference/framework-guides/GPUs/vLLM-NVIDIATritonServer)** - Production inference with Triton and vLLM
+- **[vLLM with NVIDIA Triton Server](/docs/blueprints/inference/framework-guides/GPUs/vLLM-NVIDIATritonServer)** - Inference with Triton and vLLM
 - **[vLLM with Ray Serve](/docs/blueprints/inference/framework-guides/GPUs/vLLM-rayserve)** - Scalable inference with Ray Serve and vLLM
 
 ### Neuron Deployments

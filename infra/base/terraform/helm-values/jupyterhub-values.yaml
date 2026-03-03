@@ -5,7 +5,7 @@ hub:
         - admin1
       allowed_users:
         - user1
-    # testing only - do not do this for production
+    # testing only
     DummyAuthenticator:
       password: never-do-this
     JupyterHub:

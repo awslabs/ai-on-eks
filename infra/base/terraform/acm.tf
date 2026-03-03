@@ -4,3 +4,8 @@ data "aws_acm_certificate" "issued" {
   domain   = var.acm_certificate_domain
   statuses = ["ISSUED"]
 }
+
+data "aws_route53_zone" "hosted_zone_id" {
+  count = var.acm_certificate_domain != "" ? 1 : 0
+  name  = var.acm_certificate_domain
+}

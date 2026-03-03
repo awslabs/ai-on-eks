@@ -6,13 +6,13 @@ sidebar_label: Optimizing container images size
 
 ## Selecting appropriate base images
 
-Different AI/ML frameworks and platforms offer ready-to-use container images, providing convenience and enabling experimentation. However, these images often try to address as wide a feature set as possible and thus may include different runtimes, frameworks, or supported APIs, leading to bloat that is unsuitable for production container images.
+Different AI/ML frameworks and platforms offer ready-to-use container images, providing convenience and enabling experimentation. However, these images often try to address as wide a feature set as possible and thus may include different runtimes, frameworks, or supported APIs, leading to bloat.
 
 For example, different PyTorch image variants have very different sizes: from [2.7.1-cuda11.8-cudnn9-devel](https://hub.docker.com/layers/pytorch/pytorch/2.7.1-cuda11.8-cudnn9-devel/images/sha256-5a046e4e3364b063a17854387b8820ad3f42ed197a089196bce8f2bd68f275a8) (6.66 GB) that includes development tools, compilers etc. to [2.7.1-cuda11.8-cudnn9-runtime](https://hub.docker.com/layers/pytorch/pytorch/2.7.1-cuda11.8-cudnn9-runtime/images/sha256-8d409f72f99e5968b5c4c9396a21f4b723982cfdf2c1a5b9cc045c5d0a7345a1) (3.03 GB) that contains runtime only. The vLLM project [provides](https://docs.vllm.ai/en/stable/contributing/dockerfile/dockerfile.html) several container image variants, each with different capabilities packaged in, such as the OpenAI spec, Sagemaker integration, and more.
 
 Selecting a smaller base image that satisfies the needs of the application can make a big difference, with a caveat – smaller runtime-only images may not include JIT compilation or dynamic optimization and thus fall on the slower code paths, reducing startup time.
 
-A production-oriented comprehensive approach would include:
+A comprehensive approach would include:
 
 * benchmarking workloads with different base images
 * considering custom builds that include only required optimization libraries

@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: milvus
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: milvus
+    repoURL: https://zilliztech.github.io/milvus-helm/
+    targetRevision: "5.0.6"
+    helm:
+      values: |
+        image:
+          all:
+            tag: v2.6.4
+        cluster:
+          enabled: false
+        pulsarv3:
+          enabled: false
+        standalone:
+          messageQueue: woodpecker
+        woodpecker:
+          enabled: true
+        streaming:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: milvus
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true

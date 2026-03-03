@@ -2,9 +2,8 @@ prometheus:
   serviceAccount:
     create: true
     name: ${amp_sa}
-    annotations:
-      eks.amazonaws.com/role-arn: ${amp_irsa}
   prometheusSpec:
+    serviceAccountName: ${amp_sa}
     remoteWrite:
       - url: ${amp_remotewrite_url}
         sigv4:
@@ -22,7 +21,7 @@ prometheus:
         metadata:
           name: data
         spec:
-          storageClassName: gp2
+          storageClassName: gp3
           accessModes:
             - ReadWriteOnce
           resources:
@@ -47,19 +46,33 @@ alertmanager:
 grafana:
   enabled: true
   defaultDashboardsEnabled: true
-# Adding AMP datasource to Grafana config
+  adminPassword: null
+  admin:
+    existingSecret: "grafana-admin-secret"
+    userKey: admin-user
+    passwordKey: admin-password
+  service:
+    port: ${grafana_service_port}
   serviceAccount:
-    create: false
-    name: ${amp_sa}
+    create: true
+    name: grafana-sa
   grafana.ini:
-    auth:
-      sigv4_auth_enabled: true
+    aws:
+      allowed_auth_providers: ec2_iam_role
+      assume_role_enabled: true
+  sidecar:
+    datasources:
+      defaultDatasourceEnabled: false
+  plugins:
+    - grafana-amazonprometheus-datasource
   additionalDataSources:
-    - name: AMP
-      editable: true
-      jsonData:
-        sigV4Auth: true
-        sigV4Region: ${region}
-      type: prometheus
-      isDefault: false
+    - name: Amazon-Managed-Prometheus
+      type: grafana-amazonprometheus-datasource
+      access: proxy
       url: ${amp_url}
+      isDefault: true
+      jsonData:
+        authType: ec2_iam_role
+        defaultRegion: ${region}
+        sigV4Region: ${region}
+      editable: true

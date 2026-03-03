@@ -1,0 +1,134 @@
+{
+  "id": null,
+  "title": "vLLM Metrics",
+    "tags": ["vllm"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "vLLM Iterations Token",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(vllm:iteration_tokens_total_sum[5m])",
+            "legendFormat": "Iteration Tokens Total"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "vLLM Generations Tokens",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "vllm:generation_tokens_total",
+            "legendFormat": "Generation Tokens Total"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "vLLM Time Per Output Token",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
+            "legendFormat": "Time per output token p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
+            "legendFormat": "Time per output token p95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "vLLM Time to First Token Counter",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "vllm:time_to_first_token_seconds_count",
+            "legendFormat": "TTFT Counter"
+          },
+          {
+            "expr": "histogram_quantile(0.5, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
+            "legendFormat": "TTFT p50"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "vLLM Time in Queue Requests",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(vllm:request_queue_time_seconds_bucket[5m]))",
+            "legendFormat": "Queue Time p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(vllm:request_queue_time_seconds_bucket[5m]))",
+            "legendFormat": "Queue Time p95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "vLLM Request Prompt Tokens",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(vllm:request_prompt_tokens_bucket[5m]))",
+            "legendFormat": "Prompt Tokens p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(vllm:request_prompt_tokens_bucket[5m]))",
+            "legendFormat": "Prompt Tokens p95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 7,
+        "title": "vLLM Request Inference Time",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.5, rate(vllm:request_inference_time_seconds_bucket[5m]))",
+            "legendFormat": "Inference Time p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(vllm:request_inference_time_seconds_bucket[5m]))",
+            "legendFormat": "Inference Time p95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "vLLM Num Preemptions Total",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "vllm:num_preemptions_total",
+            "legendFormat": "Preemptions Total"
+          },
+          {
+            "expr": "rate(vllm:num_preemptions_total[5m])",
+            "legendFormat": "Preemptions Rate"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+  "refresh": "5s"
+}

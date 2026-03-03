@@ -1,36 +1,37 @@
 import React from 'react';
 import clsx from 'clsx';
+import Translate, {translate} from '@docusaurus/Translate';
 import styles from './styles.module.css';
 
 const FeatureList = [
     {
-        title: 'Infrastructure',
+        title: translate({id: 'features.infrastructure.title', message: 'Infrastructure'}),
         Svg: require('@site/static/img/infra.svg').default,
         link: "/ai-on-eks/docs/infra",
         description: (
-            <div>
+            <Translate id="features.infrastructure.description">
                 Validated infrastructure for the latest generation of Artificial Intelligence workloads on EKS.
-            </div>
+            </Translate>
         ),
     },
     {
-        title: 'Blueprints',
+        title: translate({id: 'features.blueprints.title', message: 'Blueprints'}),
         Svg: require('@site/static/img/blueprints.svg').default,
         link: "/ai-on-eks/docs/blueprints",
         description: (
-            <>
+            <Translate id="features.blueprints.description">
                 Tested deployments to jumpstart and enable AI and ML workloads on EKS
-            </>
+            </Translate>
         ),
     },
     {
-        title: 'Guidance',
+        title: translate({id: 'features.guidance.title', message: 'Guidance'}),
         Svg: require('@site/static/img/guidance.svg').default,
         link: "/ai-on-eks/docs/guidance",
         description: (
-            <>
-                Proven experience scaling AI and ML on EKS<br/>
-            </>
+            <Translate id="features.guidance.description">
+                Proven experience scaling AI and ML on EKS
+            </Translate>
         ),
     },
 ];

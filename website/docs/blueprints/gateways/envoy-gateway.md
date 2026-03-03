@@ -1,7 +1,7 @@
 ---
 sidebar_label: Envoy Gateway implementation on EKS
 ---
-import CollapsibleContent from '../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # Envoy gateway
 

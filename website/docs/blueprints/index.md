@@ -13,7 +13,7 @@ Before we dive in, let's take a look at the tools available in the environment:
 
 ![OSS ML Platforms on EKS](ml-platforms-eks.png)
 
-## [Base Infrastructure](https://awslabs.github.io/ai-on-eks/docs/category/infrastructure)
+## [Base Infrastructure](https://awslabs.github.io/ai-on-eks/docs/infra)
 At its core, AIoEKS is a set of modules that can be composed to create the environment in which you want to work. We have some blueprints that will enable you to quickly start using the environment for either experimentation, training or inference. We intend to add more as they come up, but we also enable you to compose the environment however you would like. This allows you to build the environment you want to use on EKS.
 
 If you're ready to deploy your EKS cluster, check out the infrastructure section.
@@ -25,7 +25,7 @@ Our platform supports various ML frameworks including PyTorch, TensorFlow, Tenso
 
 Are you ready to dive into the world of LLMs and train models for your specific needs? Discover our comprehensive Training resources to get started.
 
-## [Inference](https://awslabs.github.io/ai-on-eks/docs/category/inference-on-eks)
+## [Inference](https://awslabs.github.io/ai-on-eks/docs/blueprints/inference)
 Inference is the process of using a trained model to make predictions or generate outputs based on new input data. In the context of generative AI, inference enables models to perform tasks such as text generation, translation, and summarization in real-time. Building a scalable inference platform is essential to handle the high demand and ensure low latency, which is critical for applications requiring real-time responses.
 
 Unlock the potential of LLMs for powerful inference tasks. Our Inference resources will guide you through deploying LLMs effectively. Utilize deployment tools such as RayServe, NVIDIA Triton Inference Server, and KServe to ensure high-performance model serving. We also offer optimization techniques with AWS Neuron for Inferentia and NVIDIA GPUs to accelerate inference. This section includes step-by-step instructions on setting up inference endpoints, scaling deployments to handle varying loads, and monitoring performance to maintain reliability and efficiency.

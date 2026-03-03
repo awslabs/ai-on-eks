@@ -3,13 +3,17 @@ import clsx from 'clsx';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 import Layout from '@theme/Layout';
+import Translate, {translate} from '@docusaurus/Translate';
 import HomepageFeatures from '@site/src/components/HomepageFeatures';
 import VideoGrid from '@site/src/components/VideoGrid/VideoGrid';
 import styles from './index.module.css';
 import Head from '@docusaurus/Head';
 
 function HomepageHeader() {
-    const { siteConfig } = useDocusaurusContext();
+    const { siteConfig, i18n } = useDocusaurusContext();
+    const doeksUrl = i18n.currentLocale === 'ko'
+        ? 'https://awslabs.github.io/data-on-eks/'
+        : 'https://awslabs.github.io/data-on-eks/';
     const OGMeta = () => (
         <Head>
             <meta name="og:image" content="https://awslabs.github.io/ai-on-eks/img/aioeks-logo-green.png" />
@@ -31,12 +35,18 @@ function HomepageHeader() {
                 {/* Hero Content */}
                 <div className={styles.heroContent}>
                     <p className={styles.heroSubtitle}>
-                        {siteConfig.tagline}
+                        <Translate id="homepage.tagline" description="The site tagline">
+                            Supercharge your AI/ML Journey with Amazon EKS
+                        </Translate>
                     </p>
                     <p className={styles.heroDescription}>
-                        The comprehensive set of tools for running AI workloads on Amazon EKS.
+                        <Translate id="homepage.description.line1" description="Hero description line 1">
+                            The comprehensive set of tools for running AI workloads on Amazon EKS.
+                        </Translate>
                         <br />
-                        Build, deploy, and scale your AI infrastructure with confidence.
+                        <Translate id="homepage.description.line2" description="Hero description line 2">
+                            Build, deploy, and scale your AI infrastructure with confidence.
+                        </Translate>
                     </p>
                 </div>
 
@@ -45,7 +55,7 @@ function HomepageHeader() {
                     <Link
                         className={clsx(styles.primaryButton)}
                         to="/docs/blueprints/">
-                        <span>Get Started</span>
+                        <span><Translate id="homepage.cta.getStarted">Get Started</Translate></span>
                         <svg className={styles.buttonIcon} width="20" height="20" viewBox="0 0 20 20" fill="none">
                             <path d="M10.75 8.75L14.25 12.25L10.75 15.75" stroke="currentColor" strokeWidth="1.5"
                                 strokeLinecap="round" strokeLinejoin="round" />
@@ -55,8 +65,8 @@ function HomepageHeader() {
                     </Link>
                     <Link
                         className={clsx(styles.secondaryButton)}
-                        to="https://awslabs.github.io/data-on-eks/">
-                        Explore Data on EKS
+                        to={doeksUrl}>
+                        <Translate id="homepage.cta.exploreDoEKS">Explore Data on EKS</Translate>
                     </Link>
                 </div>
                 <script async src="https://js.storylane.io/js/v2/storylane.js"></script>
@@ -113,8 +123,8 @@ export default function Home() {
     const { siteConfig } = useDocusaurusContext();
     return (
         <Layout
-            title={`AI on EKS (AIoEKS)`}
-            description="Tested AI/ML on Amazon Elastic Kubernetes Service">
+            title={translate({id: 'homepage.title', message: 'AI on EKS (AIoEKS)'})}
+            description={translate({id: 'homepage.metaDescription', message: 'Tested AI/ML on Amazon Elastic Kubernetes Service'})}>
             <HomepageHeader />
             <AIOnEKSHeader />
             <main>

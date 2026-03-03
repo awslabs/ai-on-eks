@@ -2,7 +2,7 @@
 sidebar_label: JARK on EKS
 sidebar_position: 1
 ---
-import CollapsibleContent from '../../../src/components/CollapsibleContent';
+import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
 # JARK on EKS
 

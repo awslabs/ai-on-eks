@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-gateway-registry
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/agentic-community/mcp-gateway-registry.git
+    targetRevision: HEAD
+    path: charts/mcp-gateway-registry-stack
+    helm:
+      values: |
+        global:
+          domain: ${domain}
+          ingress:
+            inboundCidrs: ${allowed_inbound_cidrs}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-gateway-registry
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

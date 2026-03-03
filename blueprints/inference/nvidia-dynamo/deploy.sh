@@ -503,7 +503,7 @@ case "$EXAMPLE" in
 esac
 
 echo ""
-echo "External access (production):"
+echo "External access:"
 echo "  # See README.md 'External Access' section for complete guide"
 echo "  # Quick NLB setup:"
 echo "  kubectl annotate service ${EXAMPLE}-frontend \\"

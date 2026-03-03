@@ -77,6 +77,12 @@ variable "enable_eks_auto_mode" {
   default     = false
 }
 
+variable "allowed_inbound_cidrs" {
+  description = "Comma separated string of allowed inbound CIDRs. Used for ingress deployments to restrict access on the load balancer."
+  type        = string
+  default     = "0.0.0.0/0"
+}
+
 # EKS Addons
 variable "enable_cluster_addons" {
   description = <<DESC
@@ -174,6 +180,11 @@ variable "kube_prometheus_stack_namespace" {
 }
 variable "enable_ai_ml_observability_stack" {
   description = "Enable AI/ML observability addon"
+  type        = bool
+  default     = false
+}
+variable "enable_external_dns" {
+  description = "Enable External DNS"
   type        = bool
   default     = false
 }
@@ -373,6 +384,34 @@ variable "enable_mariadb_operator" {
 # Slinky Slurm Operator
 variable "enable_slurm_operator" {
   description = "Enable slurm-operator addon"
+  type        = bool
+  default     = false
+}
+
+# Langfuse
+variable "enable_langfuse" {
+  description = "Enable langfuse addon"
+  type        = bool
+  default     = false
+}
+
+# Gitlab
+variable "enable_gitlab" {
+  description = "Enable gitlab addon"
+  type        = bool
+  default     = false
+}
+
+# Milvus
+variable "enable_milvus" {
+  description = "Enable Milvus addon"
+  type        = bool
+  default     = false
+}
+
+# MCP Gateway Registry
+variable "enable_mcp_gateway_registry" {
+  description = "Enable MCP Gateway Registry addon"
   type        = bool
   default     = false
 }

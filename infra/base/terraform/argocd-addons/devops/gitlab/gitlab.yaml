@@ -1,0 +1,96 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gitlab
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: gitlab
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: gitlab
+    helm:
+      values: |
+        gitlab-runner:
+          runners:
+            config: |
+              [[runners]]
+                environment = ["FF_USE_ADVANCED_POD_SPEC_CONFIGURATION=true"]
+                [runners.kubernetes]
+                image = "ubuntu:22.04"
+                [[runners.kubernetes.pod_spec]]
+                  name = "build-seccomp"
+                  patch = '''
+                    containers:
+                      - name: build
+                        securityContext:
+                          seccompProfile:
+                            type: Unconfined
+                  '''
+                  patch_type = "strategic"
+                {{- if .Values.global.minio.enabled }}
+                [runners.cache]
+                  Type = "s3"
+                  Path = "gitlab-runner"
+                  Shared = true
+                  [runners.cache.s3]
+                    ServerAddress = {{ include "gitlab-runner.cache-tpl.s3ServerAddress" . }}
+                    BucketName = "runner-cache"
+                    BucketLocation = "us-east-1"
+                    Insecure = false
+                {{ end }}
+        installCertmanager: false
+        nginx-ingress:
+          enabled: false
+        gitlab:
+          ingress:
+            className: alb
+            tls:
+              enabled: false
+          kas:
+            ingress:
+              enabled: false
+        global:
+          edition: ce
+          hosts:
+            domain: ${domain}
+          ingress:
+            annotations:
+              alb.ingress.kubernetes.io/target-type: 'ip'
+              alb.ingress.kubernetes.io/scheme: 'internet-facing'
+              alb.ingress.kubernetes.io/success-codes: 200,302
+              alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+              alb.ingress.kubernetes.io/ssl-redirect: '443'
+              alb.ingress.kubernetes.io/inbound-cidrs: ${allowed_inbound_cidrs}
+            configureCertmanager: false
+            class: alb
+            tls:
+              enabled: false
+        ingress:
+          enabled: false
+          class:
+            name: alb
+          configureCertmanager: false
+          tls:
+            enabled: false
+        certmanager-issuer:
+          email: $EMAIL
+        minio:
+          ingress:
+            enabled: false
+        nginx-ingress:
+          enabled: false
+        upgradeCheck:
+          enabled: false
+    repoURL: https://charts.gitlab.io/
+    targetRevision: 9.1.6
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true

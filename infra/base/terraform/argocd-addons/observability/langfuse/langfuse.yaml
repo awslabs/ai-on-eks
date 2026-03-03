@@ -1,0 +1,66 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: langfuse
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    chart: langfuse
+    repoURL: https://langfuse.github.io/langfuse-k8s
+    targetRevision: "1.5.9"
+    helm:
+      values: |
+        langfuse:
+          encryptionKey:
+            secretKeyRef:
+              name: langfuse-secret
+              key: encryption-key
+          salt:
+            secretKeyRef:
+              name: langfuse-secret
+              key: salt
+          nextauth:
+            secret:
+              secretKeyRef:
+                name: langfuse-secret
+                key: nextauth-secret
+        postgresql:
+          auth:
+            existingSecret: langfuse-secret
+            secretKeys:
+              adminPasswordKey: postgresql-password
+              userPasswordKey: postgresql-password
+        clickhouse:
+          zookeeper:
+            resources:
+              requests:
+                memory: "1Gi"
+                cpu: "500m"
+              limits:
+                memory: "2Gi"
+                cpu: "1"
+          auth:
+            existingSecret: langfuse-secret
+            existingSecretKey: clickhouse-password
+        redis:
+          auth:
+            existingSecret: langfuse-secret
+            existingSecretPasswordKey: redis-password
+        s3:
+          auth:
+            existingSecret: langfuse-secret
+            rootUserSecretKey: s3-user
+            rootPasswordSecretKey: s3-password
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: langfuse
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+    automated:
+      prune: true
+      selfHeal: true
