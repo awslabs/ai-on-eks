@@ -12,9 +12,9 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v3
-      - uses: hashicorp/setup-terraform@v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-python@3542bca2639a428e1796aaa6a2ffef0c0f575566 # v3.1.4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
           terraform_version: "1.12.2"
       - name: install tf_lint
@@ -25,5 +25,5 @@ jobs:
           repo: terraform-docs/terraform-docs
           tag: v0.20.0
       - name: install trufflehog
-        run: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
-      - uses: pre-commit/action@v3.0.1
+        run: curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/f37f2eff68c31620fd88bc37ff2b7d57ea0c700c/scripts/install.sh | sh -s -- -b /usr/local/bin
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1

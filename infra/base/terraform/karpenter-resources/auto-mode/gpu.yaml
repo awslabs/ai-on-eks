@@ -13,6 +13,7 @@ spec:
       labels:
         amiFamily: ${ami_family}
         accelerator: nvidia
+        nvidia.com/gpu.deploy.device-plugin: "false"
     spec:
       expireAfter: 336h
       nodeClassRef:

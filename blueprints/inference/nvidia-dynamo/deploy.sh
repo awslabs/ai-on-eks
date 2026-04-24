@@ -36,11 +36,11 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default namespace
-NAMESPACE="dynamo-cloud"
+NAMESPACE="dynamo-system"
 
 # Dynamo version management
 TFVARS_FILE="${SCRIPT_DIR}/../../../infra/nvidia-dynamo/terraform/blueprint.tfvars"
-DEFAULT_VERSION="v0.4.1"  # Fallback if tfvars file not found
+DEFAULT_VERSION="v1.0.0"  # Fallback if tfvars file not found
 VERSION_SOURCE=""  # Track where version came from
 
 # Utility functions
@@ -80,7 +80,7 @@ if [ -n "${DYNAMO_VERSION:-}" ]; then
     VERSION_SOURCE="env"
 # Priority 2: Read from tfvars file
 elif [ -f "${TFVARS_FILE}" ]; then
-    tfvars_version=$(grep '^dynamo_stack_version' "${TFVARS_FILE}" 2>/dev/null | sed 's/.*= *"\(.*\)"/\1/' | tr -d ' ')
+    tfvars_version=$(grep '^dynamo_platform_version' "${TFVARS_FILE}" 2>/dev/null | sed 's/.*= *"\(.*\)"/\1/' | tr -d ' ')
     if [ -n "${tfvars_version}" ]; then
         DYNAMO_VERSION="${tfvars_version}"
         VERSION_SOURCE="tfvars"

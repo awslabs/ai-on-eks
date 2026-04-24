@@ -5,6 +5,12 @@ sidebar_position: 8
 
 import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
+<div style={{background: '#d32f2f', color: 'white', padding: '2rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', borderRadius: '8px', marginBottom: '2rem', border: '3px solid #b71c1c'}}>
+  ⚠️ 이 블루프린트는 현재 최신 상태가 아닙니다 ⚠️
+</div>
+
+
+
 :::warning
 EKS에 ML 모델을 배포하려면 GPU 또는 Neuron 인스턴스에 대한 액세스가 필요합니다. 배포가 작동하지 않는 경우 이러한 리소스에 대한 액세스가 누락되어 있기 때문인 경우가 많습니다. 또한 일부 배포 패턴은 Karpenter 오토스케일링 및 정적 노드 그룹에 의존합니다. 노드가 초기화되지 않으면 Karpenter 또는 노드 그룹의 로그를 확인하여 문제를 해결하십시오.
 :::

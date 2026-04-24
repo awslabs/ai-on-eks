@@ -1,0 +1,23 @@
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "100m"
+  limits:
+    memory: "1Gi"
+    cpu: "500m"
+
+serviceMonitor:
+  enabled: ${dcgm_exporter_service_monitor_enabled}
+  additionalLabels:
+    release: kube-prometheus-stack
+
+nodeSelector:
+  karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
+
+tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+
+customMetrics: |
+  ${indent(2, dcgm_exporter_metrics)}

@@ -1,0 +1,5 @@
+dynamo-operator:
+  upgradeCRD: true
+  dynamo:
+    metrics:
+      prometheusEndpoint: ${prometheus_endpoint}

@@ -5,45 +5,22 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/compare-options: ServerSideDiff=true
 spec:
   project: default
   source:
     repoURL: https://helm.ngc.nvidia.com/nvidia/ai-dynamo
     chart: dynamo-platform
-    targetRevision: ${trimprefix(dynamo_version, "v")}
+    targetRevision: ${version}
     helm:
+      # dynamo operator manage CRDs via a pre-install/pre-upgrade hook Job via server-side apply.
+      skipCrds: true
       values: |
-        # NVIDIA Dynamo Platform Configuration for ai-on-eks using NGC
-        # Using minimal config - NGC chart defaults should work
-
-        # NGC authentication (required)
-        dynamo-operator:
-          imagePullSecrets:
-            - name: docker-imagepullsecret
-
-        # NATS configuration - use EFS for JetStream persistence
-        # Note: etcd inherits from global.storageClass, but NATS needs explicit setting
-        nats:
-          config:
-            jetstream:
-              fileStore:
-                pvc:
-                  storageClassName: efs-sc-dynamic
-
-        # etcd configuration - disable JWT auth and pre-upgrade hook
-        etcd:
-          auth:
-            token:
-              enabled: false
-          preUpgradeJob:
-            enabled: false
-
-        # Use EFS for shared storage (etcd inherits this, other components may too)
-        global:
-          storageClass: efs-sc-dynamic
+        ${user_values_yaml}
   destination:
     server: https://kubernetes.default.svc
-    namespace: dynamo-cloud
+    namespace: ${namespace}
   syncPolicy:
     automated:
       prune: true

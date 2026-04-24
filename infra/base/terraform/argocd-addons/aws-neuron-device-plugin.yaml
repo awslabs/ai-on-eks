@@ -10,15 +10,20 @@ spec:
   source:
     repoURL: public.ecr.aws/neuron
     chart: neuron-helm-chart
-    targetRevision: "1.3.0"
+    targetRevision: ${version}
     helm:
       values: |
         scheduler:
           enabled: true
+          customScheduler:
+            fullnameOverride: neuron-scheduler
+        npd:
+          fullnameOverride: neuron-npd
+          namespaceOverride: null
 
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system
+    namespace: neuron-device-plugin
   syncPolicy:
     syncOptions:
       - CreateNamespace=true

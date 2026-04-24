@@ -1,21 +1,13 @@
 locals {
-  # Base kube-prometheus values (no AMP)
-  kube_prometheus_base_values = templatefile("${path.module}/helm-values/kube-prometheus.yaml", {
+  kube_prometheus_values = templatefile("${path.module}/helm-values/kube-prometheus.yaml", {
+    enable_amp           = var.enable_amazon_prometheus
     storage_class_name   = "gp3"
     grafana_service_port = var.grafana_service_port
-  })
-
-  # AMP overlay values (only when AMP is enabled)
-  kube_prometheus_amp_values = var.enable_amazon_prometheus ? templatefile("${path.module}/helm-values/kube-prometheus-amp-enable.yaml", {
     region               = local.region
     amp_sa               = local.amp_ingest_service_account
-    amp_remotewrite_url  = "https://aps-workspaces.${local.region}.amazonaws.com/workspaces/${aws_prometheus_workspace.amp[0].id}/api/v1/remote_write"
-    amp_url              = "https://aps-workspaces.${local.region}.amazonaws.com/workspaces/${aws_prometheus_workspace.amp[0].id}"
-    grafana_service_port = var.grafana_service_port
-  }) : ""
-
-  # Merge base and AMP values
-  kube_prometheus_values = var.enable_amazon_prometheus ? "${local.kube_prometheus_base_values}\n${local.kube_prometheus_amp_values}" : local.kube_prometheus_base_values
+    amp_remotewrite_url  = var.enable_amazon_prometheus ? "https://aps-workspaces.${local.region}.amazonaws.com/workspaces/${aws_prometheus_workspace.amp[0].id}/api/v1/remote_write" : ""
+    amp_url              = var.enable_amazon_prometheus ? "https://aps-workspaces.${local.region}.amazonaws.com/workspaces/${aws_prometheus_workspace.amp[0].id}" : ""
+  })
 }
 
 #TODO: Remove if not needed, need to validate namespace is created before secret
@@ -90,6 +82,7 @@ resource "kubernetes_secret" "grafana_admin_alias" {
 resource "kubectl_manifest" "kube_prometheus_stack" {
   count = var.enable_kube_prometheus_stack ? 1 : 0
   yaml_body = templatefile("${path.module}/argocd-addons/kube-prometheus-stack.yaml", {
+    version          = var.kube_prometheus_stack_version
     user_values_yaml = indent(8, local.kube_prometheus_values)
     namespace        = var.kube_prometheus_stack_namespace
   })

@@ -12,7 +12,7 @@ The workshop deploys:
 - **Amazon Managed Prometheus (AMP)** for metrics collection
 - **Grafana** with pre-built dashboards for vLLM, Ray Serve, and DCGM
 - **S3 bucket** (`genai-models-<account-id>`) for model storage via Mountpoint S3 CSI driver
-- **Mistral-7B-Instruct-v0.3** downloaded from HuggingFace and stored in S3
+- **Ministral-3-8B-Instruct-2512** downloaded from HuggingFace and stored in S3
 - **kube-prometheus-stack** for cluster observability
 
 ---
@@ -71,7 +71,7 @@ This will:
 2. Add workshop-specific configs on top of the base
 3. Run `terraform init` and `terraform apply`
 
-> Deployment takes ~20-25 minutes. The Mistral-7B model download job runs inside the cluster after provisioning.
+> Deployment takes ~20-25 minutes. The model download job runs inside the cluster after provisioning.
 
 ### 4. Configure kubectl
 
@@ -104,5 +104,3 @@ cd terraform/_LOCAL
 This runs `terraform destroy` and removes all provisioned resources including the EKS cluster, S3 bucket, AMP workspace, and IAM roles.
 
 > The S3 bucket has `force_destroy = true` so it will be deleted even if it contains model files.
-
-> **Known Issue:** If `enable_kube_prometheus_stack = true`, `terraform destroy` may get stuck and fail with: `client rate limiter Wait returned an error: context deadline exceeded`. Track progress and workarounds in [issue #251](https://github.com/awslabs/ai-on-eks/issues/251).

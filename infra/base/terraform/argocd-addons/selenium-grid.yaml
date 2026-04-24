@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: selenium-grid
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://www.selenium.dev/docker-selenium
+    chart: selenium-grid
+    targetRevision: 0.52.0
+    helm:
+      valuesObject:
+        chromeNode:
+          enabled: true
+          extraEnvironmentVariables:
+            - name: SE_NODE_SESSION_TIMEOUT
+              value: '1800'
+            - name: SE_NODE_MAX_SESSION
+              value: '1'
+          replicas: 3
+        edgeNode:
+          enabled: false
+        firefoxNode:
+          enabled: false
+        global:
+          seleniumGrid:
+            sessionRequestTimeout: 600
+        ingress:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: selenium-grid
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    automated:
+      prune: true
+      selfHeal: true

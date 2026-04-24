@@ -7,6 +7,7 @@ resource "aws_eks_addon" "aws_ebs_csi_driver" {
 }
 
 module "aws_ebs_csi_pod_identity" {
+  count   = !var.enable_eks_auto_mode ? 1 : 0
   source  = "terraform-aws-modules/eks-pod-identity/aws"
   version = "~> 2.2"
   name    = "aws-ebs-csi"

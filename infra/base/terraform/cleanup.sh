@@ -21,10 +21,11 @@ TMPFILE=$(mktemp)
 terraform output -raw configure_kubectl > "$TMPFILE"
 # check if TMPFILE contains the string "No outputs found"
 if [[ ! $(cat $TMPFILE) == *"No outputs found"* ]]; then
-  echo "No outputs found, skipping kubectl delete"
   source "$TMPFILE"
   kubectl delete rayjob -A --all
   kubectl delete rayservice -A --all
+else
+  echo "No outputs found, skipping kubectl delete"
 fi
 
 
@@ -61,17 +62,17 @@ fi
 echo "Cleaning up PVCs and EBS volumes for deployment: $DEPLOYMENT_NAME"
 
 # Get the list of EBS volumes with the Blueprint tag
-VOLUME_IDS=$(aws ec2 describe-volumes --region "$REGION" --filters "Name=tag:Blueprint,Values=$DEPLOYMENT_NAME" --query "Volumes[].VolumeId" --output text)
+VOLUME_IDS=$(aws ec2 describe-volumes --region "$REGION" --filters "Name=tag:kubernetes.io/cluster/${DEPLOYMENT_NAME},Values=owned" --query "Volumes[].VolumeId" --output text | tr '\t' '\n')
 
 if [ -n "$VOLUME_IDS" ]; then
-  for volume_id in $VOLUME_IDS; do
+  while IFS= read -r volume_id; do
     # Get the PVC name from the volume tags
     PVC_NAME=$(aws ec2 describe-volumes --region "$REGION" --volume-ids "$volume_id" --query "Volumes[0].Tags[?Key=='kubernetes.io/created-for/pvc/name'].Value" --output text)
     PVC_NAMESPACE=$(aws ec2 describe-volumes --region "$REGION" --volume-ids "$volume_id" --query "Volumes[0].Tags[?Key=='kubernetes.io/created-for/pvc/namespace'].Value" --output text)
 
     echo "Deleting EBS volume: $volume_id, PVC: ${PVC_NAME}, Namespace: ${PVC_NAMESPACE}"
     aws ec2 delete-volume --region "$REGION" --volume-id "$volume_id"
-  done
+  done <<< "$VOLUME_IDS"
 else
   echo "No EBS volumes found for deployment : $DEPLOYMENT_NAME"
 fi

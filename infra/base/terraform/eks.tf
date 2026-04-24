@@ -3,31 +3,59 @@
 #---------------------------------------
 
 locals {
+  # exclude zones where EKS control plane can't reside in: https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html#network-requirements-subnets
+  cp_excluded_az_ids = ["use1-az3", "usw1-az2", "cac1-az3"]
+  # EKS control plane subnets, exclude zones where EKS control plane can't reside in and local zones
+  cp_subnets = [
+    for s in module.vpc.intra_subnet_objects : s.id
+    if alltrue([for az in local.cp_excluded_az_ids : s.availability_zone_id != az]) &&
+    alltrue([for az in local.local_azs : s.availability_zone != az])
+  ]
+
   # Filter secondary CIDR subnets (starting with "100.")
   secondary_cidr_subnets = compact([for subnet_id, cidr_block in zipmap(module.vpc.private_subnets, module.vpc.private_subnets_cidr_blocks) :
   substr(cidr_block, 0, 4) == "100." ? subnet_id : null])
 
+  # exclude addons for EKS Auto Mode as they are managed by EKS Auto Mode
+  auto_mode_exclude_addons = toset([
+    "vpc-cni",
+    "eks-pod-identity-agent",
+    "aws-ebs-csi-driver",
+    "coredns",
+    "kube-proxy",
+    "eks-node-monitoring-agent",
+  ])
+
   base_addons = {
     for name, enabled in var.enable_cluster_addons :
-    name => {} if enabled && !var.enable_eks_auto_mode
+    name => {} if enabled && !(var.enable_eks_auto_mode && contains(local.auto_mode_exclude_addons, name))
   }
 
   # Extended configurations used for specific addons with custom settings
-  addon_overrides = {
-    vpc-cni = {
-      most_recent    = true
-      before_compute = true
-    }
+  addon_overrides = merge(
+    {
+      vpc-cni = {
+        most_recent    = true
+        before_compute = true
+      }
 
-    eks-pod-identity-agent = {
-      before_compute = true
-    }
-
-    amazon-cloudwatch-observability = {
-      preserve                 = true
-      service_account_role_arn = aws_iam_role.cloudwatch_observability_role.arn
-    }
-  }
+      eks-pod-identity-agent = {
+        before_compute = true
+      }
+    },
+    try(var.enable_cluster_addons["amazon-cloudwatch-observability"], false) ? {
+      amazon-cloudwatch-observability = {
+        preserve                    = false
+        most_recent                 = true
+        resolve_conflicts_on_create = "OVERWRITE"
+        resolve_conflicts_on_update = "PRESERVE"
+        pod_identity_association = [{
+          role_arn        = module.amazon_cloudwatch_observability_iam_role[0].arn
+          service_account = "cloudwatch-agent"
+        }]
+      }
+    } : {}
+  )
 
   # Merge base with overrides
   cluster_addons = {
@@ -53,14 +81,13 @@ module "eks" {
   authentication_mode                      = "API_AND_CONFIG_MAP"
   enable_cluster_creator_admin_permissions = true
 
-  # EKS Add-ons
-  addons = local.cluster_addons
+  # EKS Add-ons, skipping if Auto Mode is enabled, addons get installed later after creation of NodePools
+  addons = !var.enable_eks_auto_mode ? local.cluster_addons : null
 
   vpc_id = module.vpc.vpc_id
 
-  # Filtering only Secondary CIDR private subnets starting with "100.".
   # Subnet IDs where the EKS Control Plane ENIs will be created
-  subnet_ids = local.secondary_cidr_subnets
+  control_plane_subnet_ids = local.cp_subnets
 
   # Combine root account, current user/role and additional roles to be able to access the cluster KMS key - required for terraform updates
   kms_key_administrators = distinct(concat([
@@ -96,7 +123,7 @@ module "eks" {
       # NOTE: Don't use this volume for ML workloads
       block_device_mappings = {
         xvda = {
-          device_name = "/dev/xvda"
+          device_name = "/dev/xvdb"
           ebs = {
             volume_size = 100
             volume_type = "gp3"
@@ -169,6 +196,7 @@ module "eks" {
         NodeGroupType            = "g6-mng"
         "nvidia.com/gpu.present" = "true"
         "accelerator"            = "nvidia"
+        "amiFamily"              = "al2023"
       }
 
       min_size     = 0
@@ -247,6 +275,7 @@ module "eks" {
         "nvidia.com/mig.config"         = "p4de-half-balanced" # References GPU Operator embedded MIG profile
         "node-type"                     = "p4de"
         "vpc.amazonaws.com/efa.present" = "true"
+        "amiFamily"                     = "al2023"
       }
 
       taints = {
@@ -290,33 +319,35 @@ resource "aws_ec2_tag" "cluster_primary_security_group" {
 #---------------------------------------------------------------
 # EKS Amazon CloudWatch Observability Role
 #---------------------------------------------------------------
-resource "aws_iam_role" "cloudwatch_observability_role" {
-  name_prefix = "${local.name}-eks-cw-agent-role-"
+module "amazon_cloudwatch_observability_iam_role" {
+  count   = try(var.enable_cluster_addons["amazon-cloudwatch-observability"], false) ? 1 : 0
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role"
+  version = "~> 6.4"
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Principal = {
-          Federated = module.eks.oidc_provider_arn
-        }
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" : "system:serviceaccount:amazon-cloudwatch:cloudwatch-agent",
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" : "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
+  name            = "${local.name}-cw"
+  use_name_prefix = true
+
+  trust_policy_permissions = {
+    EKSPodIdentity = {
+      principals = [{
+        type = "Service"
+        identifiers = [
+          "pods.eks.amazonaws.com",
+        ]
+      }]
+      actions = [
+        "sts:AssumeRole",
+        "sts:TagSession",
+      ]
+    }
+  }
+
+  policies = {
+    CloudWatchAgentServerPolicy = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+    AWSXrayWriteOnlyAccess      = "arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess"
+  }
+
   tags = local.tags
-}
-
-resource "aws_iam_role_policy_attachment" "cloudwatch_observability_policy_attachment" {
-  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
-  role       = aws_iam_role.cloudwatch_observability_role.name
 }
 
 #---------------------------------------------------------------
@@ -414,6 +445,7 @@ data "kubectl_path_documents" "automode_manifests_dummy" {
 resource "kubectl_manifest" "automode_manifests" {
   count     = var.enable_eks_auto_mode ? length(data.kubectl_path_documents.automode_manifests_dummy[0].documents) : 0
   yaml_body = element(data.kubectl_path_documents.automode_manifests[0].documents, count.index)
+  wait      = true
 }
 ################################################################################
 # EKS Auto Mode Ingress
@@ -453,4 +485,27 @@ resource "kubernetes_ingress_class_v1" "automode" {
     kubectl_manifest.automode_ingressclass_params,
     module.eks
   ]
+}
+
+################################################################################
+# EKS Auto Mode addons (installed after automode manifests)
+################################################################################
+resource "aws_eks_addon" "auto_mode_after_compute" {
+  for_each = { for k, v in local.cluster_addons : k => v if var.enable_eks_auto_mode }
+
+  cluster_name             = module.eks.cluster_name
+  addon_name               = each.key
+  service_account_role_arn = try(each.value.service_account_role_arn, null)
+
+  dynamic "pod_identity_association" {
+    for_each = try(each.value.pod_identity_association, null) != null ? each.value.pod_identity_association : []
+
+    content {
+      role_arn        = pod_identity_association.value.role_arn
+      service_account = pod_identity_association.value.service_account
+    }
+  }
+
+  resolve_conflicts_on_update = "PRESERVE"
+  depends_on                  = [kubectl_manifest.automode_manifests]
 }

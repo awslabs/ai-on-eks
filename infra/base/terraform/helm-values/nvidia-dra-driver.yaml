@@ -1,0 +1,43 @@
+gpuResourcesEnabledOverride: true
+
+resources:
+  gpus:
+    enabled: true
+  computeDomains:
+    enabled: true
+
+controller:
+  affinity:
+    nodeAffinity: null
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              dra-driver-nvidia-gpu-component: controller
+          topologyKey: kubernetes.io/hostname
+
+kubeletPlugin:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: "nvidia.com/gpu.present"
+            operator: In
+            values:
+            - "true"
+          - key: eks.amazonaws.com/compute-type
+            operator: NotIn
+            values:
+            - "auto"
+          - key: feature.node.kubernetes.io/system-os_release.ID
+            operator: NotIn
+            values:
+            - "bottlerocket"
+
+  tolerations:
+    - key: "nvidia.com/gpu"
+      operator: Exists
+      effect: NoSchedule

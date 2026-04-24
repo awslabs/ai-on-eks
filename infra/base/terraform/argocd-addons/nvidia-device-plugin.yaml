@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: nvidia-device-plugin
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "3"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -12,34 +10,10 @@ spec:
   source:
     repoURL: https://nvidia.github.io/k8s-device-plugin
     chart: nvidia-device-plugin
-    targetRevision: "0.17.2"
+    targetRevision: ${version}
     helm:
       values: |
-        # Target only GPU nodes with accelerator: nvidia label
-        nodeSelector:
-          karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
-
-        # Enable GPU Feature Discovery (default: false)
-        gfd:
-          enabled: true
-
-        # Configure Node Feature Discovery components
-        nfd:
-          enableNodeFeatureApi: true
-          gc:
-            nodeSelector:
-              karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
-          topologyUpdater:
-            nodeSelector:
-              karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
-          worker:
-            nodeSelector:
-              karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
-            tolerations:
-              - key: nvidia.com/gpu
-                operator: Exists
-                effect: NoSchedule
-              - operator: "Exists"
+        ${user_values_yaml}
   destination:
     server: https://kubernetes.default.svc
     namespace: nvidia-device-plugin
@@ -47,14 +21,6 @@ spec:
     syncOptions:
       - ServerSideApply=true
       - CreateNamespace=true
-      - PrunePropagationPolicy=foreground
-      - PruneLast=true
     automated:
       prune: true
       selfHeal: true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m

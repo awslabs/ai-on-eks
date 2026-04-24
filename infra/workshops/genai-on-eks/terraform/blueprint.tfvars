@@ -11,6 +11,11 @@ region = "us-east-2" # update to your preferred AWS region # update to your pref
 
 enable_eks_auto_mode = true
 
+enable_cluster_addons = {
+  metrics-server                  = false
+  amazon-cloudwatch-observability = false
+}
+
 ################################################################################
 # Observability
 ################################################################################

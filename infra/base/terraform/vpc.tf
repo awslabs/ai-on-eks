@@ -1,45 +1,72 @@
-locals {
-  # Calculate CIDR range if not specified. Check if var.vpc_cidr has subnet mask, if not add one based on the following table
-  cidr_bits = tomap({
-    4 = "19"
-    3 = "20"
-    2 = "21"
-  })
-  vpc_cidr = strcontains(var.vpc_cidr, "/") ? var.vpc_cidr : format("%s/%s", var.vpc_cidr, local.cidr_bits[var.availability_zones_count])
-
-  # Calculate subnet sizes based on number of AZs to avoid overlaps
-  # We need to allocate space for: private subnets, public subnets, and database subnets
-  # Strategy: Divide VPC CIDR into equal blocks for each subnet type
-
-  # Calculate the subnet size needed based on AZ count
-  # For 2 AZs: /24 subnets (256 IPs each)
-  # For 3 AZs: /25 subnets (128 IPs each)
-  # For 4 AZs: /26 subnets (64 IPs each)
-  subnet_newbits = var.availability_zones_count == 2 ? 3 : var.availability_zones_count == 3 ? 4 : 5
-
-  # Private subnets: Start from index 0
-  # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.0.0/24", "10.1.1.0/24"]
-  # e.g., 10.1.0.0/20 with 3 AZs => ["10.1.0.0/25", "10.1.0.128/25", "10.1.1.0/25"]
-  private_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k)]
-
-  # Public subnets: Start after private subnets
-  # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.2.0/24", "10.1.3.0/24"]
-  # e.g., 10.1.0.0/20 with 3 AZs => ["10.1.1.128/25", "10.1.2.0/25", "10.1.2.128/25"]
-  public_subnets = [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + var.availability_zones_count)]
-
-  # Database subnets: Start after public subnets
-  # e.g., 10.1.0.0/21 with 2 AZs => ["10.1.4.0/24", "10.1.5.0/24"]
-  # e.g., 10.1.0.0/20 with 3 AZs => ["10.1.3.0/25", "10.1.3.128/25", "10.1.4.0/25"]
-  database_private_subnets = var.enable_database_subnets ? [for k, v in local.azs : cidrsubnet(local.vpc_cidr, local.subnet_newbits, k + (2 * var.availability_zones_count))] : []
-
-  # RFC6598 range 100.64.0.0/16 for EKS Data Plane subnets across configurable AZs
-  # Divide the secondary CIDR equally among AZs
-  # For 2 AZs: /17 subnets (32768 IPs each)
-  # For 3 AZs: /18 subnets (16384 IPs each)
-  # For 4 AZs: /18 subnets (16384 IPs each) - using only 4 of 4 possible /18 subnets
-  secondary_newbits                  = var.availability_zones_count <= 2 ? 1 : 2
-  secondary_ip_range_private_subnets = [for k, v in local.azs : cidrsubnet(element(var.secondary_cidr_blocks, 0), local.secondary_newbits, k)]
+data "aws_availability_zones" "available" {
+  # only use zones that are availability-zones (e.g: exclude local and wavelength zones)
+  filter {
+    name   = "zone-type"
+    values = ["availability-zone"]
+  }
 }
+
+data "aws_availability_zones" "available_lz" {
+  # local zones
+  filter {
+    name   = "opt-in-status"
+    values = ["opted-in"]
+  }
+  filter {
+    name   = "zone-type"
+    values = ["local-zone"]
+  }
+}
+
+locals {
+  region    = var.region
+  local_azs = slice(data.aws_availability_zones.available_lz.names, 0, var.local_zones_count)
+  az_azs    = slice(data.aws_availability_zones.available.names, 0, var.availability_zones_count)
+
+  # concat to put local zones at the end of the list to avoid creation on NAT Gateway
+  azs       = concat(local.az_azs, local.local_azs)
+  azs_count = var.availability_zones_count + var.local_zones_count
+
+  vpc_cidr        = var.vpc_cidr
+  vpc_cidr_prefix = tonumber(split("/", local.vpc_cidr)[1])
+
+  private_subnets          = [for k, v in module.subnets.network_cidr_blocks : v if endswith(k, "/private")]
+  public_subnets           = [for k, v in module.subnets.network_cidr_blocks : v if endswith(k, "/public")]
+  control_plane_subnets    = [for k, v in module.subnets.network_cidr_blocks : v if endswith(k, "/cp")]
+  database_private_subnets = var.enable_database_subnets ? [for k, v in module.subnets.network_cidr_blocks : v if endswith(k, "/database")] : []
+
+  # Subnet sizing: newbits determines how many subnets fit per secondary CIDR block (/16 CIDR prefix)
+  # 1 - 2 /17 subnets (32763 IPs each)
+  # 2 - 4 /18 subnets (16379 IPs each)
+  # 3 - 8 /19 subnets (8187 IPs each)
+  secondary_newbits = 1
+
+  # Max subnets that fit in one CIDR block given the newbits
+  secondary_subnets_per_cidr = pow(2, local.secondary_newbits)
+
+  # For each AZ, pick the CIDR block (first one until full, then overflow to next) and compute the subnet index within that block
+  secondary_ip_range_private_subnets = [
+    for k, v in local.azs : cidrsubnet(
+      var.secondary_cidr_blocks[floor(k / local.secondary_subnets_per_cidr)],
+      local.secondary_newbits,
+      k % local.secondary_subnets_per_cidr
+    )
+  ]
+}
+
+module "subnets" {
+  source  = "hashicorp/subnets/cidr"
+  version = "1.0.0"
+
+  base_cidr_block = var.vpc_cidr
+  networks = concat(
+    [for k, v in local.azs : tomap({ "name" = "${v}/public", "new_bits" = var.public_subnets_cidr_prefix - local.vpc_cidr_prefix })],
+    [for k, v in local.azs : tomap({ "name" = "${v}/private", "new_bits" = var.private_subnets_cidr_prefix - local.vpc_cidr_prefix })],
+    [for k, v in local.azs : tomap({ "name" = "${v}/cp", "new_bits" = var.control_plane_subnets_cidr_prefix - local.vpc_cidr_prefix })],
+    var.enable_database_subnets ? [for k, v in local.azs : tomap({ "name" = "${v}/database", "new_bits" = var.database_subnets_cidr_prefix - local.vpc_cidr_prefix })] : []
+  )
+}
+
 
 #---------------------------------------------------------------
 # VPC
@@ -61,6 +88,9 @@ module "vpc" {
   # 1/ EKS Data Plane secondary CIDR blocks for subnets across configurable AZs for EKS Control Plane ENI + Nodes + Pods
   # 2/ Private Subnets with RFC1918 private IPv4 address range for Private NAT + NLB + Airflow + EC2 Jumphost etc.
   private_subnets = concat(local.private_subnets, local.secondary_ip_range_private_subnets)
+
+  # EKS Control Plane subnets
+  intra_subnets = local.control_plane_subnets
 
   # ------------------------------
   # Private Subnets for MLflow backend store

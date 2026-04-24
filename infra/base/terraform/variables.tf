@@ -36,8 +36,8 @@ variable "solution_id" {
 
 # VPC with configurable AZs - CIDR size should match AZ count
 variable "vpc_cidr" {
-  description = "VPC CIDR. This should be a valid private (RFC 1918) CIDR range. Recommended: /21 for 2 AZs, /20 for 3 AZs, /19 for 4 AZs. If the network prefix is not provided, it will be computed"
-  default     = "10.1.0.0"
+  description = "VPC CIDR. This should be a valid private (RFC 1918) CIDR range. Recommended to use a /16 CIDR"
+  default     = "10.0.0.0/16"
   type        = string
 }
 
@@ -46,9 +46,33 @@ variable "availability_zones_count" {
   type        = number
   default     = 2
   validation {
-    condition     = var.availability_zones_count >= 2 && var.availability_zones_count <= 4
-    error_message = "The availability_zones_count must be between 2 and 4."
+    condition     = var.availability_zones_count >= 2 && var.availability_zones_count <= 6
+    error_message = "The availability_zones_count must be between 2 and 6."
   }
+}
+
+variable "local_zones_count" {
+  description = "Number of local zones to use for the deployment"
+  type        = number
+  default     = 0
+}
+
+variable "private_subnets_cidr_prefix" {
+  description = "CIDR prefix for the private subnets"
+  type        = number
+  default     = 24
+}
+
+variable "public_subnets_cidr_prefix" {
+  description = "CIDR prefix for the public subnets"
+  type        = number
+  default     = 24
+}
+
+variable "control_plane_subnets_cidr_prefix" {
+  description = "CIDR prefix for the control plane subnets"
+  type        = number
+  default     = 26
 }
 
 variable "single_nat_gateway" {
@@ -58,10 +82,10 @@ variable "single_nat_gateway" {
 }
 
 # RFC6598 range 100.64.0.0/10
-# Note you can only /16 range to VPC. You can add multiples of /16 if required
+# Note you can only add /16 range to VPC. You can add multiples of /16 if required
 variable "secondary_cidr_blocks" {
   description = "Secondary CIDR blocks to be attached to VPC"
-  default     = ["100.64.0.0/16"]
+  default     = ["100.64.0.0/16", "100.65.0.0/16", "100.66.0.0/16", "100.67.0.0/16"]
   type        = list(string)
 }
 
@@ -69,6 +93,12 @@ variable "enable_database_subnets" {
   description = "Whether or not to enable the database subnets"
   type        = bool
   default     = false
+}
+
+variable "database_subnets_cidr_prefix" {
+  description = "CIDR prefix for the database subnets"
+  type        = number
+  default     = 24
 }
 
 variable "enable_eks_auto_mode" {
@@ -121,6 +151,21 @@ variable "enable_aws_efa_k8s_device_plugin" {
   type        = bool
   default     = false
 }
+variable "aws_efa_k8s_device_plugin_version" {
+  description = "AWS EFA K8s Device Plugin chart version"
+  type        = string
+  default     = "0.5.22"
+}
+variable "enable_aws_neuron_device_plugin" {
+  description = "Enable AWS Neuron Device Plugin"
+  type        = bool
+  default     = true
+}
+variable "aws_neuron_device_plugin_version" {
+  description = "AWS Neuron Device Plugin chart version"
+  type        = string
+  default     = "1.3.0"
+}
 variable "enable_aws_fsx_csi_driver" {
   description = "Whether or not to deploy the Fsx Driver"
   type        = bool
@@ -146,11 +191,20 @@ variable "enable_amazon_emr" {
   type        = bool
   default     = false
 }
-# Addon Variables for ai-on-eks/infra/base/terraform/addons.tf
 variable "enable_kube_prometheus_stack" {
-  description = "Enable Kube Prometheus addon"
+  description = "Enable Kube Prometheus Stack addon"
   type        = bool
   default     = false
+}
+variable "kube_prometheus_stack_version" {
+  description = "Kube Prometheus Stack version"
+  type        = string
+  default     = "82.16.0"
+}
+variable "kube_prometheus_stack_namespace" {
+  description = "Namespace for kube-prometheus-stack"
+  type        = string
+  default     = "kube-prometheus-stack"
 }
 variable "enable_grafana_operator" {
   description = "Enable Grafana Operator addon"
@@ -173,13 +227,13 @@ variable "grafana_admin_password" {
   default     = ""
   sensitive   = true
 }
-variable "kube_prometheus_stack_namespace" {
-  description = "Namespace for kube-prometheus-stack"
-  type        = string
-  default     = "kube-prometheus-stack"
-}
 variable "enable_ai_ml_observability_stack" {
   description = "Enable AI/ML observability addon"
+  type        = bool
+  default     = false
+}
+variable "observability_mcp_enabled" {
+  description = "Enable AI/ML observability addon MCP servers"
   type        = bool
   default     = false
 }
@@ -266,6 +320,11 @@ variable "enable_mpi_operator" {
   type        = bool
   default     = false
 }
+variable "mpi_operator_version" {
+  description = "MPI Operator chart version"
+  type        = string
+  default     = "0.8.0"
+}
 
 # AWS Load Balancer Controller Variables
 variable "enable_aws_load_balancer_controller" {
@@ -314,6 +373,12 @@ variable "enable_nvidia_dra_driver" {
   default     = false
 }
 
+variable "nvidia_dra_driver_version" {
+  description = "NVIDIA DRA Driver version"
+  type        = string
+  default     = "25.12.0"
+}
+
 variable "enable_nvidia_gpu_operator" {
   description = <<-EOF
     Enable NVIDIA GPU Operator
@@ -324,7 +389,6 @@ variable "enable_nvidia_gpu_operator" {
     - Node Feature Discovery (NFD - hardware labeling)
     - GPU Feature Discovery (GFD - GPU-specific labeling)
     - MIG Manager (Multi-Instance GPU partitioning)
-    - Container Toolkit (GPU container runtime)
     - Operator Controller (lifecycle management)
 
     Note: Drivers are NOT installed (pre-installed on EKS AMI)
@@ -333,10 +397,22 @@ variable "enable_nvidia_gpu_operator" {
   type        = bool
   default     = false
 }
+variable "nvidia_gpu_operator_version" {
+  description = "NVIDIA GPU Operator chart version"
+  type        = string
+  default     = "26.3.0"
+}
+variable "enable_nvidia_gpu_operator_dcgm_exporter" {
+  description = "Enable DCGM Exporter within NVIDIA GPU Operator"
+  type        = bool
+  default     = true
+}
 
 variable "enable_nvidia_device_plugin" {
   description = <<-EOF
-    Enable standalone NVIDIA Device Plugin chart (only when GPU Operator is disabled)
+    Enable standalone NVIDIA Device Plugin chart
+    when GPU Operator is enabled controls if GPU operator installs the device plugin
+    when GPU operator is disabled controls if standalone device plugin is installed
 
     Components deployed:
     - Device Plugin (GPU resource scheduling)
@@ -351,6 +427,12 @@ variable "enable_nvidia_device_plugin" {
   EOF
   type        = bool
   default     = true
+}
+variable "nvidia_device_plugin_version" {
+  description = "NVIDIA device plugin chart version"
+  type        = string
+  default     = "0.18.2"
+
 }
 
 variable "enable_nvidia_dcgm_exporter" {
@@ -367,6 +449,17 @@ variable "enable_nvidia_dcgm_exporter" {
   default     = true
 }
 
+variable "nvidia_dcgm_exporter_version" {
+  description = "NVIDIA DCGM Exporter version"
+  type        = string
+  default     = "4.8.1"
+}
+
+variable "nvidia_dcgm_exporter_service_monitor" {
+  description = "Enable ServiceMonitor for DCGM Exporter"
+  type        = bool
+  default     = true
+}
 # Cert Manager
 variable "enable_cert_manager" {
   description = "Enable cert-manager addon"
@@ -409,9 +502,23 @@ variable "enable_milvus" {
   default     = false
 }
 
+# Jupyter Enterprise Gateway
+variable "enable_jupyter_enterprise_gateway" {
+  description = "Enable Jupyter Enterprise Gateway addon"
+  type        = bool
+  default     = false
+}
+
 # MCP Gateway Registry
 variable "enable_mcp_gateway_registry" {
   description = "Enable MCP Gateway Registry addon"
+  type        = bool
+  default     = false
+}
+
+# Selenium Grid
+variable "enable_selenium_grid" {
+  description = "Enable Selenium Grid addon"
   type        = bool
   default     = false
 }
@@ -485,16 +592,21 @@ variable "kms_key_admin_roles" {
 }
 
 # NVIDIA Dynamo Stack Variables
-variable "enable_dynamo_stack" {
-  description = "Enable NVIDIA Dynamo Stack addon"
+variable "enable_dynamo_platform" {
+  description = "Enable NVIDIA Dynamo Platform"
   type        = bool
   default     = false
 }
 
-variable "dynamo_stack_version" {
-  description = "NVIDIA Dynamo Stack version"
+variable "dynamo_platform_version" {
+  description = "NVIDIA Dynamo Platform version"
   type        = string
-  default     = "v0.4.0"
+  default     = "1.0.0"
+}
+variable "dynamo_platform_namespace" {
+  description = "Namespace for NVIDIA Dynamo Platform"
+  type        = string
+  default     = "dynamo-system"
 }
 
 # Enable SOCI snapshotter parallel pull/unpack mode
@@ -536,7 +648,7 @@ variable "ami_family" {
 variable "karpenter_version" {
   description = "Karpenter version"
   type        = string
-  default     = "1.8.1"
+  default     = "1.11.0"
 }
 
 variable "karpenter_additional_ec2nodeclassnames" {
@@ -592,4 +704,78 @@ variable "s3_models_additional_buckets" {
   description = "List of additional S3 bucket names that both service accounts should have access to"
   type        = list(string)
   default     = []
+}
+
+# Gateway API CRDs
+variable "enable_gateway_api_crds" {
+  description = "Enable Gateway API CRDs addon"
+  type        = bool
+  default     = false
+}
+# Gateway API CRDs version
+variable "gateway_api_crds_version" {
+  description = "Gateway API CRDs version"
+  type        = string
+  default     = "1.5.1"
+}
+
+# Gateway API Inference Extension CRDs
+variable "enable_gateway_api_inference_crds" {
+  description = "Enable Gateway API Inference Extension CRDs addon"
+  type        = bool
+  default     = false
+}
+# Gateway API Inference Extension CRDs version
+variable "gateway_api_inference_crds_version" {
+  description = "Gateway API Inference Extension CRDs version"
+  type        = string
+  default     = "1.4.0"
+}
+
+# AgentGateway
+variable "enable_agentgateway" {
+  description = "Enable AgentGateway addon"
+  type        = bool
+  default     = false
+}
+# AgentGateway version
+variable "agentgateway_version" {
+  description = "AgentGateway chart version"
+  type        = string
+  default     = "1.0.0"
+}
+
+# Istio
+variable "enable_istio" {
+  description = "Enable Istio addon"
+  type        = bool
+  default     = false
+}
+# Istio version
+variable "istio_version" {
+  description = "Istio version"
+  type        = string
+  default     = "1.29.1"
+}
+
+variable "enable_dranet_driver" {
+  description = "Enable DRANET driver addon"
+  type        = bool
+  default     = false
+}
+variable "dranet_driver_version" {
+  description = "DRANET driver version"
+  type        = string
+  default     = "main"
+}
+variable "dranet_driver_image" {
+  description = "DRANET driver image"
+  type = object({
+    repository = string
+    tag        = string
+  })
+  default = {
+    repository = "registry.k8s.io/networking/dranet"
+    tag        = "stable"
+  }
 }

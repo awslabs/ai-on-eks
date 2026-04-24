@@ -1,0 +1,16 @@
+# Disable MOFED
+mofedEnabled: false
+
+# Target only nodes running AL2023 AMIs
+nodeSelector:
+  amiFamily: al2023
+
+# Enable GPU Feature Discovery (default: false)
+gfd:
+  enabled: true
+
+# Configure Node Feature Discovery components
+nfd:
+  worker:
+    tolerations:
+      - operator: "Exists"

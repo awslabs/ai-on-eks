@@ -1,4 +1,5 @@
 module "karpenter" {
+  count   = !var.enable_eks_auto_mode ? 1 : 0
   source  = "terraform-aws-modules/eks/aws//modules/karpenter"
   version = "~> 21.6"
 
@@ -18,6 +19,19 @@ module "karpenter" {
   tags = local.tags
 }
 
+resource "helm_release" "karpenter_crd" {
+  count            = !var.enable_eks_auto_mode ? 1 : 0
+  name             = "karpenter-crd"
+  namespace        = "kube-system"
+  create_namespace = true
+  repository       = "oci://public.ecr.aws/karpenter"
+  chart            = "karpenter-crd"
+  version          = var.karpenter_version
+  wait             = true
+  take_ownership   = true
+
+  depends_on = [module.karpenter]
+}
 
 resource "helm_release" "karpenter" {
   count            = !var.enable_eks_auto_mode ? 1 : 0
@@ -28,6 +42,7 @@ resource "helm_release" "karpenter" {
   chart            = "karpenter"
   version          = var.karpenter_version
   wait             = true
+  skip_crds        = true
 
   values = [
     <<-EOT
@@ -36,7 +51,7 @@ resource "helm_release" "karpenter" {
     settings:
       clusterName: ${module.eks.cluster_name}
       clusterEndpoint: ${module.eks.cluster_endpoint}
-      interruptionQueue: ${module.karpenter.queue_name}
+      interruptionQueue: ${module.karpenter[0].queue_name}
     tolerations:
       - key: CriticalAddonsOnly
         operator: Exists
@@ -48,5 +63,5 @@ resource "helm_release" "karpenter" {
     EOT
   ]
 
-  depends_on = [module.karpenter]
+  depends_on = [helm_release.karpenter_crd]
 }

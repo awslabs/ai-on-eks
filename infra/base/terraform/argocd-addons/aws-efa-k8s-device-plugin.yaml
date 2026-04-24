@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://aws.github.io/eks-charts
     chart: aws-efa-k8s-device-plugin
-    targetRevision: "0.5.18"
+    targetRevision: ${version}
     helm:
       values: |
         ${user_values_yaml}

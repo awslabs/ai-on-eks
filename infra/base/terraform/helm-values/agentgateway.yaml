@@ -1,0 +1,2 @@
+inferenceExtension:
+  enabled: ${enable_inference_extension}

@@ -7,14 +7,23 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  source:
-    repoURL: https://github.com/awslabs/ai-ml-observability-reference-architecture.git
-    targetRevision: HEAD
-    path: deploy
+  sources:
+    - repoURL: https://github.com/awslabs/ai-ml-observability-reference-architecture.git
+      path: chart
+      targetRevision: HEAD
+      helm:
+        releaseName: kube-prometheus-stack
+        values: |
+          opensearch-operator:
+            fullnameOverride: opensearch-operator
+          mcp:
+            enabled: ${observability_mcp_enabled}
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
   syncPolicy:
+    automated:
+      selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
-    automated: {}

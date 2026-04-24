@@ -1,12 +1,15 @@
-name                        = "aioeks-agents"
-enable_langfuse             = true        # Enable Langfuse for observability
-enable_gitlab               = true        # Enable Gitlab for source control
-enable_external_dns         = true        # Enable External DNS to sync Route53 records
-enable_milvus               = true        # Enable Milvus for persistent memory storage
-enable_mcp_gateway_registry = true        # Enable MCP Gateway Registry
-max_user_namespaces         = 16384       # Enables docker builds on bottlerocket
-acm_certificate_domain      = ""          # Update with domain (ex agents.example.com)
-allowed_inbound_cidrs       = "0.0.0.0/0" # Set the CIDR range allowed through the load balancer. Should include your IP as well as the IP of the gitlab runner node
+name                              = "aioeks-agents"
+enable_langfuse                   = true        # Enable Langfuse for observability
+enable_gitlab                     = true        # Enable Gitlab for source control
+enable_external_dns               = true        # Enable External DNS to sync Route53 records
+enable_milvus                     = true        # Enable Milvus for persistent memory storage
+enable_selenium_grid              = true        # Enable Selenium Grid for web browsing
+enable_jupyter_enterprise_gateway = true        # Enable Jupyterhub Enterprise Gateway for code execution
+enable_mcp_gateway_registry       = true        # Enable MCP Gateway Registry
+max_user_namespaces               = 16384       # Enables docker builds on bottlerocket
+acm_certificate_domain            = ""          # Update with domain (ex agents.example.com)
+allowed_inbound_cidrs             = "0.0.0.0/0" # Set the CIDR range allowed through the load balancer. Should include your IP as well as the IP of the gitlab runner node
+
 # region              = "us-west-2"
 # eks_cluster_version = "1.34"
 

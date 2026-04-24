@@ -1,7 +1,7 @@
 locals {
   ec2nodeclass = templatefile("${path.module}/karpenter-resources/templates/${var.ami_family}_ec2nodeclass.tpl",
     {
-      node_iam_role                       = var.enable_eks_auto_mode ? module.eks.node_iam_role_name : module.karpenter.node_iam_role_name
+      node_iam_role                       = var.enable_eks_auto_mode ? module.eks.node_iam_role_name : module.karpenter[0].node_iam_role_name
       cluster_name                        = module.eks.cluster_name
       enable_soci_snapshotter             = var.enable_soci_snapshotter
       soci_snapshotter_use_instance_store = var.soci_snapshotter_use_instance_store
@@ -44,6 +44,7 @@ resource "kubectl_manifest" "nodepool" {
   for_each = !var.enable_eks_auto_mode ? local.karpenter_node_pools : {}
 
   yaml_body = each.value
+  wait      = true
 
   depends_on = [
     module.karpenter,

@@ -1,29 +1,24 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dynamo-crds
+  name: jupyter-enterprise-gateway
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://helm.ngc.nvidia.com/nvidia/ai-dynamo
-    chart: dynamo-crds
-    targetRevision: ${trimprefix(dynamo_version, "v")}
+    repoURL: https://github.com/jupyter-server/enterprise_gateway.git
+    path: etc/kubernetes/helm/enterprise-gateway
+    targetRevision: v3.2.3
+    helm: {}
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: enterprise-gateway
   syncPolicy:
     automated:
-      prune: false
+      prune: true
       selfHeal: true
-    retry:
-      limit: 3
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
-      - Replace=true

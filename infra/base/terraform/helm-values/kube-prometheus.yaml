@@ -1,10 +1,29 @@
+crds:
+  upgradeJob:
+    enabled: true
 prometheus:
   # The ClusterRole for Prometheus needs additional permissions for the EKS scheduler/controller metrics https://docs.aws.amazon.com/eks/latest/userguide/view-raw-metrics.html
   additionalRulesForClusterRole:
     - apiGroups: [ "metrics.eks.amazonaws.com" ]
       resources: [ "kcm/metrics", "ksh/metrics" ]
       verbs: [ "get" ]
+%{ if enable_amp ~}
+  serviceAccount:
+    create: true
+    name: ${amp_sa}
+%{ endif ~}
   prometheusSpec:
+%{ if enable_amp ~}
+    serviceAccountName: ${amp_sa}
+    remoteWrite:
+      - url: ${amp_remotewrite_url}
+        sigv4:
+          region: ${region}
+        queueConfig:
+          maxSamplesPerSend: 1000
+          maxShards: 200
+          capacity: 2500
+%{ endif ~}
     retention: 5h
     scrapeInterval: 30s
     evaluationInterval: 30s
@@ -44,7 +63,7 @@ prometheus:
           - role: endpoints
             namespaces:
               names:
-                - karpenter
+                - kube-system
         relabel_configs:
           - source_labels:
               - __meta_kubernetes_endpoints_name
@@ -111,6 +130,30 @@ grafana:
   service:
     port: ${grafana_service_port}
   defaultDashboardsEnabled: true
+%{ if enable_amp ~}
+  serviceAccount:
+    create: true
+    name: grafana-sa
+  grafana.ini:
+    auth:
+      sigv4_auth_enabled: true
+  sidecar:
+    datasources:
+      defaultDatasourceEnabled: false
+  plugins:
+    - grafana-amazonprometheus-datasource
+  additionalDataSources:
+    - name: Amazon-Managed-Prometheus
+      type: grafana-amazonprometheus-datasource
+      access: proxy
+      url: ${amp_url}
+      isDefault: true
+      jsonData:
+        sigV4Auth: true
+        defaultRegion: ${region}
+        sigV4Region: ${region}
+      editable: true
+%{ else ~}
   dashboardProviders:
     dashboardproviders.yaml:
       apiVersion: 1
@@ -125,7 +168,8 @@ grafana:
             path: /var/lib/grafana/dashboards/default
   dashboards:
     default:
-      karpenter-capacity-dashboard:
-        url: https://raw.githubusercontent.com/aws/karpenter-provider-aws/d389d3c82f93b9abd713746ed3fefd3ef8f34d72/website/content/en/v1.2/getting-started/getting-started-with-karpenter/karpenter-capacity-dashboard.json
-      karpenter-performance-dashboard:
-        url: https://raw.githubusercontent.com/aws/karpenter-provider-aws/d389d3c82f93b9abd713746ed3fefd3ef8f34d72/website/content/en/v1.2/getting-started/getting-started-with-karpenter/karpenter-performance-dashboard.json
+      capacity-dashboard:
+        url: https://karpenter.sh/v1.11/getting-started/getting-started-with-karpenter/karpenter-capacity-dashboard.json
+      performance-dashboard:
+        url: https://karpenter.sh/v1.11/getting-started/getting-started-with-karpenter/karpenter-performance-dashboard.json
+%{ endif ~}

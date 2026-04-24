@@ -7,22 +7,26 @@
 module "efs" {
   count   = var.enable_aws_efs_csi_driver ? 1 : 0
   source  = "terraform-aws-modules/efs/aws"
-  version = "~> 1.8"
+  version = "~> 2.2"
 
   creation_token = local.name
   name           = local.name
 
+  throughput_mode = "elastic"
   # Mount targets / security group
   mount_targets = {
-    for k, v in zipmap(local.azs, slice(module.vpc.private_subnets, length(module.vpc.private_subnets) - var.availability_zones_count, length(module.vpc.private_subnets))) : k => { subnet_id = v }
+    for k, v in zipmap(local.azs, slice(module.vpc.private_subnets, length(module.vpc.private_subnets) - local.azs_count, length(module.vpc.private_subnets))) : k => { subnet_id = v }
+    if alltrue([for az in local.local_azs : k != az])
   }
+
+  security_group_name        = "${local.name}-efs"
   security_group_description = "${local.name} EFS security group"
   security_group_vpc_id      = module.vpc.vpc_id
-  security_group_rules = {
-    vpc = {
+  security_group_ingress_rules = {
+    for cidr in module.vpc.private_subnets_cidr_blocks : cidr => {
       # relying on the defaults provided for EFS/NFS (2049/TCP + ingress)
       description = "NFS ingress from VPC private subnets"
-      cidr_blocks = module.vpc.private_subnets_cidr_blocks
+      cidr_ipv4   = cidr
     }
   }
 

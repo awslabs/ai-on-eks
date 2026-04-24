@@ -6,6 +6,7 @@ resource "kubectl_manifest" "mistral_model_download" {
     aws_s3_bucket.model_storage
   ]
 
+  force_new = true
   yaml_body = <<-YAML
     apiVersion: batch/v1
     kind: Job
@@ -15,6 +16,7 @@ resource "kubectl_manifest" "mistral_model_download" {
     spec:
       backoffLimit: 3
       activeDeadlineSeconds: 7200
+      ttlSecondsAfterFinished: 86400
       template:
         spec:
           restartPolicy: Never
@@ -26,10 +28,10 @@ resource "kubectl_manifest" "mistral_model_download" {
             args:
             - |
               set -e
-              pip install -q huggingface_hub[cli] boto3
+              pip install -q huggingface_hub boto3
 
-              echo "Downloading Mistral-7B-Instruct-v0.3 from HuggingFace..."
-              hf download mistralai/Mistral-7B-Instruct-v0.3 --local-dir /tmp/mistral-7b
+              echo "Downloading Ministral-3-8B-Instruct-2512 from HuggingFace..."
+              python3 -c "from huggingface_hub import snapshot_download; snapshot_download('mistralai/Ministral-3-8B-Instruct-2512', local_dir='/tmp/mistral', allow_patterns=['*.json', '*.txt', '*.md', '*.model', 'consolidated.safetensors'])"
 
               echo "Uploading to S3 bucket: ${aws_s3_bucket.model_storage.bucket}"
               python3 << 'EOF'
@@ -39,11 +41,14 @@ resource "kubectl_manifest" "mistral_model_download" {
 
               s3 = boto3.client('s3')
               bucket = "${aws_s3_bucket.model_storage.bucket}"
-              local_dir = Path("/tmp/mistral-7b")
+              local_dir = Path("/tmp/mistral")
 
               for file_path in local_dir.rglob("*"):
                   if file_path.is_file():
-                      s3_key = f"mistral-7b-v0-3/{file_path.relative_to(local_dir)}"
+                      # Skip .cache directories and their contents
+                      if '.cache' in file_path.parts:
+                          continue
+                      s3_key = f"Ministral-3-8B-Instruct-2512/{file_path.relative_to(local_dir)}"
                       print(f"Uploading {file_path.name}...")
                       s3.upload_file(str(file_path), bucket, s3_key)
 

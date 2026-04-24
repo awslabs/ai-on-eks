@@ -1,3 +1,6 @@
+
+# 🚨 This blueprint is currently outdated — we're actively working on a fresh, improved version to celebrate the release of NVIDIA Dynamo v1. 🚨
+
 # NVIDIA Dynamo v0.5.0 Inference Examples
 
 This directory contains production-ready examples for deploying different inference backends using NVIDIA Dynamo v0.5.0 on Amazon EKS. These examples use official NGC prebuilt containers with `DynamoGraphDeployment` manifests for GitOps-based deployment via ArgoCD.

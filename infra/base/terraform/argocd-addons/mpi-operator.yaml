@@ -9,17 +9,24 @@ spec:
   project: default
   source:
     repoURL: https://github.com/kubeflow/mpi-operator.git
-    targetRevision: v0.4.0
-    path: deploy/v2beta1
+    targetRevision: v${version}
+    path: manifests/overlays/standalone
   destination:
     server: https://kubernetes.default.svc
     namespace: mpi-operator
   syncPolicy:
-    syncOptions:
-      - ServerSideApply=true
     automated:
       prune: true
       selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
   ignoreDifferences:
     - group: rbac.authorization.k8s.io
       kind: ClusterRole

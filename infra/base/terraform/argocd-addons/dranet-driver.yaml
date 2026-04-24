@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dranet-driver
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kubernetes-sigs/dranet.git
+    path: deployments/helm/dranet
+    targetRevision: ${version}
+    helm:
+      values: |
+        ${user_values_yaml}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true

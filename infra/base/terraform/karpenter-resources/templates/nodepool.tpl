@@ -12,6 +12,9 @@ spec:
     metadata:
       labels:
         amiFamily: ${ami_family}
+%{ if ami_family == "bottlerocket" ~}
+        nvidia.com/gpu.deploy.device-plugin: "false"
+%{ endif ~}
     spec:
       expireAfter: 720h
       nodeClassRef:

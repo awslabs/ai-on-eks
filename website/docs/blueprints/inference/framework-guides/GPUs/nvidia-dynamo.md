@@ -5,6 +5,12 @@ sidebar_position: 8
 
 import CollapsibleContent from '@site/src/components/CollapsibleContent';
 
+<div style={{background: '#d32f2f', color: 'white', padding: '2rem', textAlign: 'center', fontSize: '1.5rem', fontWeight: 'bold', borderRadius: '8px', marginBottom: '2rem', border: '3px solid #b71c1c'}}>
+  ⚠️ This blueprint is currently outdated  ⚠️
+</div>
+
+
+
 :::warning
 Deployment of ML models on EKS requires access to GPUs or Neuron instances. If your deployment isn't working, it's often due to missing access to these resources. Also, some deployment patterns rely on Karpenter autoscaling and static node groups; if nodes aren't initializing, check the logs for Karpenter or Node groups to resolve the issue.
 :::

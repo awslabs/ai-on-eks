@@ -141,7 +141,7 @@ resource "aws_eks_pod_identity_association" "s3_csi" {
 # Create S3 prefix/folder for models
 resource "aws_s3_object" "model_prefix" {
   bucket = aws_s3_bucket.model_storage.bucket
-  key    = "mistral-7b-v0-3/"
+  key    = "Ministral-3-8B-Instruct-2512/"
   source = "/dev/null"
 }
 
@@ -172,7 +172,7 @@ resource "kubectl_manifest" "mistral_model_pv" {
         volumeHandle = "s3-csi-driver-volume"
         volumeAttributes = {
           bucketName = aws_s3_bucket.model_storage.bucket
-          prefix     = "mistral-7b-v0-3/"
+          prefix     = "Ministral-3-8B-Instruct-2512/"
         }
       }
     }

@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: model-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: "efs-sc-dynamic"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: compilation-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: "efs-sc-dynamic"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: perf-cache
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: "efs-sc-dynamic"

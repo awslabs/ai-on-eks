@@ -1,0 +1,218 @@
+# Node feature discovery
+nfd:
+  enabled: true
+
+# GPU feature discovery
+gfd:
+  enabled: true
+
+# Enable MIG support with mixed strategy
+mig:
+  strategy: mixed  # Supports both MIG and non-MIG workloads
+
+# Disable driver installation since EKS AMI already has drivers
+driver:
+  enabled: false
+
+# EKS AMIs come with the container toolkit installed
+toolkit:
+  enabled: false
+
+# Device plugin configuration
+devicePlugin:
+  enabled: ${enable_device_plugin}
+  env:
+    - name: MOFED_ENABLED
+      value: "false"
+
+# DCGM exporter for monitoring
+dcgmExporter:
+  enabled: ${enable_dcgm_exporter}
+  serviceMonitor:
+    enabled: ${dcgm_exporter_service_monitor_enabled}
+    interval: 15s
+    honorLabels: false
+    additionalLabels:
+      release: kube-prometheus-stack
+  config:
+    create: true
+    name: custom-dcgm-exporter-metrics
+    data: |
+      ${indent(6, dcgm_exporter_metrics)}
+
+# Node status exporter
+nodeStatusExporter:
+  enabled: false
+
+# Sandbox device plugin
+sandboxDevicePlugin:
+  enabled: false
+
+kataSandboxDevicePlugin:
+  enabled: false
+
+# MIG Manager configuration with embedded MIG profiles
+migManager:
+  enabled: true
+  env:
+    - name: WITH_REBOOT
+      value: "true"
+  config:
+    create: true
+    name: custom-mig-parted-configs
+    default: "all-disabled"
+    data:
+      config.yaml: |-
+        version: v1
+        mig-configs:
+          all-disabled:
+            - devices: all
+              mig-enabled: false
+
+          # P4D profiles (A100 40GB)
+          # https://docs.nvidia.com/datacenter/tesla/mig-user-guide/index.html#a100-mig-profiles
+          p4d-half-balanced:
+            - devices: [0, 1, 2, 3]
+              mig-enabled: true
+              mig-devices:
+                "1g.5gb": 2
+                "2g.10gb": 1
+                "3g.20gb": 1
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p4d-all-small:
+            - devices: all
+              mig-enabled: true
+              mig-devices:
+                "1g.5gb": 7
+
+          p4d-mixed-workload:
+            - devices: [0, 1]
+              mig-enabled: true
+              mig-devices:
+                "1g.5gb": 4
+                "2g.10gb": 1
+            - devices: [2, 3]
+              mig-enabled: true
+              mig-devices:
+                "3g.20gb": 1
+                "1g.5gb": 2
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p4d-inference-optimized:
+            - devices: [0, 1, 2, 3, 4, 5]
+              mig-enabled: true
+              mig-devices:
+                "1g.5gb": 6
+            - devices: [6, 7]
+              mig-enabled: false
+
+          # P4DE profiles (A100 80GB)
+          # https://docs.nvidia.com/datacenter/tesla/mig-user-guide/index.html#a100-mig-profiles
+          p4de-half-balanced:
+            - devices: [0, 1, 2, 3]
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 2
+                "2g.20gb": 1
+                "3g.40gb": 1
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p4de-all-small:
+            - devices: all
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 7
+
+          p4de-mixed-workload:
+            - devices: [0, 1]
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 3
+                "2g.20gb": 1
+                "3g.40gb": 1
+            - devices: [2, 3]
+              mig-enabled: true
+              mig-devices:
+                "7g.80gb": 1
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p4de-inference-optimized:
+            - devices: [0, 1, 2, 3, 4, 5]
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 4
+                "2g.20gb": 1
+            - devices: [6, 7]
+              mig-enabled: false
+
+          p4de-training-optimized:
+            - devices: [0, 1]
+              mig-enabled: true
+              mig-devices:
+                "3g.40gb": 1
+                "2g.20gb": 1
+            - devices: [2, 3, 4, 5]
+              mig-enabled: true
+              mig-devices:
+                "7g.80gb": 1
+            - devices: [6, 7]
+              mig-enabled: false
+
+          # P5 profiles (H100 80GB)
+          # https://docs.nvidia.com/datacenter/tesla/mig-user-guide/index.html#h100-mig-profiles
+          p5-half-balanced:
+            - devices: [0, 1, 2, 3]
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 2
+                "2g.20gb": 1
+                "3g.40gb": 1
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p5-all-small:
+            - devices: all
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 7
+
+          p5-inference-optimized:
+            - devices: [0, 1, 2, 3, 4, 5]
+              mig-enabled: true
+              mig-devices:
+                "1g.10gb": 4
+                "2g.20gb": 1
+            - devices: [6, 7]
+              mig-enabled: false
+
+          # P6 profiles (B200 180GB)
+          # https://docs.nvidia.com/datacenter/tesla/mig-user-guide/index.html#h200-mig-profiles
+          p6-b200-half-balanced:
+            - devices: [0, 1, 2, 3]
+              mig-enabled: true
+              mig-devices:
+                "1g.23gb": 1
+                "2g.45gb": 1
+                "4g.90gb": 1
+            - devices: [4, 5, 6, 7]
+              mig-enabled: false
+
+          p6-b200-all-small:
+            - devices: all
+              mig-enabled: true
+              mig-devices:
+                "1g.23gb": 7
+
+          p6-b200-inference-optimized:
+            - devices: [0, 1, 2, 3, 4, 5]
+              mig-enabled: true
+              mig-devices:
+                "1g.23gb": 5
+                "2g.40gb": 1
+            - devices: [6, 7]
+              mig-enabled: false
