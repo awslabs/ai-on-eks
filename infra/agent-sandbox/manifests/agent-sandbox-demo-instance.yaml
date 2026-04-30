@@ -1,8 +1,14 @@
 # One-CR AgentSandbox demonstrating the KRO composition. Creates a
-# ServiceAccount + Sandbox + CiliumNetworkPolicy from a single declarative
-# unit. Contrast this with demo-agent.yaml which stages all three
-# primitives explicitly — the AgentSandbox view is what a customer
-# would see after adopting the blueprint.
+# ServiceAccount + Sandbox from a single declarative unit. Contrast
+# this with demo-agent.yaml which stages both primitives explicitly
+# — the AgentSandbox view is what a customer would see after
+# adopting the blueprint.
+#
+# Egress policy enforcement is provided by the sibling
+# CiliumNetworkPolicy (ciliumnetworkpolicy-sandbox-llm.yaml) — the
+# AgentSandbox's podTemplate stamps an `egress-tier: sandbox` label
+# that the policy's endpointSelector matches, so the composition is
+# complete once both resources are applied to the same namespace.
 apiVersion: custom.agents.x-k8s.io/v1alpha1
 kind: AgentSandbox
 metadata:
@@ -11,15 +17,10 @@ metadata:
 spec:
   image: python:3.12-slim
   runtimeClass: gvisor
-  # iamRoleArn: populated at apply time by walkthrough.sh — same
-  # Bedrock role the standalone demo-agent.yaml consumes.
-  iamRoleArn: ""
-  egressAllowlist:
-    - matchPattern: "bedrock-runtime.*.amazonaws.com"
-    - matchPattern: "sts.*.amazonaws.com"
-    - matchName: "pypi.org"
-    - matchPattern: "*.pypi.org"
-    - matchPattern: "*.pythonhosted.org"
+  # iamRoleArn: set at apply time (walkthrough.sh substitutes the
+  # same Bedrock role the standalone demo-agent.yaml uses via sed
+  # substitution on __BEDROCK_ROLE_ARN__).
+  iamRoleArn: "__BEDROCK_ROLE_ARN__"
   command:
     - /bin/sh
     - -c
