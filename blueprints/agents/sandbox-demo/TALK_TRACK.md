@@ -4,9 +4,11 @@
 **Event**: Get Ahead, Stay Ahead Showcase
 **Presenter**: Brian Hammons (AWS)
 
-Format: 2 min context → 3 min architecture → 5 min live demo → 3 min roadmap → 2 min Q&A.
+Format: 1.5 min context → 2.5 min architecture → 7 min live demo (6 acts) → 2.5 min roadmap → 1.5 min Q&A.
 
 All commands below are pre-loaded in `walkthrough.sh run` — press ENTER between acts rather than typing live.
+
+**Audience**: internal AWS peers. Friendly, engaged, willing to push on design + implementation tradeoffs. The demo's job is to validate the pathway, not to sell the concept — assume agreement on "why" and spend the time on "how" + "what-if."
 
 ---
 
@@ -22,21 +24,21 @@ All commands below are pre-loaded in `walkthrough.sh run` — press ENTER betwee
 
 ---
 
-## 0:00-2:00 — Context
+## 0:00-1:30 — Context
 
-**Opening beat** — "Last showcase I walked through Firecracker as the hardware-isolated sandbox tier. Today I want to zoom out. Agents on Kubernetes is no longer a design discussion — the community shipped, AWS shipped, customers are building on it right now."
+**Opening beat** — "Last showcase I walked through Firecracker as the hardware-isolated sandbox tier. Today I want to zoom out. Agents on Kubernetes is no longer a design discussion — the community shipped, AWS shipped, customers are building on it right now. I'm looking for your feedback on the implementation path — what you'd change, what you'd cut, what you'd want to see next."
 
 **Three anchor facts**:
 
-1. **March 2026 — `agent-sandbox` became a formal SIG Apps subproject.** Sandbox CRD, warm pools, Python SDK. Released under `agents.x-k8s.io/v1alpha1`. v0.4.3 is current.
-2. **April 13, 2026 — Mihnea Spirescu's reference architecture** on AWS Builder Center — first comprehensive EKS reference for this pattern using gVisor + Kata + Firecracker.
-3. **Anthropic's Mythos Preview findings** — frontier models can find and exploit sophisticated vulnerabilities at low cost. Anthropic's own defensive recommendations include running agents in kernel-isolated sandboxes and reviewing PRs with security-aware models. We're operationalizing both on EKS.
+1. **March 2026** — `agent-sandbox` became a formal SIG Apps subproject. v0.4.3 current.
+2. **April 13, 2026** — Mihnea Spirescu's reference architecture on AWS Builder Center — first comprehensive EKS reference for this pattern using gVisor + Kata + Firecracker.
+3. **Anthropic's Mythos Preview** — frontier models can find and exploit sophisticated vulnerabilities at low cost. Defensive recommendations include kernel-isolated agents + security-aware PR review. We're operationalizing both.
 
-**The gap I'm filling**: Mihnea's post explicitly leaves three topics for follow-up — **egress filtering**, **credentials**, and **direct Firecracker control plane**. I'm turning those into a shippable blueprint pair for `awslabs/ai-on-eks`.
+**The gap I'm filling**: Mihnea's post explicitly leaves three topics for follow-up — **egress filtering**, **credentials**, and **direct Firecracker control plane**. I'm turning those into a shippable blueprint pair for `awslabs/ai-on-eks`. Today's demo validates Phase 1 of that.
 
 ---
 
-## 2:00-5:00 — Architecture
+## 1:30-4:00 — Architecture
 
 **Three talking points, slide-backed**:
 
@@ -66,22 +68,22 @@ The customer reality today on **standard EKS** (most real deployments) — you d
 
 - `infra/agent-sandbox/` — cluster + gVisor + agent-sandbox controller + policies
 - `blueprints/agents/sandbox-demo/` — reference Bedrock-backed agent
-- Composition layer via kro — optional `AgentSandbox` single-CR abstraction
+- Composition layer via KRO — `AgentSandbox` single-CR abstraction (live demo, not just a slide)
 
 ---
 
-## 5:00-10:00 — Live demo
+## 4:00-11:00 — Live demo
 
-Drive via `./walkthrough.sh run` in terminal 1, Hubble UI visible in browser.
+Drive via `./walkthrough.sh run` in terminal 1, Hubble UI visible in browser. Six acts, paced tightly — ~7 min total.
 
-### Act 1 (0:30) — "The sandbox is running"
+### Act 1 (0:30) — "Two sandboxes are running, one from three manifests, one from a single CR"
 
 ```bash
 kubectl get sandbox -n agent-sandboxes
 kubectl get pods -n agent-sandboxes -o wide
 ```
 
-**Narration**: "Nothing special about this — it's a pod. What's different is the tier, the policies, the controller lifecycle."
+**Narration**: "Two pods. `sandbox-demo` is the explicit three-manifest version — ServiceAccount, Sandbox, CiliumNetworkPolicy as separate YAMLs. `demo-composed` is the same thing through a single AgentSandbox CR we'll look at in Act 5. Both on gVisor nodes. Both enforced by the same network policy."
 
 ### Act 2 (0:45) — "Confirm it's actually on gVisor"
 
@@ -90,7 +92,7 @@ kubectl describe pod sandbox-demo -n agent-sandboxes | grep -E "Runtime|Node:"
 kubectl get node <node-name> --show-labels
 ```
 
-**Narration**: "The RuntimeClassName is gvisor. The node has the `agent-sandbox/runtime=gvisor` label, which means Karpenter provisioned it from a dedicated NodePool with AL2023 + the gVisor containerd shim installed via user-data. Standard-tier pods won't land here because of the taint."
+**Narration**: "RuntimeClassName is gvisor. Node has `agent-sandbox/runtime=gvisor` — Karpenter provisioned it from a dedicated NodePool with AL2023 + the gVisor containerd shim installed via user-data. Standard-tier pods won't land here because of the NoSchedule taint. Separate pool, separate node lifecycle, separate blast radius."
 
 ### Act 3 (0:45) — "What the policies actually are"
 
@@ -99,11 +101,11 @@ kubectl get ciliumclusterwidenetworkpolicies
 kubectl get ciliumnetworkpolicies -n agent-sandboxes
 ```
 
-**Narration**: "Two layers. Admin tier blocks IMDS and link-local across every pod on the cluster — that's the defense-in-depth floor. App tier is the per-sandbox FQDN allowlist — this sandbox can reach Bedrock, STS, and PyPI. Nothing else."
+**Narration**: "Two layers. Admin tier blocks IMDS + ECS metadata for pods in the agent-sandboxes namespace. App tier is the FQDN allowlist — this sandbox can reach Bedrock, STS, and PyPI. Nothing else. Both policies are scoped to this namespace — a common mistake is to apply an empty endpointSelector on a cluster-wide policy, which flips every pod in the cluster into default-deny including CoreDNS. Been there."
 
-### Act 4 (2:30) — "Run the agent" ← the money shot
+### Act 4 (2:30) — "Run the agent" ← the first money shot
 
-**Narration setup**: "The agent does four things. First, it pip-installs boto3 — exercises the PyPI allow rule. Second, it calls Bedrock Claude — exercises the Bedrock allow rule. Third, Claude generates a Python snippet and the agent executes it inside the sandbox — exercises gVisor syscall isolation. Fourth, it deliberately tries to egress to a non-allowlisted domain — which should fail."
+**Narration setup**: "Four steps. pip-install boto3, exercises PyPI allow. Call Bedrock Claude 4.5 Sonnet, exercises Bedrock allow. Execute the Python snippet Claude generated, exercises gVisor syscall interception. Egress to a non-allowlisted domain, should fail. Watch Hubble."
 
 ```bash
 kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime -- python /workspace/agent.py
@@ -116,17 +118,31 @@ kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime -- python /workspa
 - ~20s in → **red DROP flow** to demo-blocked.example.com:443 — policy-denied
 - Terminal prints PASS/BLOCKED summary
 
-**Narration at the drop**: "There it is. The policy worked. If a model inside one of these sandboxes gets prompt-injected or generates pathological tool calls, this is where it stops."
+**Narration at the drop**: "There it is. If a model inside one of these sandboxes gets prompt-injected or generates pathological tool calls, this is where it stops."
 
-### Act 5 (0:30) — "Recap via Hubble"
+### Act 5 (2:00) — "From three manifests to one via KRO" ← the second money shot
+
+**Narration setup**: "Everything you just saw was three separate resources — ServiceAccount, Sandbox, CiliumNetworkPolicy. That's fine for someone who's already deep in the CRD shapes, but customers adopting this pattern shouldn't have to learn three resource types to ship an agent. We ship a KRO ResourceGraphDefinition that generates a new user-facing CRD — AgentSandbox — that composes the first two."
+
+```bash
+kubectl get rgd
+kubectl get agentsandbox demo-composed -n agent-sandboxes -o yaml | awk '/^spec:/,/^status:/'
+kubectl get sandbox,serviceaccount demo-composed -n agent-sandboxes
+```
+
+**Narration**: "ResourceGraphDefinition says `agent-sandbox` is Active. The AgentSandbox instance is ~15 lines of user-facing YAML — image, runtimeClass, iamRoleArn, command. KRO reconciles it into a ServiceAccount + Sandbox child. The CiliumNetworkPolicy stays as a sibling resource because separating workload from policy is usually what you want — but both sides point at the same `egress-tier: sandbox` label, so they compose cleanly."
+
+"The upstream agent-sandbox project has a `composing-sandbox-nw-policies` example that uses KRO the same way — we're extending that exact pattern with tier selection and IRSA wiring. Not inventing a new abstraction shape."
+
+### Act 6 (0:30) — "Recap via Hubble"
 
 Show the flow map in Hubble UI filtered to the last minute. Point out the three allowed destinations and the one drop.
 
-**Narration**: "Four flows, three allowed, one dropped. That's the demo — agent sandboxed in gVisor, egress filtered by FQDN, observability via Hubble. Everything you just saw is in the ai-on-eks fork — PR coming in the next few weeks."
+**Narration**: "Four flows, three allowed, one dropped. That's the demo. Everything you just saw is in the ai-on-eks fork, branch `feat/agent-sandbox-blueprint` — PR to upstream coming in the next few weeks."
 
 ---
 
-## 10:00-13:00 — Roadmap
+## 11:00-13:30 — Roadmap
 
 **Phase 1 Production** (next 4-6 weeks):
 - Canonicalize what you just saw → merge PR to `awslabs/ai-on-eks`
@@ -143,13 +159,15 @@ Show the flow map in Hubble UI filtered to the last minute. Point out the three 
 - Agent-aware egress component — complements `ApplicationNetworkPolicy` with per-sandbox scoping, time-bounded allowlists, session-identity tagging. Standalone eBPF DaemonSet.
 - Direct Firecracker control plane contribution — closes Mihnea's third follow-up. Upstream contribution to `kubernetes-sigs/agent-sandbox`.
 
-**The kro layer** (across all phases):
-- `AgentSandbox` single-CR composition — pick tier + allowlist + IAM role, get Sandbox + ServiceAccount + CiliumNetworkPolicy. Extends upstream's `composing-sandbox-nw-policies/rgd.yaml`.
-- Production shape for this pattern — give customers the one-CR experience without forcing them into operator development.
+**Specific feedback I want from this room**:
+1. Is `agents/sandbox/` the right blueprint home, or should sandbox + egress be a single blueprint?
+2. Is the KRO dependency a blocker for any AWS customers you work with? (We could ship with a fallback "three manifests" path as the primary, KRO as the opt-in shortcut.)
+3. For Phase 2 credentials — is LiteLLM the right proxy layer, or should we build on something else?
+4. Any customers you'd introduce me to for allowlist-template validation?
 
 ---
 
-## 13:00-15:00 — Q&A
+## 13:30-15:00 — Q&A
 
 **Anticipated questions**:
 

@@ -119,7 +119,10 @@ phase_setup() {
 }
 
 phase_run() {
-    banner "Act 1: The sandbox is already running, let's look at it"
+    banner "Act 1: The sandboxes are already running, let's look at them"
+    echo "Two sandboxes are running — one created from three separate"
+    echo "manifests, one composed from a single AgentSandbox CR via KRO."
+    echo ""
     echo "Command: kubectl get sandbox -n agent-sandboxes"
     kubectl get sandbox -n $NS
     echo ""
@@ -127,7 +130,7 @@ phase_run() {
     kubectl get pods -n $NS -o wide
     pause
 
-    banner "Act 2: Confirm this is actually running on gVisor"
+    banner "Act 2: Confirm these are actually running on gVisor"
     echo "Command: kubectl describe pod sandbox-demo -n agent-sandboxes | grep -E 'Runtime|Node:'"
     kubectl describe pod sandbox-demo -n $NS | grep -E "Runtime|Node:"
     echo ""
@@ -136,7 +139,7 @@ phase_run() {
     pause
 
     banner "Act 3: Show the network policies that are enforced"
-    echo "Cluster-wide (admin tier — blocks IMDS + link-local for every pod):"
+    echo "Cluster-wide (admin tier — blocks IMDS for agent-sandboxes pods):"
     echo "Command: kubectl get ciliumclusterwidenetworkpolicies"
     kubectl get ciliumclusterwidenetworkpolicies
     echo ""
@@ -159,7 +162,37 @@ phase_run() {
     kubectl exec -n $NS sandbox-demo -c agent-runtime -- python /workspace/agent.py
     pause
 
-    banner "Act 5: Recap via Hubble flow map"
+    banner "Act 5: From three manifests to one — KRO composition"
+    echo "Everything you just saw was three separate resources:"
+    echo "  - ServiceAccount with IRSA annotation"
+    echo "  - Sandbox (agents.x-k8s.io) with gVisor runtime class"
+    echo "  - CiliumNetworkPolicy with the FQDN allowlist"
+    echo ""
+    echo "We ship a KRO ResourceGraphDefinition that generates a new"
+    echo "user-facing CRD — AgentSandbox — that composes the first two"
+    echo "(the CiliumNetworkPolicy stays separate for policy-vs-workload"
+    echo "separation of concerns)."
+    echo ""
+    echo "Command: kubectl get rgd"
+    kubectl get rgd
+    pause
+    echo ""
+    echo "Here's the one-CR AgentSandbox that produced the demo-composed pod:"
+    echo ""
+    echo "Command: kubectl get agentsandbox demo-composed -n agent-sandboxes -o yaml | grep -A 20 '^spec:'"
+    kubectl get agentsandbox demo-composed -n $NS -o yaml 2>&1 | awk '/^spec:/,/^status:/' | head -15
+    pause
+    echo ""
+    echo "And the children KRO materialized from it:"
+    echo ""
+    echo "Command: kubectl get sandbox,serviceaccount demo-composed -n agent-sandboxes"
+    kubectl get sandbox,serviceaccount demo-composed -n $NS
+    echo ""
+    echo "Same gVisor isolation. Same IRSA wiring. Same pod Running."
+    echo "~15 lines of user-facing YAML instead of ~150."
+    pause
+
+    banner "Act 6: Recap via Hubble flow map"
     echo "In Hubble UI, filter to namespace=agent-sandboxes"
     echo "Expected flows:"
     echo "  - ALLOWED to bedrock-runtime.us-east-1.amazonaws.com:443"
@@ -170,30 +203,22 @@ phase_run() {
 }
 
 phase_kro_demo() {
-    banner "Stretch: KRO AgentSandbox composite CRD"
-    echo "The blueprint ships a kro ResourceGraphDefinition that turns"
-    echo "this three-manifest demo (ServiceAccount + Sandbox + CiliumNetworkPolicy)"
-    echo "into a single-CR AgentSandbox abstraction. Customers who adopt it"
-    echo "write one YAML instead of three."
+    # Legacy standalone KRO act — retained for deep-dive sessions or
+    # when the showcase pacing can't fit Act 5 inline. The main `run`
+    # phase now includes KRO as Act 5.
+    banner "KRO AgentSandbox composite CRD (deep-dive)"
+    echo "This runs the same content as Act 5 in 'walkthrough.sh run',"
+    echo "but as a standalone invocation for deeper inspection or for"
+    echo "rehearsals that focus specifically on the composition story."
     echo ""
     echo "Command: kubectl get rgd"
-    kubectl get rgd 2>&1 | head -5
-    echo ""
+    kubectl get rgd
     pause
-    echo "The RGD defines an AgentSandbox CRD with runtimeClass + iamRoleArn"
-    echo "+ image + command fields. Here's the one-CR instance:"
-    echo ""
-    echo "Command: kubectl get agentsandbox -n agent-sandboxes -o yaml"
+    echo "AgentSandbox instance:"
     kubectl get agentsandbox demo-composed -n $NS -o yaml 2>&1 | head -30
     pause
-    echo "...and the child resources KRO composes from it:"
-    echo ""
-    echo "Command: kubectl get sandbox,serviceaccount demo-composed -n agent-sandboxes"
-    kubectl get sandbox,serviceaccount demo-composed -n $NS 2>&1
-    echo ""
-    echo "Same gVisor runtime, same IRSA wiring, same egress policy"
-    echo "(the CiliumNetworkPolicy is a sibling that matches via label)"
-    echo "— but written as ~15 lines of YAML instead of ~150."
+    echo "Composed children:"
+    kubectl get sandbox,serviceaccount demo-composed -n $NS
 }
 
 phase_cleanup() {

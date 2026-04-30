@@ -85,42 +85,37 @@ If any step fails, debug via the TROUBLESHOOTING section below. **Don't start th
 
 ## T-0 — Showtime execution
 
-### 18:00 — Opening (2 min)
+### 18:00 — Opening (1.5 min)
 
-Follow TALK_TRACK.md §0:00-2:00 context. Keep the laptop presenting slides; kubectl is idle.
+Follow TALK_TRACK.md §0:00-1:30 context. Keep the laptop presenting slides; kubectl is idle.
 
-### 18:02 — Architecture (3 min)
+### 18:01:30 — Architecture (2.5 min)
 
-TALK_TRACK.md §2:00-5:00. Still slides.
+TALK_TRACK.md §1:30-4:00. Still slides.
 
-### 18:05 — Live demo (5 min)
+### 18:04:00 — Live demo (7 min)
 
 Switch to Terminal 1. Pre-loaded command: `./walkthrough.sh run`
 
-The script will:
-1. Show Sandbox + pod (press ENTER)
+The script walks 6 acts:
+1. Show both sandboxes + pods (press ENTER)
 2. Confirm gVisor runtime + node (press ENTER)
-3. List policies (press ENTER)
-4. Run the agent (press ENTER to start, then wait for script output — ~20s)
-5. Recap via Hubble UI (manual switch to browser)
+3. List policies, narrate narrow-scoping lesson (press ENTER)
+4. Run the agent — wait for script output ~20s (press ENTER to start)
+5. KRO composition walkthrough — RGD + AgentSandbox + children (press ENTER 3 times)
+6. Recap via Hubble UI (manual switch to browser)
 
 **Hubble narration** during act 4: point at the green flows for `bedrock-runtime.*` + `pypi.org`, and the DROP flow for `demo-blocked.example.com` when it appears (~20s into agent run).
 
-### 18:10 — Roadmap (3 min)
+**Act 5 pacing**: the three KRO commands (rgd, agentsandbox spec, composed children) each get ~30s of narration. Don't rush — this is the composition story most customers will care about.
 
-TALK_TRACK.md §10:00-13:00.
+### 18:11:00 — Roadmap + ask for feedback (2.5 min)
 
-**If time permits and energy is high**: run the KRO stretch. Terminal 1:
+TALK_TRACK.md §11:00-13:30. Four specific feedback prompts at the end — explicitly named so the audience knows when to engage.
 
-```bash
-./walkthrough.sh kro
-```
+### 18:13:30 — Q&A (1.5 min)
 
-Shows the ResourceGraphDefinition + the one-CR AgentSandbox instance + the composed children. Contrasts the "three YAMLs" story with the "one YAML" story.
-
-### 18:13 — Q&A (2 min)
-
-TALK_TRACK.md §13:00-15:00 for anticipated questions.
+TALK_TRACK.md §13:30-15:00 for anticipated questions.
 
 ---
 
