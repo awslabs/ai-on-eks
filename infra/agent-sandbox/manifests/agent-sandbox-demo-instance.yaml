@@ -1,0 +1,26 @@
+# One-CR AgentSandbox demonstrating the KRO composition. Creates a
+# ServiceAccount + Sandbox + CiliumNetworkPolicy from a single declarative
+# unit. Contrast this with demo-agent.yaml which stages all three
+# primitives explicitly — the AgentSandbox view is what a customer
+# would see after adopting the blueprint.
+apiVersion: custom.agents.x-k8s.io/v1alpha1
+kind: AgentSandbox
+metadata:
+  name: demo-composed
+  namespace: agent-sandboxes
+spec:
+  image: python:3.12-slim
+  runtimeClass: gvisor
+  # iamRoleArn: populated at apply time by walkthrough.sh — same
+  # Bedrock role the standalone demo-agent.yaml consumes.
+  iamRoleArn: ""
+  egressAllowlist:
+    - matchPattern: "bedrock-runtime.*.amazonaws.com"
+    - matchPattern: "sts.*.amazonaws.com"
+    - matchName: "pypi.org"
+    - matchPattern: "*.pypi.org"
+    - matchPattern: "*.pythonhosted.org"
+  command:
+    - /bin/sh
+    - -c
+    - "sleep infinity"

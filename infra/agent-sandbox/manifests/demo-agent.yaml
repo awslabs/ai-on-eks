@@ -1,0 +1,122 @@
+# Demo agent — direct Sandbox resource (not a SandboxClaim against the
+# gVisor template) because the demo wants the full spec visible in one
+# file for narration. Production workloads would consume the template
+# via SandboxClaim; both patterns are supported by the upstream
+# controller.
+#
+# Expected flow during the showcase:
+#   1. Apply this file + the ConfigMap that carries agent.py.
+#   2. Sandbox controller creates the pod on a gVisor node.
+#   3. Demo operator runs:
+#        kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime \
+#            -- python /workspace/agent.py
+#      ...which walks the four-step flow (install, Bedrock call,
+#      execute, blocked-egress) and prints PASS/BLOCKED outcomes.
+#
+# IAM: the ServiceAccount picks up Bedrock permissions via EKS Pod
+# Identity (configured by install.sh before this manifest applies).
+# The role ARN is templated and substituted at apply time.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-demo-agent
+  namespace: agent-sandboxes
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sandbox-demo-agent-script
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: demo-agent
+data:
+  # Actual contents populated by install.sh via
+  #   kubectl create configmap --from-file=agent.py=...
+  # This placeholder keeps the manifest self-contained for review.
+  agent.py: "# populated by install.sh from blueprints/agents/sandbox-demo/agent.py"
+---
+apiVersion: agents.x-k8s.io/v1alpha1
+kind: Sandbox
+metadata:
+  name: sandbox-demo
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: demo
+    agent-sandbox/tier: gvisor
+spec:
+  podTemplate:
+    metadata:
+      labels:
+        # This label is what the CiliumNetworkPolicy selector matches
+        # — sandbox pods without it don't get the FQDN allowlist.
+        egress-tier: sandbox
+        agent-sandbox/tier: gvisor
+    spec:
+      serviceAccountName: sandbox-demo-agent
+      runtimeClassName: gvisor
+      tolerations:
+        - key: agent-sandbox/runtime
+          operator: Equal
+          value: gvisor
+          effect: NoSchedule
+      containers:
+        - name: agent-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/agent.py /workspace/agent.py
+              chmod +x /workspace/agent.py
+              echo "sandbox ready"
+              echo "run: kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime -- python /workspace/agent.py"
+              sleep infinity
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_MODEL_ID
+              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+            # Override HOME so pip install --user has a writable
+            # target. readOnlyRootFilesystem means /.local (the
+            # default $HOME when uid=1000 isn't in /etc/passwd) is
+            # not writable; /workspace is an emptyDir.
+            - name: HOME
+              value: /workspace
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            # Read-only root FS + writable /workspace + /tmp. pip
+            # install --user writes to ~/.local which is in /workspace
+            # via HOME=/workspace below.
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: agent-script
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: agent-script
+          configMap:
+            name: sandbox-demo-agent-script
+            items:
+              - key: agent.py
+                path: agent.py

@@ -1,0 +1,74 @@
+# Cluster-wide admin-tier egress policy.
+#
+# Purpose: block the two egress primitives that survive even a
+# compromised sandbox — EC2 IMDS (169.254.169.254) and link-local.
+# Per SPEC §3.1, sandbox tiers are defense-in-depth; the admin tier
+# is the "even if the sandbox escapes namespace isolation" floor.
+#
+# Scoping: targets the agent-sandboxes namespace ONLY, even though
+# this is a Cluster-wide resource. Broader scoping (empty endpoint
+# selector) would default-deny egress for every pod in the cluster
+# — including CoreDNS, Hubble, and the agent-sandbox controller
+# itself — because adding a deny rule flips that endpoint into
+# Cilium's default-deny mode. Keep the admin tier narrowly focused
+# on the sandboxes themselves.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: admin-block-imds
+  labels:
+    agent-sandbox/tier: admin
+spec:
+  description: "Deny EC2 IMDS and link-local from agent-sandboxes namespace pods. Defense-in-depth floor for sandboxed workloads."
+  endpointSelector:
+    matchLabels:
+      k8s:io.kubernetes.pod.namespace: agent-sandboxes
+  egressDeny:
+    - toCIDR:
+        # Block EC2 IMDS specifically. ECS task metadata (169.254.170.2)
+        # isn't relevant on EKS pods but block it defensively. Keep
+        # the rest of the link-local range (169.254.170.0/24)
+        # reachable because EKS Pod Identity uses 169.254.170.23 for
+        # its credential vending endpoint — blocking the /16 would
+        # break IRSA-less auth inside the sandbox.
+        - 169.254.169.254/32  # EC2 Instance Metadata Service v1/v2
+        - 169.254.170.2/32    # ECS task metadata
+---
+# DNS must remain reachable for agent-sandboxes pods so FQDN-based
+# allow rules can resolve hostnames into IP decisions. Without this,
+# the FQDN allowlist in ciliumnetworkpolicy-sandbox-llm.yaml never
+# matches because DNS lookups themselves are blocked before the
+# allow rule runs.
+#
+# Note the narrow scoping — same as admin-block-imds above. A
+# broader selector would flip every cluster pod into Cilium
+# default-deny, breaking CoreDNS and controller-plane pods that
+# never opted into policy enforcement.
+apiVersion: cilium.io/v2
+kind: CiliumClusterwideNetworkPolicy
+metadata:
+  name: admin-allow-cluster-dns
+  labels:
+    agent-sandbox/tier: admin
+spec:
+  description: "Allow agent-sandboxes pods to reach cluster DNS (kube-dns) for FQDN resolution."
+  endpointSelector:
+    matchLabels:
+      k8s:io.kubernetes.pod.namespace: agent-sandboxes
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"  # Admin tier: allow any FQDN lookup.
+                                    # App-tier policies restrict which
+                                    # lookups are actionable via
+                                    # toFQDNs.

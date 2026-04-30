@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-sandboxes
+  labels:
+    # Labels consumed by the CiliumClusterwideNetworkPolicy admin
+    # tier — this namespace is the sandbox execution surface, so
+    # default-deny + FQDN allowlist rules target it explicitly.
+    agent-sandbox/role: runtime
+    # Cilium pod-selector shorthand — every sandbox pod inherits
+    # this label via the SandboxTemplate podTemplate.metadata.labels
+    # so per-sandbox CiliumNetworkPolicies can match pods without
+    # reaching into the sandbox-name string.
+    egress-tier: sandbox
