@@ -169,6 +169,33 @@ phase_run() {
     echo "End of live demo. Switch to Phase 2+3 preview slides."
 }
 
+phase_kro_demo() {
+    banner "Stretch: KRO AgentSandbox composite CRD"
+    echo "The blueprint ships a kro ResourceGraphDefinition that turns"
+    echo "this three-manifest demo (ServiceAccount + Sandbox + CiliumNetworkPolicy)"
+    echo "into a single-CR AgentSandbox abstraction. Customers who adopt it"
+    echo "write one YAML instead of three."
+    echo ""
+    echo "Command: kubectl get rgd"
+    kubectl get rgd 2>&1 | head -5
+    echo ""
+    pause
+    echo "The RGD defines an AgentSandbox CRD with runtimeClass + iamRoleArn"
+    echo "+ image + command fields. Here's the one-CR instance:"
+    echo ""
+    echo "Command: kubectl get agentsandbox -n agent-sandboxes -o yaml"
+    kubectl get agentsandbox demo-composed -n $NS -o yaml 2>&1 | head -30
+    pause
+    echo "...and the child resources KRO composes from it:"
+    echo ""
+    echo "Command: kubectl get sandbox,serviceaccount demo-composed -n agent-sandboxes"
+    kubectl get sandbox,serviceaccount demo-composed -n $NS 2>&1
+    echo ""
+    echo "Same gVisor runtime, same IRSA wiring, same egress policy"
+    echo "(the CiliumNetworkPolicy is a sibling that matches via label)"
+    echo "— but written as ~15 lines of YAML instead of ~150."
+}
+
 phase_cleanup() {
     banner "Cleanup (between rehearsals only — not during live demo)"
     kubectl delete -f "$INFRA_DIR/manifests/demo-agent.yaml" --ignore-not-found
@@ -179,12 +206,13 @@ phase_cleanup() {
 }
 
 case "$PHASE" in
-    setup)    phase_setup   ;;
-    run)      phase_run     ;;
-    cleanup)  phase_cleanup ;;
+    setup)    phase_setup    ;;
+    run)      phase_run      ;;
+    kro)      phase_kro_demo ;;
+    cleanup)  phase_cleanup  ;;
     *)
         echo "Unknown phase: $PHASE"
-        echo "Valid phases: setup | run | cleanup"
+        echo "Valid phases: setup | run | kro | cleanup"
         exit 1
         ;;
 esac
