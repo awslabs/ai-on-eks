@@ -17,9 +17,10 @@ metadata:
 spec:
   image: python:3.12-slim
   runtimeClass: gvisor
-  # iamRoleArn: set at apply time (walkthrough.sh substitutes the
-  # same Bedrock role the standalone demo-agent.yaml uses via sed
-  # substitution on __BEDROCK_ROLE_ARN__).
+  # iamRoleArn: replaced at apply time via sed substitution on
+  # __BEDROCK_ROLE_ARN__. Point at the same IAM role as the
+  # standalone demo-agent.yaml — IRSA trust policy must include
+  # system:serviceaccount:agent-sandboxes:demo-composed.
   iamRoleArn: "__BEDROCK_ROLE_ARN__"
   command:
     - /bin/sh

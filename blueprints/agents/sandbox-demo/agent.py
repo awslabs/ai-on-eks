@@ -1,7 +1,7 @@
-"""Reference Bedrock agent for the agent-sandbox-on-EKS showcase.
+"""Reference Bedrock agent for the agent-sandbox-on-EKS blueprint.
 
-Runs inside a gVisor Sandbox pod. Exercises four paths during the
-demo so the isolation + egress story is visible end-to-end:
+Runs inside a gVisor Sandbox pod. Exercises four paths so the
+isolation + egress story is visible end-to-end:
 
   1. Bedrock call (allowed by ciliumnetworkpolicy-sandbox-llm.yaml) —
      the model generates a small Python snippet.
@@ -11,14 +11,13 @@ demo so the isolation + egress story is visible end-to-end:
      the host kernel).
   3. Allowed egress follow-up — the agent pip-installs `requests`
      from PyPI as a second allowed-domain call.
-  4. Blocked egress attempt — the agent curls
+  4. Blocked egress attempt — the agent requests
      `demo-blocked.example.com`, which is NOT on the allowlist.
-     Hubble shows this as a DROP flow, the narrator highlights it
-     as the "here's the boundary holding" moment.
+     Hubble shows this as a DROP flow.
 
 Each path's result is printed to stdout with a clear prefix
-(``PASS:``, ``BLOCKED:``, ``ERROR:``) so the demo log-tail is
-legible even to viewers who can't see the terminal clearly.
+(``PASS:``, ``BLOCKED:``, ``ERROR:``) so the output log is
+legible and machine-parseable (see `conformance.sh`).
 
 Environment variables:
   BEDROCK_MODEL_ID  — defaults to Claude Sonnet 4 in us-east-1
@@ -101,9 +100,9 @@ def call_bedrock(prompt: str) -> str | None:
 def try_egress(url: str, label: str) -> None:
     """Attempt an HTTPS GET against the URL. Prints PASS or BLOCKED
     based on the outcome. Uses a short timeout so blocked calls
-    don't stall the demo waiting for the ciliumnetworkpolicy drop
-    to take effect (DROP with TCP RST is near-instant, but the
-    timeout floor handles the non-RST case too)."""
+    don't stall waiting for the ciliumnetworkpolicy drop to take
+    effect (DROP with TCP RST is near-instant, but the timeout
+    floor handles the non-RST case too)."""
     print(f"Attempting egress to {url} ({label})...")
     try:
         req = urllib.request.Request(
@@ -224,7 +223,7 @@ def main() -> int:
 
     step("Step 4: Attempt egress to a BLOCKED domain")
     # This should get denied by the CiliumNetworkPolicy. Hubble shows
-    # the DROP flow with reason "policy-denied". Demo money shot.
+    # the DROP flow with reason "policy-denied".
     try_egress("https://demo-blocked.example.com/", "NOT on allowlist")
 
     step("Demo complete")
