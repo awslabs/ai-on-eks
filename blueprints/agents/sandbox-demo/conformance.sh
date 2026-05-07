@@ -50,39 +50,58 @@ require_cluster() {
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; run 'infra/agent-sandbox/install.sh sandbox'"
 }
 
-setup_configmap() {
-    log "Installing agent.py into ConfigMap..."
-    kubectl -n "$NS" delete configmap sandbox-demo-agent-script --ignore-not-found >/dev/null
+setup_configmap_with_real_agent() {
+    # demo-agent.yaml embeds a ConfigMap with a placeholder agent.py.
+    # We apply demo-agent.yaml first (which creates the SA + placeholder
+    # ConfigMap + Sandbox), then overwrite the ConfigMap with the real
+    # agent.py contents, then bounce the pod so the container's
+    # startup `cp /config/agent.py /workspace/agent.py` picks up the
+    # real content. This order avoids races where the placeholder
+    # content is copied into /workspace and sticks there.
+    log "Applying Sandbox manifest (creates SA + placeholder ConfigMap + Sandbox)..."
+    kubectl apply -f "$INFRA_DIR/manifests/demo-agent.yaml" >/dev/null
+
+    log "Replacing placeholder ConfigMap with real agent.py contents..."
     kubectl -n "$NS" create configmap sandbox-demo-agent-script \
-        --from-file=agent.py="$SCRIPT_DIR/agent.py" >/dev/null
+        --from-file=agent.py="$SCRIPT_DIR/agent.py" \
+        --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+
+    # Force pod recreation so the container's one-shot `cp` at
+    # startup reads the real ConfigMap content.
+    log "Recreating Sandbox pod so it mounts the real agent.py..."
+    kubectl -n "$NS" delete pod "$POD" --ignore-not-found --wait=true >/dev/null 2>&1 || true
 }
 
-setup_pod_identity() {
-    log "Checking Pod Identity association for ServiceAccount $SA..."
-    local existing
-    existing=$(aws eks list-pod-identity-associations \
-        --cluster-name "$CLUSTER_NAME" \
-        --namespace "$NS" \
-        --service-account "$SA" \
-        --region "$REGION" \
-        --query 'associations[0].associationId' \
-        --output text 2>/dev/null || true)
-    if [ -n "$existing" ] && [ "$existing" != "None" ]; then
-        log "Pod Identity association already exists: $existing"
-        return 0
+setup_irsa_annotation() {
+    # IRSA wiring — annotate the ServiceAccount with the IAM role ARN
+    # so the EKS admission controller injects AWS_WEB_IDENTITY_TOKEN_FILE
+    # + AWS_ROLE_ARN into the Sandbox pod.
+    #
+    # gVisor's Sentry network namespace doesn't forward the link-local
+    # route to 169.254.170.23, so EKS Pod Identity doesn't work for
+    # sandboxes on the gVisor tier. IRSA routes through STS over the
+    # regular network path (covered by the Cilium FQDN allowlist) and
+    # works transparently.
+    #
+    # Environment variables expected:
+    #   BEDROCK_ROLE_ARN  — IAM role ARN with bedrock:InvokeModel +
+    #                       IRSA trust policy allowing the cluster's
+    #                       OIDC provider for
+    #                       system:serviceaccount:agent-sandboxes:sandbox-demo-agent
+    log "Ensuring ServiceAccount $SA exists + has IRSA annotation..."
+    if ! kubectl -n "$NS" get serviceaccount "$SA" >/dev/null 2>&1; then
+        kubectl -n "$NS" create serviceaccount "$SA" >/dev/null
     fi
-    log "Creating Pod Identity association..."
-    aws eks create-pod-identity-association \
-        --cluster-name "$CLUSTER_NAME" \
-        --namespace "$NS" \
-        --service-account "$SA" \
-        --role-arn "$BEDROCK_ROLE_ARN" \
-        --region "$REGION" >/dev/null
+    kubectl annotate serviceaccount "$SA" -n "$NS" \
+        "eks.amazonaws.com/role-arn=$BEDROCK_ROLE_ARN" \
+        --overwrite >/dev/null
 }
 
 wait_for_pod() {
-    log "Applying Sandbox + waiting for pod Ready (up to 5 min)..."
-    kubectl apply -f "$INFRA_DIR/manifests/demo-agent.yaml" >/dev/null
+    log "Waiting for Sandbox pod Ready (up to 5 min)..."
+    # Sandbox controller recreates the pod after our delete; give it
+    # a moment to spawn a fresh one before waiting on Ready.
+    sleep 5
     if ! kubectl -n "$NS" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null; then
         kubectl -n "$NS" describe "pod/$POD" >&2
         fail "Sandbox pod did not become Ready within 5 min"
@@ -124,18 +143,25 @@ run_agent_and_validate() {
 }
 
 cleanup() {
+    # Default: leave the sandbox running so repeat conformance runs
+    # are fast (no re-provisioning gVisor nodes). Pass CLEANUP=1 to
+    # tear down the demo resources on exit.
+    if [ "${CLEANUP:-0}" != "1" ]; then
+        log "Leaving Sandbox + ConfigMap in place (set CLEANUP=1 to remove)."
+        return 0
+    fi
     log "Removing test-run resources (Sandbox pod + ConfigMap)..."
     kubectl delete -f "$INFRA_DIR/manifests/demo-agent.yaml" --ignore-not-found >/dev/null 2>&1 || true
     kubectl -n "$NS" delete configmap sandbox-demo-agent-script --ignore-not-found >/dev/null 2>&1 || true
-    log "Cleanup complete. Pod Identity association + IAM role retained for re-runs."
+    log "Cleanup complete. IAM role + IRSA annotation retained for re-runs."
 }
 
 main() {
     trap cleanup EXIT
     require_env
     require_cluster
-    setup_configmap
-    setup_pod_identity
+    setup_irsa_annotation
+    setup_configmap_with_real_agent
     wait_for_pod
     assert_runtime_class
     assert_policies_valid

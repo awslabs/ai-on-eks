@@ -7,7 +7,7 @@ Use this as a working example to build your own agent against the blueprint, or 
 ## Prerequisites
 
 - The `infra/agent-sandbox/` blueprint installed: run `../../../infra/agent-sandbox/install.sh` from a clone of the repo.
-- An IAM role with `bedrock:InvokeModel` for the target Claude model and a trust policy that allows EKS Pod Identity. See `../../../infra/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json` and `iam-bedrock-permissions.template.json` for starting points.
+- An IAM role with `bedrock:InvokeModel` for the target Claude model and a trust policy that allows IRSA (the cluster's OIDC provider, for `system:serviceaccount:agent-sandboxes:sandbox-demo-agent`). See `../../../infra/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json` and `iam-bedrock-permissions.template.json` for starting points.
 - `kubectl` configured against the cluster (`aws eks update-kubeconfig --name agent-sandbox --region us-east-1`).
 
 ## What the agent does
@@ -35,13 +35,12 @@ Step 4 (blocked egress):  BLOCKED
 ### Interactive run (one-off)
 
 ```bash
-# 1. Create the Pod Identity association (one time per cluster).
-aws eks create-pod-identity-association \
-    --cluster-name agent-sandbox \
-    --namespace agent-sandboxes \
-    --service-account sandbox-demo-agent \
-    --role-arn arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
-    --region us-east-1
+# 1. Annotate the ServiceAccount with the IAM role for IRSA (one time
+#    per cluster — the annotation persists across pod rebuilds).
+kubectl create serviceaccount sandbox-demo-agent -n agent-sandboxes --dry-run=client -o yaml | kubectl apply -f -
+kubectl annotate serviceaccount sandbox-demo-agent -n agent-sandboxes \
+    eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
+    --overwrite
 
 # 2. Install the agent script into a ConfigMap the Sandbox mounts.
 kubectl -n agent-sandboxes create configmap sandbox-demo-agent-script \
@@ -72,7 +71,16 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
     ./conformance.sh
 ```
 
-The script registers its own cleanup trap — the Sandbox pod and ConfigMap are removed on exit regardless of pass/fail. Pod Identity association + IAM role are retained for re-runs.
+The script registers its own cleanup trap — by default it leaves the Sandbox pod + ConfigMap in place so repeat conformance runs are fast (no re-provisioning gVisor nodes). Pass `CLEANUP=1` to remove the demo resources on exit:
+
+```bash
+CLUSTER_NAME=agent-sandbox \
+BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
+CLEANUP=1 \
+    ./conformance.sh
+```
+
+IAM role + IRSA annotation are retained in both modes.
 
 ## Files
 
@@ -96,7 +104,7 @@ To use this pattern for your own agent:
 ## Troubleshooting
 
 - **`PASS: boto3 installed` missing** — Cilium policy isn't permitting PyPI. Check `kubectl -n agent-sandboxes get ciliumnetworkpolicy sandbox-llm-allowlist` is `Valid=True` and the `toFQDNs` list includes `pypi.org` + `files.pythonhosted.org`.
-- **Bedrock `AccessDeniedException`** — Pod Identity association is missing or the IAM role lacks `bedrock:InvokeModel`. Run `aws eks list-pod-identity-associations --cluster-name agent-sandbox --namespace agent-sandboxes --service-account sandbox-demo-agent`.
+- **Bedrock `AccessDeniedException`** — IRSA annotation is missing or the IAM role lacks `bedrock:InvokeModel`. Check with `kubectl get sa sandbox-demo-agent -n agent-sandboxes -o yaml | grep role-arn` and confirm the role's trust policy allows the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-demo-agent`.
 - **Bedrock `ResourceNotFoundException` with "Legacy" in the message** — the target model hasn't been invoked in 30+ days. Either invoke it once manually from the AWS console or update `BEDROCK_MODEL_ID` in `agent.py` to a currently-active model.
 - **`BLOCKED: https://demo-blocked.example.com/` missing** — the blocked step isn't being reached; check earlier steps for errors.
 - **Step 4 unexpectedly PASSes** — the FQDN policy isn't enforcing. Confirm Cilium chaining took effect: `kubectl -n kube-system exec ds/cilium -- cilium status | grep Enforcement` should show "Policy Enforcement: Default".
