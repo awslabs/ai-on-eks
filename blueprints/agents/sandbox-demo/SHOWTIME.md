@@ -2,7 +2,7 @@
 
 Demo-day operational checklist. Not a rewrite of TALK_TRACK.md — that's content, this is pre-flight.
 
-**Target show time**: Thursday April 30, 2026 @ 18:00 local
+**Target show time**: Thursday May 7, 2026 @ 18:00 local *(rescheduled from April 30)*
 
 ---
 
@@ -187,6 +187,18 @@ Rehearsed fallback: **apologize briefly, switch to slides**, show pre-captured s
 Pre-captured artifacts to have ready:
 - Screenshot of Hubble UI showing the green + red flows (capture one before showtime)
 - Screenshot of the walkthrough.sh rehearsal terminal output
+
+---
+
+## Multi-day demo preservation (if the demo slips or reschedules)
+
+**Observed pattern — April 30 → May 7**: Original showcase slot moved by 7 days. Cluster + demo artifacts were preserved across the window with minimal intervention. Notes for future multi-day holds:
+
+- **Karpenter NodePool `expireAfter: 24h` does cycle nodes** — the original gVisor node (April 30) was replaced by a fresh one ~6 days in. Both demo pods (`sandbox-demo`, `demo-composed`) survived the cycle because Karpenter won't disrupt actively-running workloads; only empty nodes get consolidated. Verified May 7: both pods had 22h uptime on a 22h-old node.
+- **Port-forwards die quickly** — the Hubble UI port-forward from the build session won't survive a laptop sleep or network change. Treat it as a fresh start for every demo session (`kubectl port-forward -n kube-system svc/hubble-ui 12000:80`).
+- **Re-verify the agent run before demo** — one full `kubectl exec ... python /workspace/agent.py` immediately validates everything: IRSA env vars, Bedrock model ID, Cilium FQDN allowlist, gVisor runtime, DNS resolution. If any of those drifted, this single command catches it.
+- **AWS credentials can expire** — run `aws sts get-caller-identity` as part of the T-30 pre-flight if the cluster has sat idle for multiple days.
+- **The AI-on-EKS IaC pattern is collapse-and-rebuild friendly** — if a multi-day window stretches further (e.g., 2+ weeks) and preservation becomes costly, `./cleanup.sh` + re-running `./install.sh all` takes ~30 minutes. Preservation is a cost-vs-convenience call, not a hard requirement.
 
 ---
 
