@@ -2,10 +2,19 @@
 # Agent Sandbox blueprint installer.
 #
 # Installs an EKS cluster with Karpenter plus the Kubernetes SIG-Apps
-# agent-sandbox operator, two sandbox isolation tiers (standard + gVisor),
-# and chained Cilium for FQDN egress. Matches the existing blueprint
-# pattern: copies the shared base into a local directory, runs its
-# install, then layers agent-sandbox-specific manifests on top.
+# agent-sandbox operator and two sandbox isolation tiers (standard +
+# gVisor). Matches the existing blueprint pattern: copies the shared
+# base into a local directory, runs its install, then layers
+# agent-sandbox-specific manifests on top.
+#
+# This blueprint covers the sandbox runtime only — egress enforcement
+# is a separate concern addressed by two sibling blueprints:
+#   infra/agent-egress-chained/  — VPC CNI + Cilium chaining, available
+#                                  on Standard EKS today.
+#   infra/agent-egress-native/   — ApplicationNetworkPolicy via VPC CNI,
+#                                  available on EKS Auto Mode today.
+# Install agent-sandbox first, then install one of the egress
+# blueprints against the same cluster.
 #
 # Usage (full install):
 #   cd infra/agent-sandbox
@@ -13,9 +22,9 @@
 #
 # Usage (phased — useful when iterating on manifests):
 #   ./install.sh cluster    # Base EKS cluster only (20-30 min)
-#   ./install.sh cilium     # + Cilium chaining + Hubble
 #   ./install.sh sandbox    # + SIG-Apps agent-sandbox controller
-#   ./install.sh manifests  # + RuntimeClass, SandboxTemplates, NetworkPolicies
+#   ./install.sh manifests  # + RuntimeClass, NodePool, SandboxTemplates
+#   ./install.sh kro        # + KRO + AgentSandbox RGD (optional)
 #
 # Each phase is idempotent; running `./install.sh manifests` after a
 # full `./install.sh` just re-applies manifests. Useful when
@@ -53,57 +62,9 @@ install_cluster() {
     kubectl get nodes
 }
 
-install_cilium() {
-    echo ""
-    echo "=== Phase 2: Installing Cilium (chaining mode) + Hubble ==="
-    helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
-    helm repo update cilium
-    # Chaining mode: VPC CNI keeps allocating pod IPs + setting up the
-    # veth pair, Cilium runs as a meta-plugin attaching eBPF programs
-    # on top. Hubble is bundled for flow observability.
-    #
-    # Critical chaining-mode settings that Cilium's Helm defaults get
-    # wrong if you don't set them explicitly:
-    #   - ipam.mode=cluster-pool (Cilium default) + a pod CIDR that
-    #     doesn't collide with the VPC. In aws-cni chaining mode,
-    #     this CIDR is NOT used for pod IPs (VPC CNI allocates those)
-    #     — it's only for Cilium's per-node `cilium_host` interface
-    #     that lives in the host network namespace. Use 10.100.0.0/16
-    #     which is outside both our primary VPC CIDR (10.0.0.0/16)
-    #     and the secondary (100.64.0.0/16).
-    #     The ipam.mode=kubernetes alternative needs every Node to
-    #     have spec.podCIDR populated, which EKS does not do.
-    #     The ipam.mode=delegated-plugin alternative needs per-node
-    #     local-router-ipv4 annotation, which is too intricate for
-    #     this blueprint.
-    #   - routingMode=native — no encapsulation; VPC CNI handles all
-    #     underlay networking. (tunnel=disabled was removed in 1.15;
-    #     routingMode=native implies it.)
-    #   - kubeProxyReplacement=false — chaining doesn't replace
-    #     kube-proxy; VPC CNI relies on it.
-    #   - enableIPv4Masquerade=false — VPC CNI handles SNAT via the
-    #     underlying ENI.
-    helm upgrade --install cilium cilium/cilium \
-        --namespace kube-system \
-        --set cni.chainingMode=aws-cni \
-        --set cni.exclusive=false \
-        --set ipam.operator.clusterPoolIPv4PodCIDRList="{10.100.0.0/16}" \
-        --set endpointRoutes.enabled=true \
-        --set routingMode=native \
-        --set kubeProxyReplacement=false \
-        --set enableIPv4Masquerade=false \
-        --set l7Proxy=true \
-        --set hubble.enabled=true \
-        --set hubble.relay.enabled=true \
-        --set hubble.ui.enabled=true \
-        --set hubble.metrics.enabled="{dns,drop,tcp,flow,port-distribution,icmp,http}" \
-        --wait --timeout 5m
-    kubectl -n kube-system rollout status daemonset cilium --timeout=2m
-}
-
 install_sandbox() {
     echo ""
-    echo "=== Phase 3: Installing SIG-Apps agent-sandbox (v0.4.3) ==="
+    echo "=== Phase 2: Installing SIG-Apps agent-sandbox (v0.4.3) ==="
     AGENT_SANDBOX_VERSION="v0.4.3"
     kubectl apply -f "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/${AGENT_SANDBOX_VERSION}/manifest.yaml"
     kubectl apply -f "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/${AGENT_SANDBOX_VERSION}/extensions.yaml"
@@ -115,7 +76,7 @@ install_sandbox() {
 
 install_manifests() {
     echo ""
-    echo "=== Phase 4: Applying runtime class, Karpenter NodePool, sandbox templates, and policies ==="
+    echo "=== Phase 3: Applying runtime class, Karpenter NodePool, and sandbox templates ==="
     kubectl apply -f "$SCRIPT_DIR/manifests/namespace.yaml"
     kubectl apply -f "$SCRIPT_DIR/manifests/runtimeclass-gvisor.yaml"
 
@@ -144,21 +105,17 @@ install_manifests() {
 
     kubectl apply -f "$SCRIPT_DIR/manifests/sandbox-template-standard.yaml"
     kubectl apply -f "$SCRIPT_DIR/manifests/sandbox-template-gvisor.yaml"
-    kubectl apply -f "$SCRIPT_DIR/manifests/ciliumclusterwidenetworkpolicy-admin.yaml"
-    kubectl apply -f "$SCRIPT_DIR/manifests/ciliumnetworkpolicy-sandbox-llm.yaml"
 
     echo ""
     echo "=== Verifying installation ==="
     kubectl get runtimeclasses
     kubectl get nodepools 2>/dev/null || true
     kubectl get sandboxtemplates -A 2>/dev/null || true
-    kubectl get ciliumclusterwidenetworkpolicies 2>/dev/null || true
-    kubectl get ciliumnetworkpolicies -A 2>/dev/null || true
 }
 
 install_kro() {
     echo ""
-    echo "=== Phase 5 (optional): Installing KRO + AgentSandbox RGD ==="
+    echo "=== Phase 4 (optional): Installing KRO + AgentSandbox RGD ==="
     bash "$SCRIPT_DIR/manifests/kro-install.sh"
     kubectl apply -f "$SCRIPT_DIR/manifests/rgd-agent-sandbox.yaml"
     # Wait for the RGD's generated CRD to register so that users can
@@ -180,18 +137,17 @@ finish_message() {
     echo "=== Installation complete ==="
     echo ""
     echo "Next steps:"
+    echo "  - Install an egress blueprint:"
+    echo "      Standard EKS:  cd ../agent-egress-chained && ./install.sh"
+    echo "      EKS Auto Mode: cd ../agent-egress-native  && ./install.sh"
     echo "  - Deploy the reference agent: kubectl apply -f $SCRIPT_DIR/manifests/sandbox-agent.yaml"
-    echo "  - Watch sandbox provisioning: kubectl get sandboxes -A -w"
-    echo "  - Open Hubble UI:             kubectl port-forward -n kube-system svc/hubble-ui 12000:80"
+    echo "  - Run end-to-end conformance: ./conformance.sh"
     echo "  - Cleanup:                    cd terraform/_LOCAL && ./cleanup.sh"
 }
 
 case "$PHASE" in
     cluster)
         install_cluster
-        ;;
-    cilium)
-        install_cilium
         ;;
     sandbox)
         install_sandbox
@@ -205,14 +161,13 @@ case "$PHASE" in
         ;;
     all)
         install_cluster
-        install_cilium
         install_sandbox
         install_manifests
         finish_message
         ;;
     *)
         echo "Unknown phase: $PHASE"
-        echo "Valid phases: cluster | cilium | sandbox | manifests | kro | all"
+        echo "Valid phases: cluster | sandbox | manifests | kro | all"
         exit 1
         ;;
 esac

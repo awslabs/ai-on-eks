@@ -50,6 +50,23 @@ require_cluster() {
     kubectl get runtimeclass gvisor >/dev/null 2>&1 || fail "RuntimeClass 'gvisor' missing; run 'infra/agent-sandbox/install.sh manifests'"
     kubectl get sandboxtemplate sandbox-gvisor -n "$NS" >/dev/null 2>&1 || fail "SandboxTemplate 'sandbox-gvisor' missing; run 'infra/agent-sandbox/install.sh manifests'"
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; run 'infra/agent-sandbox/install.sh sandbox'"
+
+    # Egress enforcement ships in a sibling blueprint (agent-egress-chained or
+    # agent-egress-native). At least one must be installed for Step 4/5 of the
+    # reference agent to produce BLOCKED outcomes.
+    local chained_policy_ok=""
+    local native_policy_ok=""
+    kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && chained_policy_ok="yes"
+    kubectl -n "$NS" get applicationnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && native_policy_ok="yes"
+    if [ -z "$chained_policy_ok" ] && [ -z "$native_policy_ok" ]; then
+        fail "No egress allowlist found. Install either 'infra/agent-egress-chained/' (Standard EKS) or 'infra/agent-egress-native/' (Auto Mode) first."
+    fi
+    if [ -n "$chained_policy_ok" ]; then
+        log "Detected chained egress blueprint (Cilium CNP sandbox-llm-allowlist)."
+    fi
+    if [ -n "$native_policy_ok" ]; then
+        log "Detected native egress blueprint (ApplicationNetworkPolicy sandbox-llm-allowlist)."
+    fi
 }
 
 setup_configmap_with_real_agent() {
@@ -120,12 +137,24 @@ assert_runtime_class() {
 }
 
 assert_policies_valid() {
-    log "Asserting Cilium policies are Valid..."
-    local admin_valid app_valid
-    admin_valid=$(kubectl get ciliumclusterwidenetworkpolicy admin-block-imds -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
-    app_valid=$(kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
-    [ "$admin_valid" = "True" ] || fail "CiliumClusterwideNetworkPolicy admin-block-imds not Valid (got '$admin_valid')"
-    [ "$app_valid" = "True" ] || fail "CiliumNetworkPolicy sandbox-llm-allowlist not Valid (got '$app_valid')"
+    log "Asserting egress policies are Valid..."
+    # Policies live in the installed egress blueprint. Check whichever
+    # is present — both blueprints share the same resource names.
+    local chained_admin chained_app native_admin native_app
+    chained_admin=$(kubectl get ciliumclusterwidenetworkpolicy admin-block-imds -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
+    chained_app=$(kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
+    native_admin=$(kubectl get clusternetworkpolicy admin-block-imds 2>/dev/null || echo "")
+    native_app=$(kubectl -n "$NS" get applicationnetworkpolicy sandbox-llm-allowlist 2>/dev/null || echo "")
+
+    if [ "$chained_admin" = "True" ] && [ "$chained_app" = "True" ]; then
+        log "  Chained egress (Cilium) — admin CCNP + app CNP both Valid."
+        return 0
+    fi
+    if [ -n "$native_admin" ] && [ -n "$native_app" ]; then
+        log "  Native egress (VPC CNI) — ClusterNetworkPolicy + ApplicationNetworkPolicy both present."
+        return 0
+    fi
+    fail "Expected egress policies not found. For chained: admin-block-imds (CCNP) + sandbox-llm-allowlist (CNP). For native: admin-block-imds (ClusterNetworkPolicy) + sandbox-llm-allowlist (ApplicationNetworkPolicy)."
 }
 
 run_agent_and_validate() {

@@ -1,0 +1,128 @@
+# Sample EKS Managed Node Group launch template for gVisor-capable
+# worker nodes. Alternative to the default Karpenter-provisioned
+# NodePool in `../karpenter-nodepool-gvisor.yaml`.
+#
+# Use this when:
+#   - Existing operational patterns rely on MNG (IaC, monitoring, policies)
+#   - Stricter IAM role boundaries are required than Karpenter provides
+#   - You want explicit scaling rather than demand-driven provisioning
+#
+# Avoid this when:
+#   - You need Kata + Firecracker isolation — MNG strips the CPU Options
+#     needed for nested virtualization. gVisor works on MNG because it's
+#     a userspace shim, not a hardware-virt solution.
+#   - You want Karpenter's bin-packing + spot-instance economics.
+#
+# How to apply:
+#   1. Substitute the three `__PLACEHOLDER__` values below with real
+#      values from your cluster (subnet IDs, security group ID, and
+#      node IAM role ARN — the base module tags these for discovery).
+#   2. Apply via Terraform (using the `aws_launch_template` +
+#      `aws_eks_node_group` resources in your infra-as-code), OR
+#      via the AWS CLI / console referencing this user-data.
+#   3. Label the resulting nodes with `agent-sandbox/runtime=gvisor`
+#      and taint with `agent-sandbox/runtime=gvisor:NoSchedule` so
+#      that gVisor-tier pods land on them and runc-tier pods don't.
+#
+# The user-data below is identical to the one in the Karpenter
+# NodePool's EC2NodeClass — it installs runsc + containerd-shim-runsc-v1
+# from the gVisor release channel and registers runsc in containerd
+# v2's plugin path. AL2023 is required; Bottlerocket would need a
+# custom variant build.
+---
+# Example launch template body. Substitute placeholders before use.
+# This YAML is informational — apply via Terraform or AWS CLI, not
+# via kubectl.
+apiVersion: ec2.amazonaws.com/sample  # placeholder kind, not a real K8s resource
+kind: LaunchTemplate
+metadata:
+  name: agent-sandbox-gvisor-mng
+spec:
+  imageId: __AL2023_AMI_ID__
+  instanceType: c6a.xlarge
+  iamInstanceProfile: __NODE_IAM_INSTANCE_PROFILE_NAME__
+  networkInterfaces:
+    - deviceIndex: 0
+      associatePublicIpAddress: false
+      subnetIds:
+        - __PRIVATE_SUBNET_1__
+        - __PRIVATE_SUBNET_2__
+      groups:
+        - __NODE_SECURITY_GROUP__
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100
+        volumeType: gp3
+        encrypted: true
+  tagSpecifications:
+    - resourceType: instance
+      tags:
+        - key: agent-sandbox/tier
+          value: gvisor
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    ---
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      cluster:
+        name: __CLUSTER_NAME__
+        apiServerEndpoint: __API_SERVER_ENDPOINT__
+        certificateAuthority: __CA_DATA__
+        cidr: __CLUSTER_SERVICE_CIDR__
+      kubelet:
+        config:
+          maxPods: 110
+        flags:
+          - --node-labels=agent-sandbox/runtime=gvisor
+          - --register-with-taints=agent-sandbox/runtime=gvisor:NoSchedule
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+
+    # Install gVisor runsc binary + containerd shim from the official
+    # Google release channel. Using `release/latest/` alias keeps this
+    # sample self-updating. Production deployments should pin to a
+    # specific release tag and bump via CI.
+    ARCH=$(uname -m)
+    mkdir -p /tmp/gvisor && cd /tmp/gvisor
+
+    curl -fsSL -o runsc "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/runsc"
+    curl -fsSL -o containerd-shim-runsc-v1 "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/containerd-shim-runsc-v1"
+    chmod +x runsc containerd-shim-runsc-v1
+    mv runsc containerd-shim-runsc-v1 /usr/local/bin/
+
+    # Register runsc with containerd v2. AL2023 / EKS 1.34 ships with
+    # containerd v2 which uses the `io.containerd.cri.v1.runtime.*`
+    # plugin path. The older `io.containerd.grpc.v1.cri.*` path is
+    # legacy and silently ignored.
+    cat <<'EOT' >> /etc/containerd/config.toml
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc]
+      runtime_type = "io.containerd.runsc.v1"
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc.options]
+      TypeUrl = "io.containerd.runsc.v1.options"
+      ConfigPath = "/etc/containerd/runsc.toml"
+    EOT
+
+    # Default gVisor runtime options — platform=ptrace for broad EC2
+    # compatibility, platform=kvm for nested-virt-capable instances
+    # (C8i / M8i / R8i from February 2026 onward).
+    cat <<'EOT' > /etc/containerd/runsc.toml
+    [runsc_config]
+      platform = "ptrace"
+      network = "sandbox"
+    EOT
+
+    systemctl restart containerd
+    --//--
