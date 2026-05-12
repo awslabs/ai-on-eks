@@ -23,6 +23,10 @@ This blueprint can provision its own EKS Auto Mode cluster (via the standard ai-
 - `infra/agent-sandbox/` installed against the same cluster (provides the `agent-sandboxes` namespace + sandbox controller).
 - `kubectl >=1.30`, `aws` CLI v2.
 
+Note on enforcement: EKS Auto Mode ships the `ApplicationNetworkPolicy` / `ClusterNetworkPolicy` CRDs but disables the Network Policy Controller by default. `./install.sh policies` enables the controller via the `amazon-vpc-cni` ConfigMap in `kube-system` before applying the policies. Without that ConfigMap, policies are accepted silently but nothing is enforced (per [Use Network Policies with EKS Auto Mode](https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html)). If you already enforce the controller cluster-wide, the install is idempotent.
+
+Note on FQDN wildcards: native ApplicationNetworkPolicy accepts `*` only as the leftmost label (e.g., `*.amazonaws.com`). Patterns like `bedrock-runtime.*.amazonaws.com` are rejected at admission. The default allowlist therefore enumerates the most-common AWS regions (us-east-1 + us-west-2) explicitly; consumers in other regions should add matching entries. The chained blueprint's `CiliumNetworkPolicy` variant uses `matchPattern` which supports embedded wildcards, so its templates are more compact.
+
 ## Usage
 
 Apply policies to an existing Auto Mode cluster:
@@ -79,8 +83,10 @@ infra/agent-egress-native/
 ├── terraform/
 │   └── blueprint.tfvars                          # EKS Auto Mode enabled
 └── manifests/
+    ├── network-policy-controller-enable.yaml    # ConfigMap enabling the Auto Mode NP Controller
     ├── clusternetworkpolicy-admin.yaml           # Admin tier: deny IMDS (Admin tier CNP)
     ├── applicationnetworkpolicy-sandbox-llm.yaml # App tier: default sandbox allowlist (Bedrock + STS + PyPI)
+    ├── test-pod.yaml                             # Minimal test pod for validating enforcement
     └── allowlists/
         ├── aws-services.yaml                     # STS, Bedrock, S3, DynamoDB
         ├── llm-apis.yaml                         # Bedrock, Anthropic, OpenAI

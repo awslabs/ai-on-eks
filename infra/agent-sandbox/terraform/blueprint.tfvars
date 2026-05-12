@@ -1,11 +1,15 @@
 name                = "agent-sandbox"
+region              = "us-east-1"
 eks_cluster_version = "1.34"
 
-# Region defaults to whatever's configured in the base module
-# (us-west-2 at the time of this writing). Override by uncommenting
-# the line below and setting your target region, or by setting the
-# `TF_VAR_region` environment variable before running install.sh.
-# region              = "us-west-2"
+# Region explicitly declared above. Change to your preferred AWS
+# region before running `install.sh`. Can also be overridden via the
+# `TF_VAR_region` environment variable without editing this file.
+#
+# (The ai-on-eks base module defaults to us-west-2 when `region` is
+# omitted; this blueprint pins us-east-1 because Bedrock model
+# availability and the reference agent's IAM trust policy example
+# target that region. Blueprint consumers pick their own.)
 
 # Use standard EKS (not Auto Mode) so the runtime class story works
 # cleanly. gVisor shim installation needs node-level control which is

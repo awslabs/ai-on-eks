@@ -1,0 +1,22 @@
+# Enable Network Policy Controller on EKS Auto Mode.
+#
+# Required prerequisite for ApplicationNetworkPolicy and
+# ClusterNetworkPolicy enforcement. Without this ConfigMap, Auto Mode
+# accepts policy resources (CRDs are pre-installed) but the Network
+# Policy Controller is disabled and policies silently do not enforce.
+#
+# Standard EKS enables policy enforcement via the vpc-cni addon's
+# `enable-network-policy` configuration; Auto Mode uses this
+# ConfigMap in kube-system instead (per AWS docs,
+# https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html).
+#
+# This manifest is applied automatically by `install.sh policies` as
+# the first step. Included here as a standalone file so customers can
+# reapply or audit the controller-enable contract independently.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: amazon-vpc-cni
+  namespace: kube-system
+data:
+  enable-network-policy-controller: "true"

@@ -40,9 +40,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PHASE="${1:-policies}"
 
-REGION=$(awk -F'=' '/^region/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
+REGION=$(awk -F'=' '/^[[:space:]]*region[[:space:]]*=/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
 REGION=${REGION:-us-east-1}
-CLUSTER_NAME=$(awk -F'=' '/^name/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
+CLUSTER_NAME=$(awk -F'=' '/^[[:space:]]*name[[:space:]]*=/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
 CLUSTER_NAME=${CLUSTER_NAME:-agent-egress-native}
 
 install_cluster() {
@@ -79,6 +79,15 @@ require_auto_mode() {
 
 install_policies() {
     require_auto_mode
+    echo ""
+    echo "=== Enabling Network Policy Controller ==="
+    # Required for ApplicationNetworkPolicy / ClusterNetworkPolicy
+    # enforcement on Auto Mode. CRDs are pre-installed but the
+    # controller is disabled by default; applying this ConfigMap
+    # activates enforcement. See the header comment in
+    # manifests/network-policy-controller-enable.yaml.
+    kubectl apply -f "$SCRIPT_DIR/manifests/network-policy-controller-enable.yaml"
+
     echo ""
     echo "=== Applying admin-tier ClusterNetworkPolicy + app-tier ApplicationNetworkPolicy ==="
     kubectl apply -f "$SCRIPT_DIR/manifests/clusternetworkpolicy-admin.yaml"

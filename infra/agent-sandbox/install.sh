@@ -41,9 +41,9 @@ PHASE="${1:-all}"
 
 cd "$SCRIPT_DIR"
 
-REGION=$(awk -F'=' '/^region/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
+REGION=$(awk -F'=' '/^[[:space:]]*region[[:space:]]*=/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
 REGION=${REGION:-us-east-1}
-CLUSTER_NAME=$(awk -F'=' '/^name/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
+CLUSTER_NAME=$(awk -F'=' '/^[[:space:]]*name[[:space:]]*=/ {gsub(/[" ]/, "", $2); print $2}' terraform/blueprint.tfvars 2>/dev/null)
 CLUSTER_NAME=${CLUSTER_NAME:-agent-sandbox}
 
 install_cluster() {

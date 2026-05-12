@@ -29,11 +29,17 @@ spec:
   egress:
     - to:
         - domainNames:
-            # Bedrock across regions.
-            - "bedrock-runtime.*.amazonaws.com"
-            - "bedrock.*.amazonaws.com"
+            # Bedrock across common regions — native ANP wildcards
+            # only match as leftmost label (no embedded wildcards).
+            # Enumerate additional regions as needed.
+            - "bedrock-runtime.us-east-1.amazonaws.com"
+            - "bedrock-runtime.us-west-2.amazonaws.com"
+            - "bedrock.us-east-1.amazonaws.com"
+            - "bedrock.us-west-2.amazonaws.com"
             # STS for IRSA auth path.
-            - "sts.*.amazonaws.com"
+            - "sts.us-east-1.amazonaws.com"
+            - "sts.us-west-2.amazonaws.com"
+            - "sts.amazonaws.com"
             # Anthropic + OpenAI public endpoints.
             - "api.anthropic.com"
             - "api.openai.com"
