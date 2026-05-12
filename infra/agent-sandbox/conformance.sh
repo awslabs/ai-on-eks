@@ -19,7 +19,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INFRA_DIR="$SCRIPT_DIR/../../../infra/agent-sandbox"
+INFRA_DIR="$SCRIPT_DIR"
+AGENT_DIR="$SCRIPT_DIR/../../blueprints/agents/agent-sandbox"
 NS="agent-sandboxes"
 SA="sandbox-agent-sa"
 POD="sandbox-agent"
@@ -65,7 +66,7 @@ setup_configmap_with_real_agent() {
 
     log "Replacing placeholder ConfigMap with real agent.py contents..."
     kubectl -n "$NS" create configmap "$CONFIGMAP" \
-        --from-file=agent.py="$SCRIPT_DIR/agent.py" \
+        --from-file=agent.py="$AGENT_DIR/agent.py" \
         --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
     # Force pod recreation so the container's one-shot `cp` at

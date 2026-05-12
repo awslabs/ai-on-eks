@@ -85,9 +85,10 @@ kubectl port-forward -n kube-system svc/hubble-ui 12000:80
 
 ### Automated conformance run
 
-`conformance.sh` wraps the steps above, executes the agent, and asserts the expected PASS/BLOCKED markers appear. Exits 0 on success, 1 on any failure. Useful after a blueprint install or as a regression check.
+`conformance.sh` (in the infra directory, `../../../infra/agent-sandbox/conformance.sh`) wraps the interactive steps above, executes the agent, and asserts the expected PASS/BLOCKED markers appear. Exits 0 on success, 1 on any failure. Useful after a blueprint install or as a regression check.
 
 ```bash
+cd ../../../infra/agent-sandbox
 CLUSTER_NAME=agent-sandbox \
 BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
     ./conformance.sh
@@ -109,10 +110,9 @@ IAM role + IRSA annotation are retained in both modes.
 | File | Purpose |
 |---|---|
 | `agent.py` | The reference agent. Mounted into the Sandbox via ConfigMap; runs via `kubectl exec`. |
-| `conformance.sh` | Automated setup + run + assertion + cleanup. |
 | `README.md` | This file. |
 
-The Sandbox resource itself (`sandbox-agent.yaml`) and the KRO composite variant (`agent-sandbox-instance.yaml`) live under `../../../infra/agent-sandbox/manifests/` alongside the rest of the blueprint manifests.
+The Sandbox resource itself (`sandbox-agent.yaml`) and the KRO composite variant (`agent-sandbox-instance.yaml`) live under `../../../infra/agent-sandbox/manifests/` alongside the rest of the blueprint manifests. The automated conformance test (`conformance.sh`) lives under `../../../infra/agent-sandbox/` to match the repo's shell-script-under-infra convention.
 
 ## Adapting the agent
 

@@ -47,7 +47,6 @@ Each phase is idempotent. Re-run `./install.sh manifests` to re-apply after edit
 Deploy and run the reference agent:
 
 ```bash
-cd ../../blueprints/agents/agent-sandbox
 CLUSTER_NAME=agent-sandbox \
 BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
     ./conformance.sh
