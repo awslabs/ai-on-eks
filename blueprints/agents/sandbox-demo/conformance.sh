@@ -138,8 +138,9 @@ run_agent_and_validate() {
     echo "$output" | grep -q "PASS: boto3 installed" || fail "Step 1 (PyPI install) did not PASS"
     echo "$output" | grep -q "Bedrock reply" || fail "Step 2 (Bedrock call) did not return a reply"
     echo "$output" | grep -q "PASS: snippet exited 0" || fail "Step 3 (snippet execution) did not PASS"
-    echo "$output" | grep -qE "BLOCKED: https://demo-blocked\.example\.com" || fail "Step 4 (blocked egress) did not BLOCK"
-    log "All 4 expected outcomes matched."
+    echo "$output" | grep -qE "BLOCKED: https://demo-blocked\.example\.com" || fail "Step 4 (FQDN block) did not BLOCK"
+    echo "$output" | grep -qE "BLOCKED: 8\.8\.8\.8:443" || fail "Step 5 (IP block) did not BLOCK"
+    log "All 5 expected outcomes matched."
 }
 
 cleanup() {

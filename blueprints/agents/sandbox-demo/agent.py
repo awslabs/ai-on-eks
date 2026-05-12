@@ -1,19 +1,28 @@
 """Reference Bedrock agent for the agent-sandbox-on-EKS blueprint.
 
-Runs inside a gVisor Sandbox pod. Exercises four paths so the
-isolation + egress story is visible end-to-end:
+Runs inside a gVisor Sandbox pod. Exercises five paths so both
+enforcement layers (FQDN proxy + L3/L4 policy) are visible end-to-end:
 
-  1. Bedrock call (allowed by ciliumnetworkpolicy-sandbox-llm.yaml) —
-     the model generates a small Python snippet.
-  2. Snippet execution inside the sandbox (exercises gVisor syscall
+  1. PyPI egress (allowed by FQDN policy) — pip-install boto3 from
+     pypi.org + files.pythonhosted.org.
+  2. Bedrock call (allowed by FQDN policy) — the model generates a
+     small Python snippet via bedrock-runtime.*.amazonaws.com.
+  3. Snippet execution inside the sandbox (exercises gVisor syscall
      interception via the `open` / `read` / `write` calls the snippet
      makes, which Sentry intercepts rather than routing direct to
      the host kernel).
-  3. Allowed egress follow-up — the agent pip-installs `requests`
-     from PyPI as a second allowed-domain call.
-  4. Blocked egress attempt — the agent requests
-     `demo-blocked.example.com`, which is NOT on the allowlist.
-     Hubble shows this as a DROP flow.
+  4. Blocked FQDN egress — request `demo-blocked.example.com`, which
+     is NOT on the allowlist. Cilium's DNS proxy returns an empty
+     answer; Python surfaces this as "no address associated with
+     hostname". Observable in Hubble via `cilium observe` / DNS-proxy
+     flow logs (see README); NOT visible as a DROPPED flow in the
+     default Hubble UI because FQDN enforcement is a DNS-layer filter,
+     not an L3/L4 packet drop.
+  5. Blocked IP egress — raw TCP connect to 8.8.8.8:443, a
+     non-allowlisted IP. Bypasses DNS entirely, so Cilium's L3/L4
+     policy drops the SYN packet directly. THIS one appears as a
+     red DROPPED flow in Hubble's default view — the visible
+     counterpart to the invisible Step 4.
 
 Each path's result is printed to stdout with a clear prefix
 (``PASS:``, ``BLOCKED:``, ``ERROR:``) so the output log is
@@ -33,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
 import urllib.error
@@ -118,6 +128,35 @@ def try_egress(url: str, label: str) -> None:
         print(f"BLOCKED: {url} rejected — {reason}")
     except Exception as e:  # noqa: BLE001
         print(f"BLOCKED: {url} rejected — {type(e).__name__}: {e}")
+
+
+def try_ip_egress(host: str, port: int, label: str) -> None:
+    """Attempt a raw TCP connection to a host:port, bypassing DNS.
+
+    Unlike ``try_egress`` (which goes through Python's URL library and
+    triggers DNS resolution first), this opens a socket directly to an
+    IP address. When the target IP is NOT on the CiliumNetworkPolicy
+    allowlist, Cilium's L3/L4 enforcement drops the SYN packet — which
+    produces a ``DROPPED`` flow in Hubble's default Service Map view.
+
+    This is the counterpart to Step 4's FQDN-level block. Step 4's
+    blocked egress fails at the DNS proxy (empty answer, no TCP ever
+    attempted, no packet-level drop to visualize). Step 5 fails at
+    L3/L4 (real SYN, real drop, visible in Hubble).
+    """
+    print(f"Attempting raw TCP connect to {host}:{port} ({label})...")
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(3)
+    try:
+        s.connect((host, port))
+        s.close()
+        print(f"UNEXPECTED PASS: connect to {host}:{port} succeeded")
+    except (socket.timeout, TimeoutError):
+        # L3/L4 drop manifests as connection timeout — no TCP RST,
+        # the SYN is silently discarded by Cilium eBPF policy.
+        print(f"BLOCKED: {host}:{port} connect timed out — L3/L4 policy drop")
+    except Exception as e:  # noqa: BLE001
+        print(f"BLOCKED: {host}:{port} rejected — {type(e).__name__}: {e}")
 
 
 def pip_install(package: str) -> bool:
@@ -221,18 +260,35 @@ def main() -> int:
             cleaned = cleaned[first_newline + 1 : last_fence].strip()
     execute_snippet(cleaned)
 
-    step("Step 4: Attempt egress to a BLOCKED domain")
-    # This should get denied by the CiliumNetworkPolicy. Hubble shows
-    # the DROP flow with reason "policy-denied".
+    step("Step 4: Attempt FQDN egress to a BLOCKED domain")
+    # Cilium FQDN policy enforces by DNS-proxy filtering, not packet
+    # drop. When the FQDN isn't on the allowlist, the DNS proxy
+    # returns an empty answer and the pod sees a resolution failure.
+    # NO DROPPED flow appears in Hubble UI for this step because no
+    # TCP connection is ever attempted — the pod never gets an IP.
+    # Observable via `cilium observe --type policy-verdict` / DNS
+    # proxy flow logs; not visible in default Hubble Service Map.
     try_egress("https://demo-blocked.example.com/", "NOT on allowlist")
+
+    step("Step 5: Attempt raw IP egress to a BLOCKED address")
+    # Counterpart to Step 4. Connecting by IP bypasses DNS entirely,
+    # so Cilium's L3/L4 enforcement drops the SYN packet directly.
+    # THIS step IS visible as a red DROPPED flow in Hubble's default
+    # Service Map — the visible evidence that FQDN enforcement (Step
+    # 4) is complemented by packet-level enforcement (Step 5).
+    # 8.8.8.8 (Google Public DNS) is used because it's a well-known
+    # non-allowlisted IP with no ambiguity about what gets blocked.
+    try_ip_egress("8.8.8.8", 443, "NOT on allowlist")
 
     step("Demo complete")
     print("\nExpected outcomes:")
     print("  Step 1 (PyPI):            PASS — allowed by FQDN policy")
     print("  Step 2 (Bedrock):         PASS — allowed by FQDN policy")
     print("  Step 3 (snippet exec):    PASS — syscalls via Sentry (gVisor)")
-    print("  Step 4 (blocked egress):  BLOCKED — denied by FQDN policy")
-    print("\nCheck Hubble UI for the full flow decision trail.")
+    print("  Step 4 (FQDN block):      BLOCKED — denied at DNS proxy (not in Hubble UI)")
+    print("  Step 5 (IP block):        BLOCKED — dropped at L3/L4 (visible in Hubble UI)")
+    print("\nCheck Hubble UI for the Step 5 DROPPED flow to 8.8.8.8:443.")
+    print("Use `cilium observe` or the DNS proxy logs for the Step 4 verdict.")
     return 0
 
 

@@ -12,14 +12,15 @@ Use this as a working example to build your own agent against the blueprint, or 
 
 ## What the agent does
 
-Four steps, each designed to exercise a distinct part of the blueprint:
+Five steps, each designed to exercise a distinct part of the blueprint:
 
 | Step | Action | Demonstrates |
 |---|---|---|
 | 1 | `pip install boto3` from PyPI | Cilium FQDN allowlist permits `pypi.org` + `files.pythonhosted.org` |
 | 2 | Call Bedrock Claude Sonnet | IRSA credential path works through gVisor; FQDN allowlist permits `bedrock-runtime.*.amazonaws.com` + `sts.*.amazonaws.com` |
 | 3 | Execute the model-generated Python snippet inside the sandbox | Sandbox can run code; syscalls flow through gVisor's Sentry userspace kernel |
-| 4 | HTTP GET to a non-allowlisted domain | Cilium policy denies the flow; Hubble shows a DROP event |
+| 4 | HTTP GET to a non-allowlisted FQDN | Cilium DNS proxy returns an empty answer; Python surfaces a resolution failure |
+| 5 | Raw TCP connect to a non-allowlisted IP (8.8.8.8:443) | Cilium L3/L4 policy drops the SYN packet; produces a DROPPED flow in Hubble |
 
 Expected console output:
 
@@ -27,8 +28,29 @@ Expected console output:
 Step 1 (PyPI):            PASS
 Step 2 (Bedrock):         PASS
 Step 3 (snippet exec):    PASS
-Step 4 (blocked egress):  BLOCKED
+Step 4 (FQDN block):      BLOCKED — at DNS proxy
+Step 5 (IP block):        BLOCKED — at L3/L4
 ```
+
+## Two enforcement layers, two observability surfaces
+
+Cilium enforces network policy at two distinct layers, and they show up differently in Hubble:
+
+**FQDN enforcement (Step 4)** — Cilium's DNS proxy intercepts DNS queries and filters the response. When a FQDN isn't on the allowlist, the proxy returns an empty answer. The pod sees a hostname resolution failure, never attempts a TCP connection, and produces no packet-level event to visualize. Step 4 does NOT render as a red flow in Hubble's default Service Map view. To observe the FQDN verdict directly:
+
+```bash
+# Run while the agent is executing Step 4
+kubectl -n kube-system exec ds/cilium -c cilium-agent -- \
+    cilium monitor --type l7 | grep "DNS proxy"
+```
+
+You'll see lines like `verdict Forwarded DNS proxy: demo-blocked.example.com. A TTL: 4294967295 Answer: ''` — the empty `Answer: ''` is how Cilium denies FQDN egress.
+
+Alternatively, add a positive filter for the FQDN in the Hubble UI filter bar (e.g., type `demo-blocked.example.com`) to un-blacklist DNS events for that specific domain.
+
+**L3/L4 enforcement (Step 5)** — Cilium's eBPF policy drops packets at the socket/network layer. When a pod attempts to connect to a non-allowlisted IP, the SYN is silently discarded. This IS visible in Hubble's default Service Map as a red DROPPED flow to `8.8.8.8:443`. No filter tuning required.
+
+This distinction matters because adopters who only look at Hubble's default view will see Step 5 but miss Step 4. Both are doing the same work (blocking unauthorized egress), they just show up in different places.
 
 ## Running the agent
 
@@ -106,5 +128,6 @@ To use this pattern for your own agent:
 - **`PASS: boto3 installed` missing** — Cilium policy isn't permitting PyPI. Check `kubectl -n agent-sandboxes get ciliumnetworkpolicy sandbox-llm-allowlist` is `Valid=True` and the `toFQDNs` list includes `pypi.org` + `files.pythonhosted.org`.
 - **Bedrock `AccessDeniedException`** — IRSA annotation is missing or the IAM role lacks `bedrock:InvokeModel`. Check with `kubectl get sa sandbox-demo-agent -n agent-sandboxes -o yaml | grep role-arn` and confirm the role's trust policy allows the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-demo-agent`.
 - **Bedrock `ResourceNotFoundException` with "Legacy" in the message** — the target model hasn't been invoked in 30+ days. Either invoke it once manually from the AWS console or update `BEDROCK_MODEL_ID` in `agent.py` to a currently-active model.
-- **`BLOCKED: https://demo-blocked.example.com/` missing** — the blocked step isn't being reached; check earlier steps for errors.
-- **Step 4 unexpectedly PASSes** — the FQDN policy isn't enforcing. Confirm Cilium chaining took effect: `kubectl -n kube-system exec ds/cilium -- cilium status | grep Enforcement` should show "Policy Enforcement: Default".
+- **Step 4 doesn't show `BLOCKED: ... No address associated with hostname`** — the agent reached the FQDN somehow. Check that `demo-blocked.example.com` is NOT in the `toFQDNs` allowlist in `ciliumnetworkpolicy-sandbox-llm.yaml`, and that the CNP is `Valid=True`.
+- **Step 5 doesn't show `BLOCKED: ... L3/L4 policy drop`** — the connect succeeded or errored differently. Check that the sandbox pod has `agent-sandbox/role: runtime` labels matching the CNP's `endpointSelector`, and that Cilium policy enforcement is active: `kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium status | grep Enforcement` should show `Default` or stricter.
+- **Neither Step 4 nor Step 5 is visible in Hubble UI** — this is expected for Step 4 (FQDN enforcement happens at DNS proxy layer, not L3/L4). Step 5's DROPPED flow to `8.8.8.8:443` should always render in the default Hubble Service Map. If it doesn't, verify hubble-relay is connected to all peer agents: `kubectl -n kube-system logs -l k8s-app=hubble-relay --tail=20 | grep -E "Connected|No connection"`.
