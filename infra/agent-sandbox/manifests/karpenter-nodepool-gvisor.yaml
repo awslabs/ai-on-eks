@@ -9,7 +9,7 @@
 #   2. NodePool — matches any pod requesting `runtimeClassName: gvisor`
 #      via the label selector, applies a matching taint so runc-only
 #      workloads don't accidentally land on gVisor nodes, and caps
-#      the node count so the demo can't runaway.
+#      the node count to prevent runaway provisioning.
 #
 # Node label `agent-sandbox/runtime=gvisor` is referenced by the
 # RuntimeClass scheduling block in runtimeclass-gvisor.yaml.
@@ -53,9 +53,9 @@ spec:
     set -euxo pipefail
 
     # Install gVisor runsc binary + containerd shim from the official
-    # Google release channel. Using `release/latest/` alias for
-    # demo-day resilience — in a production blueprint this would be
-    # pinned to a specific release tag and bumped via CI.
+    # Google release channel. Using `release/latest/` alias keeps
+    # this blueprint self-updating. Production deployments should
+    # pin to a specific release tag and bump via CI.
     ARCH=$(uname -m)
     mkdir -p /tmp/gvisor && cd /tmp/gvisor
 
@@ -81,8 +81,9 @@ spec:
 
     # Default gVisor runtime options — platform=kvm for hardware
     # acceleration on nested-virt-capable instances, falling back to
-    # platform=ptrace for instances without nested virt. Demo uses m5
-    # class so ptrace is the active path.
+    # platform=ptrace on instances without nested virt. m5-class
+    # instances use ptrace; c5n.metal + m5.metal + other nested-virt
+    # instances would use kvm.
     cat <<'EOT' > /etc/containerd/runsc.toml
     [runsc_config]
       platform = "ptrace"

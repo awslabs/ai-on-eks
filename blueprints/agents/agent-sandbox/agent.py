@@ -11,13 +11,13 @@ enforcement layers (FQDN proxy + L3/L4 policy) are visible end-to-end:
      interception via the `open` / `read` / `write` calls the snippet
      makes, which Sentry intercepts rather than routing direct to
      the host kernel).
-  4. Blocked FQDN egress — request `demo-blocked.example.com`, which
-     is NOT on the allowlist. Cilium's DNS proxy returns an empty
-     answer; Python surfaces this as "no address associated with
-     hostname". Observable in Hubble via `cilium observe` / DNS-proxy
-     flow logs (see README); NOT visible as a DROPPED flow in the
-     default Hubble UI because FQDN enforcement is a DNS-layer filter,
-     not an L3/L4 packet drop.
+  4. Blocked FQDN egress — request `blocked-example.example.com`,
+     which is NOT on the allowlist. Cilium's DNS proxy returns an
+     empty answer; Python surfaces this as "no address associated
+     with hostname". Observable in Hubble via `cilium observe` /
+     DNS-proxy flow logs (see README); NOT visible as a DROPPED
+     flow in the default Hubble UI because FQDN enforcement is a
+     DNS-layer filter, not an L3/L4 packet drop.
   5. Blocked IP egress — raw TCP connect to 8.8.8.8:443, a
      non-allowlisted IP. Bypasses DNS entirely, so Cilium's L3/L4
      policy drops the SYN packet directly. THIS one appears as a
@@ -57,7 +57,7 @@ AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 
 
 def step(label: str) -> None:
-    """Prints a section header so the demo log-tail has clear breaks."""
+    """Print a section header so the output log has clear breaks."""
     print(f"\n{'=' * 70}\n>>> {label}\n{'=' * 70}", flush=True)
 
 
@@ -65,9 +65,7 @@ def call_bedrock(prompt: str) -> str | None:
     """Call Bedrock Claude Sonnet via the AWS SDK.
 
     Returns the assistant's text reply on success, None on failure
-    (typically credential or network issue — the demo narrator
-    points to Hubble at that moment to show whether the call even
-    left the pod).
+    (typically credential or network issue).
     """
     try:
         # pip install --user writes to $HOME/.local/lib/pythonX.Y/
@@ -81,8 +79,7 @@ def call_bedrock(prompt: str) -> str | None:
         import boto3  # noqa: PLC0415 — lazy so the pip-install step can
                      #                   succeed before boto3 is imported
     except ImportError:
-        print("BLOCKED: boto3 not yet installed — demo ordering bug; "
-              "install before calling Bedrock")
+        print("BLOCKED: boto3 not yet installed — install before calling Bedrock")
         return None
 
     client = boto3.client("bedrock-runtime", region_name=AWS_REGION)
@@ -102,7 +99,7 @@ def call_bedrock(prompt: str) -> str | None:
         )
         payload = json.loads(resp["body"].read())
         return payload["content"][0]["text"]
-    except Exception as e:  # noqa: BLE001 — demo resilience over exception hygiene
+    except Exception as e:  # noqa: BLE001 — broad to surface any Bedrock failure
         print(f"ERROR: Bedrock call failed: {e}")
         return None
 
@@ -117,7 +114,7 @@ def try_egress(url: str, label: str) -> None:
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "agent-sandbox-demo/0.1"},
+            headers={"User-Agent": "agent-sandbox-reference/0.1"},
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
             status = resp.status
@@ -160,9 +157,9 @@ def try_ip_egress(host: str, port: int, label: str) -> None:
 
 
 def pip_install(package: str) -> bool:
-    """Install a package inside the sandbox. Used to demonstrate the
-    PyPI allowlist — a successful install means the FQDN policy
-    permitted pypi.org + files.pythonhosted.org."""
+    """Install a package inside the sandbox. Exercises the PyPI
+    allowlist — a successful install means the FQDN policy permitted
+    pypi.org + files.pythonhosted.org."""
     print(f"Pip-installing {package} from PyPI...")
     try:
         result = subprocess.run(
@@ -197,8 +194,8 @@ def execute_snippet(code: str) -> None:
     subprocess. Two purposes:
       1. Shows the sandbox can run code (runtime story).
       2. The snippet's syscalls go through Sentry on the gVisor tier
-         — useful narration point for "this is what gVisor isolation
-         actually does."
+         — concrete evidence of what gVisor isolation does at
+         runtime.
     """
     snippet_path = "/tmp/agent_snippet.py"
     with open(snippet_path, "w", encoding="utf-8") as f:
@@ -219,14 +216,14 @@ def execute_snippet(code: str) -> None:
         print(f"PASS: snippet exited {result.returncode}")
     except subprocess.TimeoutExpired:
         print("ERROR: snippet execution timed out (gVisor platform=ptrace "
-              "is slow under heavy syscall load — acceptable for demo)")
+              "is slow under heavy syscall load — expected behavior)")
 
 
 def main() -> int:
     step("Step 1: Install boto3 from PyPI (allowed egress)")
     if not pip_install("boto3"):
-        # If PyPI is blocked, the demo is broken — fail loudly so the
-        # narrator can pivot to Hubble to show WHY.
+        # If PyPI is blocked, nothing downstream works — fail loudly
+        # so the cause is obvious in the log.
         print("\nFATAL: PyPI install failed — check CiliumNetworkPolicy "
               "sandbox-llm-allowlist in the agent-sandboxes namespace.\n"
               "Hubble should show DROP flows to pypi.org if the policy "
@@ -251,7 +248,7 @@ def main() -> int:
 
     step("Step 3: Execute model-generated snippet inside the sandbox")
     # Strip any accidental markdown fences the model added despite the
-    # explicit "no markdown" instruction — real-world defense.
+    # explicit "no markdown" instruction.
     cleaned = snippet.strip()
     if cleaned.startswith("```"):
         first_newline = cleaned.find("\n")
@@ -268,7 +265,11 @@ def main() -> int:
     # TCP connection is ever attempted — the pod never gets an IP.
     # Observable via `cilium observe --type policy-verdict` / DNS
     # proxy flow logs; not visible in default Hubble Service Map.
-    try_egress("https://demo-blocked.example.com/", "NOT on allowlist")
+    # The hostname below is an example.com subdomain that's
+    # deliberately absent from the allowlist — swap in any FQDN
+    # that isn't in ciliumnetworkpolicy-sandbox-llm.yaml to test
+    # a different enforcement path.
+    try_egress("https://blocked-example.example.com/", "NOT on allowlist")
 
     step("Step 5: Attempt raw IP egress to a BLOCKED address")
     # Counterpart to Step 4. Connecting by IP bypasses DNS entirely,
@@ -280,7 +281,7 @@ def main() -> int:
     # non-allowlisted IP with no ambiguity about what gets blocked.
     try_ip_egress("8.8.8.8", 443, "NOT on allowlist")
 
-    step("Demo complete")
+    step("Reference run complete")
     print("\nExpected outcomes:")
     print("  Step 1 (PyPI):            PASS — allowed by FQDN policy")
     print("  Step 2 (Bedrock):         PASS — allowed by FQDN policy")

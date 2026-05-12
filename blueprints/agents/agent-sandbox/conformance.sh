@@ -21,8 +21,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INFRA_DIR="$SCRIPT_DIR/../../../infra/agent-sandbox"
 NS="agent-sandboxes"
-SA="sandbox-demo-agent"
-POD="sandbox-demo"
+SA="sandbox-agent-sa"
+POD="sandbox-agent"
+CONFIGMAP="sandbox-agent-script"
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
 REGION="${AWS_REGION:-us-east-1}"
 
@@ -51,18 +52,19 @@ require_cluster() {
 }
 
 setup_configmap_with_real_agent() {
-    # demo-agent.yaml embeds a ConfigMap with a placeholder agent.py.
-    # We apply demo-agent.yaml first (which creates the SA + placeholder
-    # ConfigMap + Sandbox), then overwrite the ConfigMap with the real
-    # agent.py contents, then bounce the pod so the container's
-    # startup `cp /config/agent.py /workspace/agent.py` picks up the
-    # real content. This order avoids races where the placeholder
-    # content is copied into /workspace and sticks there.
+    # sandbox-agent.yaml embeds a ConfigMap with a placeholder
+    # agent.py. We apply sandbox-agent.yaml first (which creates the
+    # SA + placeholder ConfigMap + Sandbox), then overwrite the
+    # ConfigMap with the real agent.py contents, then bounce the pod
+    # so the container's startup `cp /config/agent.py
+    # /workspace/agent.py` picks up the real content. This order
+    # avoids races where the placeholder content is copied into
+    # /workspace and sticks there.
     log "Applying Sandbox manifest (creates SA + placeholder ConfigMap + Sandbox)..."
-    kubectl apply -f "$INFRA_DIR/manifests/demo-agent.yaml" >/dev/null
+    kubectl apply -f "$INFRA_DIR/manifests/sandbox-agent.yaml" >/dev/null
 
     log "Replacing placeholder ConfigMap with real agent.py contents..."
-    kubectl -n "$NS" create configmap sandbox-demo-agent-script \
+    kubectl -n "$NS" create configmap "$CONFIGMAP" \
         --from-file=agent.py="$SCRIPT_DIR/agent.py" \
         --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
@@ -87,7 +89,7 @@ setup_irsa_annotation() {
     #   BEDROCK_ROLE_ARN  — IAM role ARN with bedrock:InvokeModel +
     #                       IRSA trust policy allowing the cluster's
     #                       OIDC provider for
-    #                       system:serviceaccount:agent-sandboxes:sandbox-demo-agent
+    #                       system:serviceaccount:agent-sandboxes:sandbox-agent-sa
     log "Ensuring ServiceAccount $SA exists + has IRSA annotation..."
     if ! kubectl -n "$NS" get serviceaccount "$SA" >/dev/null 2>&1; then
         kubectl -n "$NS" create serviceaccount "$SA" >/dev/null
@@ -138,7 +140,7 @@ run_agent_and_validate() {
     echo "$output" | grep -q "PASS: boto3 installed" || fail "Step 1 (PyPI install) did not PASS"
     echo "$output" | grep -q "Bedrock reply" || fail "Step 2 (Bedrock call) did not return a reply"
     echo "$output" | grep -q "PASS: snippet exited 0" || fail "Step 3 (snippet execution) did not PASS"
-    echo "$output" | grep -qE "BLOCKED: https://demo-blocked\.example\.com" || fail "Step 4 (FQDN block) did not BLOCK"
+    echo "$output" | grep -qE "BLOCKED: https://blocked-example\.example\.com" || fail "Step 4 (FQDN block) did not BLOCK"
     echo "$output" | grep -qE "BLOCKED: 8\.8\.8\.8:443" || fail "Step 5 (IP block) did not BLOCK"
     log "All 5 expected outcomes matched."
 }
@@ -146,14 +148,14 @@ run_agent_and_validate() {
 cleanup() {
     # Default: leave the sandbox running so repeat conformance runs
     # are fast (no re-provisioning gVisor nodes). Pass CLEANUP=1 to
-    # tear down the demo resources on exit.
+    # tear down the sandbox resources on exit.
     if [ "${CLEANUP:-0}" != "1" ]; then
         log "Leaving Sandbox + ConfigMap in place (set CLEANUP=1 to remove)."
         return 0
     fi
     log "Removing test-run resources (Sandbox pod + ConfigMap)..."
-    kubectl delete -f "$INFRA_DIR/manifests/demo-agent.yaml" --ignore-not-found >/dev/null 2>&1 || true
-    kubectl -n "$NS" delete configmap sandbox-demo-agent-script --ignore-not-found >/dev/null 2>&1 || true
+    kubectl delete -f "$INFRA_DIR/manifests/sandbox-agent.yaml" --ignore-not-found >/dev/null 2>&1 || true
+    kubectl -n "$NS" delete configmap "$CONFIGMAP" --ignore-not-found >/dev/null 2>&1 || true
     log "Cleanup complete. IAM role + IRSA annotation retained for re-runs."
 }
 

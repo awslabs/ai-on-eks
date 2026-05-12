@@ -5,18 +5,20 @@
 # via podTemplate.metadata.labels so every claimed sandbox inherits
 # the allowlist automatically.
 #
-# Allowed destinations (demo scope):
-#   - Bedrock runtime API (us-east-1)       — the reference agent's LLM call
-#   - STS                                   — IRSA / pod-identity auth for Bedrock
+# Allowed destinations:
+#   - Bedrock runtime API                   — the reference agent's LLM call
+#   - STS                                   — IRSA auth for Bedrock
 #   - PyPI + pythonhosted                   — pip install inside the sandbox
 #
 # Everything else is denied by default (no egress section = default-deny
 # for pods matching this selector).
 #
-# For the Hubble demo: the money shot is watching Hubble flows turn
-# green for Bedrock + PyPI and red for any unlisted destination the
-# reference agent attempts (by design, the agent deliberately tries
-# one unlisted FQDN to make the denial visible).
+# Visibility in Hubble: allowed destinations render as forwarded flows
+# in the default Service Map. Blocked FQDNs are enforced at the DNS
+# proxy layer (empty-answer response) and won't produce a DROPPED
+# flow in the UI — see the reference agent's README for how to
+# observe FQDN verdicts directly. Raw-IP drops DO render as DROPPED
+# flows; the reference agent's Step 5 exercises this path.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -61,7 +63,7 @@ spec:
             - port: "80"
               protocol: TCP
 
-    # 3. Bedrock runtime — the LLM the demo agent calls.
+    # 3. Bedrock runtime — the LLM the reference agent calls.
     - toFQDNs:
         - matchPattern: "bedrock-runtime.*.amazonaws.com"
       toPorts:
@@ -80,9 +82,10 @@ spec:
               protocol: TCP
 
     # 4. PyPI — so the agent can install packages inside the sandbox
-    #    mid-session (demo narrative: "the agent needs requests, it
-    #    pip-installs it from PyPI — allowed — then tries to exfil
-    #    to evil-domain.com — blocked").
+    #    mid-session. Example pattern: the agent imports a package
+    #    like `requests`, pip-installs it from PyPI (permitted here),
+    #    then attempts egress to an unlisted domain (blocked at the
+    #    DNS proxy because the FQDN isn't in this allowlist).
     - toFQDNs:
         - matchName: "pypi.org"
         - matchPattern: "*.pypi.org"

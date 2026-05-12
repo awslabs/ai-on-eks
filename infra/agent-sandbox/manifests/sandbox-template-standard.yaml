@@ -5,9 +5,9 @@
 # for orchestration-only agents making LLM calls without executing
 # untrusted code. Cold start ~1s; no additional isolation cost.
 #
-# Tier selection for the demo: this template is claimed by the
-# "orchestration-only" variant of the reference agent to contrast
-# against the gVisor tier.
+# Tier selection: orchestration-only agents (LLM calls, no code
+# execution) claim this template; agents that execute untrusted
+# code should claim the gVisor template instead.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
@@ -18,10 +18,10 @@ metadata:
 spec:
   # Let Cilium be the sole policy enforcement path. The controller's
   # default is Managed, which auto-creates a kubernetes.io/v1
-  # NetworkPolicy alongside the Sandbox — fine functionally but
-  # obscures the demo narrative ("here's what Cilium is doing vs
-  # what the built-in policy is doing"). Unmanaged = one policy
-  # surface, easier to reason about.
+  # NetworkPolicy alongside the Sandbox — functionally equivalent
+  # for default-allow workloads but creates two policy surfaces to
+  # reason about when debugging. Unmanaged = one policy surface,
+  # easier to audit.
   networkPolicyManagement: Unmanaged
   podTemplate:
     metadata:
@@ -37,8 +37,8 @@ spec:
           image: python:3.12-slim
           imagePullPolicy: IfNotPresent
           # Keep the sandbox alive until the agent explicitly shuts it
-          # down. The demo agent runs inside via kubectl exec rather
-          # than as the pod entrypoint — matches the SIG-Apps
+          # down. The reference agent runs inside via kubectl exec
+          # rather than as the pod entrypoint — matches the SIG-Apps
           # singleton-stateful pattern.
           command: ["/bin/sh", "-c", "sleep infinity"]
           resources:

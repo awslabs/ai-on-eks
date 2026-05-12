@@ -1,6 +1,6 @@
 {
   "Version": "2012-10-17",
-  "Comment": "Bedrock permission template — substitute <ACCOUNT_ID> before applying. Widen the resource scope to match whichever Claude model family the demo agent invokes.",
+  "Comment": "Bedrock permission template — substitute <ACCOUNT_ID> before applying. Widen the resource scope to match whichever Claude model family the reference agent invokes.",
   "Statement": [
     {
       "Sid": "BedrockInvoke",

@@ -11,15 +11,15 @@
 #   cd infra/agent-sandbox
 #   ./install.sh
 #
-# Usage (phased — useful when iterating on manifests during demo prep):
+# Usage (phased — useful when iterating on manifests):
 #   ./install.sh cluster    # Base EKS cluster only (20-30 min)
 #   ./install.sh cilium     # + Cilium chaining + Hubble
 #   ./install.sh sandbox    # + SIG-Apps agent-sandbox controller
 #   ./install.sh manifests  # + RuntimeClass, SandboxTemplates, NetworkPolicies
 #
 # Each phase is idempotent; running `./install.sh manifests` after a
-# full `./install.sh` just re-applies manifests. Useful when the demo
-# needs a last-minute reset.
+# full `./install.sh` just re-applies manifests. Useful when
+# debugging or reprovisioning individual components.
 #
 # Destroy:
 #   cd infra/agent-sandbox/terraform/_LOCAL
@@ -60,9 +60,7 @@ install_cilium() {
     helm repo update cilium
     # Chaining mode: VPC CNI keeps allocating pod IPs + setting up the
     # veth pair, Cilium runs as a meta-plugin attaching eBPF programs
-    # on top. Hubble is bundled for flow observability — the primary
-    # demo surface for "show me the egress decisions happening in real
-    # time."
+    # on top. Hubble is bundled for flow observability.
     #
     # Critical chaining-mode settings that Cilium's Helm defaults get
     # wrong if you don't set them explicitly:
@@ -126,7 +124,7 @@ install_manifests() {
     # IAM role name (the ai-on-eks base module appends a
     # Terraform-generated suffix so the name isn't predictable).
     # Render both from the live cluster state rather than
-    # requiring the demo operator to hand-edit.
+    # requiring hand-editing of manifests.
     #
     # Using sed-based substitution (not envsubst) because the user-data
     # in the NodePool is shell script with its own $VAR references
@@ -160,12 +158,11 @@ install_manifests() {
 
 install_kro() {
     echo ""
-    echo "=== Phase 5 (stretch): Installing KRO + AgentSandbox RGD ==="
+    echo "=== Phase 5 (optional): Installing KRO + AgentSandbox RGD ==="
     bash "$SCRIPT_DIR/manifests/kro-install.sh"
     kubectl apply -f "$SCRIPT_DIR/manifests/rgd-agent-sandbox.yaml"
-    # Wait for the RGD's generated CRD to register. Useful to confirm
-    # before the showcase since users will immediately kubectl apply
-    # the instance YAML.
+    # Wait for the RGD's generated CRD to register so that users can
+    # immediately kubectl apply the instance YAML.
     echo ""
     echo "Waiting for AgentSandbox CRD to be installed..."
     for i in $(seq 1 30); do
@@ -183,7 +180,7 @@ finish_message() {
     echo "=== Installation complete ==="
     echo ""
     echo "Next steps:"
-    echo "  - Run the reference agent:    kubectl apply -f $SCRIPT_DIR/manifests/demo-agent.yaml"
+    echo "  - Deploy the reference agent: kubectl apply -f $SCRIPT_DIR/manifests/sandbox-agent.yaml"
     echo "  - Watch sandbox provisioning: kubectl get sandboxes -A -w"
     echo "  - Open Hubble UI:             kubectl port-forward -n kube-system svc/hubble-ui 12000:80"
     echo "  - Cleanup:                    cd terraform/_LOCAL && ./cleanup.sh"

@@ -1,48 +1,57 @@
-# Demo agent — direct Sandbox resource (not a SandboxClaim against the
-# gVisor template) because the demo wants the full spec visible in one
-# file for narration. Production workloads would consume the template
-# via SandboxClaim; both patterns are supported by the upstream
-# controller.
+# Reference Sandbox — a direct Sandbox resource demonstrating the
+# blueprint's isolation + egress story end-to-end. Uses a plain
+# `Sandbox` CR (not a `SandboxClaim` against a SandboxTemplate) so
+# the full spec is visible in one file for readers. Production
+# workloads are equally supported via the SandboxClaim pattern;
+# see the sibling `sandbox-template-{standard,gvisor}.yaml`.
 #
-# Expected flow during the showcase:
-#   1. Apply this file + the ConfigMap that carries agent.py.
-#   2. Sandbox controller creates the pod on a gVisor node.
-#   3. Demo operator runs:
-#        kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime \
-#            -- python /workspace/agent.py
-#      ...which walks the four-step flow (install, Bedrock call,
-#      execute, blocked-egress) and prints PASS/BLOCKED outcomes.
+# Usage:
+#   1. Apply this manifest + the ConfigMap that carries agent.py.
+#      `install.sh` populates the ConfigMap from the reference
+#      agent at blueprints/agents/agent-sandbox/agent.py.
+#   2. Sandbox controller provisions the pod on a gVisor node
+#      (the NodePool in karpenter-nodepool-gvisor.yaml supplies
+#      nodes with the `runsc` containerd shim installed).
+#   3. Execute the reference agent:
+#        kubectl exec -n agent-sandboxes sandbox-agent \
+#            -c agent-runtime -- python /workspace/agent.py
+#      The agent walks five steps (pip install, Bedrock call,
+#      snippet execution, FQDN block, IP block) and prints
+#      PASS/BLOCKED outcomes.
 #
-# IAM: the ServiceAccount picks up Bedrock permissions via EKS Pod
-# Identity (configured by install.sh before this manifest applies).
-# The role ARN is templated and substituted at apply time.
+# IAM: the ServiceAccount is annotated with an IRSA role via
+# `install.sh` / `conformance.sh` runtime setup. Pod Identity is
+# NOT used for gVisor-tier sandboxes because the Sentry network
+# namespace doesn't forward the link-local route to the Pod
+# Identity credential endpoint at 169.254.170.23 — IRSA routes
+# through STS over the regular network path, which the CNP allows.
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sandbox-demo-agent
+  name: sandbox-agent-sa
   namespace: agent-sandboxes
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: sandbox-demo-agent-script
+  name: sandbox-agent-script
   namespace: agent-sandboxes
   labels:
-    agent-sandbox/role: demo-agent
+    agent-sandbox/role: runtime
 data:
   # Actual contents populated by install.sh via
   #   kubectl create configmap --from-file=agent.py=...
   # This placeholder keeps the manifest self-contained for review.
-  agent.py: "# populated by install.sh from blueprints/agents/sandbox-demo/agent.py"
+  agent.py: "# populated by install.sh from blueprints/agents/agent-sandbox/agent.py"
 ---
 apiVersion: agents.x-k8s.io/v1alpha1
 kind: Sandbox
 metadata:
-  name: sandbox-demo
+  name: sandbox-agent
   namespace: agent-sandboxes
   labels:
-    agent-sandbox/role: demo
+    agent-sandbox/role: runtime
     agent-sandbox/tier: gvisor
 spec:
   podTemplate:
@@ -53,7 +62,7 @@ spec:
         egress-tier: sandbox
         agent-sandbox/tier: gvisor
     spec:
-      serviceAccountName: sandbox-demo-agent
+      serviceAccountName: sandbox-agent-sa
       runtimeClassName: gvisor
       tolerations:
         - key: agent-sandbox/runtime
@@ -71,7 +80,7 @@ spec:
               cp /config/agent.py /workspace/agent.py
               chmod +x /workspace/agent.py
               echo "sandbox ready"
-              echo "run: kubectl exec -n agent-sandboxes sandbox-demo -c agent-runtime -- python /workspace/agent.py"
+              echo "run: kubectl exec -n agent-sandboxes sandbox-agent -c agent-runtime -- python /workspace/agent.py"
               sleep infinity
           env:
             - name: AWS_REGION
@@ -95,8 +104,8 @@ spec:
             runAsNonRoot: true
             runAsUser: 1000
             # Read-only root FS + writable /workspace + /tmp. pip
-            # install --user writes to ~/.local which is in /workspace
-            # via HOME=/workspace below.
+            # install --user writes to ~/.local which resolves to
+            # /workspace/.local via HOME=/workspace above.
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
@@ -116,7 +125,7 @@ spec:
           emptyDir: {}
         - name: agent-script
           configMap:
-            name: sandbox-demo-agent-script
+            name: sandbox-agent-script
             items:
               - key: agent.py
                 path: agent.py

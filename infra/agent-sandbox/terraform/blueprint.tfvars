@@ -14,9 +14,9 @@ enable_eks_auto_mode = false
 ami_family = "bottlerocket"
 
 # Core addons — the base already ships VPC CNI with most_recent=true,
-# which pulls v1.21.1+ for DNS-based ClusterNetworkPolicy support. The
-# demo also relies on metrics-server for resource visibility during the
-# live run.
+# which pulls v1.21.1+ for DNS-based ClusterNetworkPolicy support.
+# metrics-server is retained for `kubectl top` visibility during
+# development and troubleshooting.
 enable_cluster_addons = {
   coredns                         = true
   kube-proxy                      = true
@@ -27,15 +27,15 @@ enable_cluster_addons = {
   amazon-cloudwatch-observability = true
 }
 
-# AWS Load Balancer Controller — needed for any ingress we expose during
-# the demo (Hubble UI, sample agent webhook). Already the base default
-# but explicit here for clarity.
+# AWS Load Balancer Controller — needed for any ingress that exposes
+# cluster services externally (e.g., Hubble UI or an agent webhook).
+# Already the base default but explicit here for clarity.
 enable_aws_load_balancer_controller = true
 
-# Observability — keep the Kube Prometheus stack off for the demo
-# (Hubble's built-in UI is enough, and Prometheus adds ~90s to the
-# install). Re-enable for long-lived deployments where flow metrics
-# matter.
+# Observability — keep the Kube Prometheus stack off by default
+# (Hubble's built-in UI covers the flow-level observability this
+# blueprint needs, and Prometheus adds ~90s to the install). Enable
+# for long-lived deployments where flow metrics retention matters.
 enable_kube_prometheus_stack = false
 enable_amazon_prometheus     = false
 
