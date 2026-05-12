@@ -1,15 +1,30 @@
 # Reference AgentSandbox instance — demonstrates the KRO
-# composition pattern. Creates a ServiceAccount + Sandbox from a
-# single declarative unit via the ResourceGraphDefinition at
-# rgd-agent-sandbox.yaml. Contrast with sandbox-agent.yaml, which
-# stages both primitives explicitly: the AgentSandbox view is what
-# a customer would see after adopting the blueprint.
+# composition pattern. Creates a ServiceAccount + Sandbox running
+# the reference agent from a single declarative unit via the
+# ResourceGraphDefinition at rgd-agent-sandbox.yaml.
+#
+# Contrast with sandbox-agent.yaml, which stages the ServiceAccount,
+# ConfigMap, and Sandbox explicitly across ~130 lines. The AgentSandbox
+# form collapses the declaration to this ~20-line instance. Both
+# paths produce an equivalent running pod — the composition view is
+# what a customer adopting the blueprint would typically apply.
 #
 # Egress policy enforcement is provided by the sibling
-# CiliumNetworkPolicy (ciliumnetworkpolicy-sandbox-llm.yaml) — the
-# AgentSandbox's podTemplate stamps an `egress-tier: sandbox` label
-# that the policy's endpointSelector matches, so the composition is
+# CiliumNetworkPolicy (ciliumnetworkpolicy-sandbox-llm.yaml) or the
+# native ApplicationNetworkPolicy — the AgentSandbox's podTemplate
+# stamps an `egress-tier: sandbox` label that the policy's
+# endpointSelector / podSelector matches, so the composition is
 # complete once both resources are applied to the same namespace.
+#
+# Prerequisites:
+#   1. The reference agent ConfigMap (`sandbox-agent-script`) must
+#      exist in the target namespace. install.sh populates it from
+#      blueprints/agents/agent-sandbox/agent.py. The AgentSandbox
+#      mounts it at /config and cp's it to /workspace/agent.py on
+#      container start.
+#   2. The IAM role referenced by iamRoleArn must include both the
+#      direct sandbox-agent-sa AND this AgentSandbox name
+#      (`composed-sandbox`) in its IRSA trust policy subject list.
 apiVersion: custom.agents.x-k8s.io/v1alpha1
 kind: AgentSandbox
 metadata:
@@ -23,7 +38,7 @@ spec:
   # standalone sandbox-agent.yaml — IRSA trust policy must include
   # system:serviceaccount:agent-sandboxes:composed-sandbox.
   iamRoleArn: "__BEDROCK_ROLE_ARN__"
-  command:
-    - /bin/sh
-    - -c
-    - "sleep infinity"
+  # Script ConfigMap to mount at /config. Shared with the direct
+  # sandbox-agent.yaml path so both forms exercise the same
+  # reference agent without duplicating the ConfigMap.
+  scriptConfigMap: sandbox-agent-script
