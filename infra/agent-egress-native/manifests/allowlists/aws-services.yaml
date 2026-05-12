@@ -1,0 +1,39 @@
+# AWS service allowlist — ApplicationNetworkPolicy (native egress variant).
+#
+# Allows outbound HTTPS to core AWS service endpoints that agent
+# workloads most commonly need. IMDS is denied cluster-wide via the
+# admin-tier ClusterNetworkPolicy — don't add it here.
+#
+# Services included:
+#   - STS          — sts.*.amazonaws.com (IRSA auth)
+#   - Bedrock      — bedrock.*.amazonaws.com + bedrock-runtime.*.amazonaws.com
+#   - S3           — *.s3.*.amazonaws.com + s3.*.amazonaws.com
+#   - DynamoDB     — dynamodb.*.amazonaws.com
+#
+# Equivalent CiliumNetworkPolicy for Standard EKS:
+#   ../../../agent-egress-chained/manifests/allowlists/aws-services.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: allowlist-aws-services
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: aws-services
+spec:
+  podSelector:
+    matchLabels:
+      allowlist: aws-services
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - domainNames:
+            - "sts.*.amazonaws.com"
+            - "bedrock.*.amazonaws.com"
+            - "bedrock-runtime.*.amazonaws.com"
+            - "s3.*.amazonaws.com"
+            - "*.s3.*.amazonaws.com"
+            - "dynamodb.*.amazonaws.com"
+      ports:
+        - protocol: TCP
+          port: 443

@@ -1,0 +1,70 @@
+# Per-sandbox FQDN egress allowlist — native EKS Auto Mode variant.
+#
+# Scope: the `agent-sandboxes` namespace, pods labeled `egress-tier:
+# sandbox`. Both SandboxTemplates (standard + gVisor) apply this
+# label via podTemplate.metadata.labels so every claimed sandbox
+# inherits the allowlist automatically.
+#
+# Allowed destinations:
+#   - Bedrock runtime API                   — the reference agent's LLM call
+#   - STS                                   — IRSA auth for Bedrock
+#   - PyPI + pythonhosted                   — pip install inside the sandbox
+#
+# Everything else is denied by default (namespace-scoped ANP with
+# only explicit Allow entries = implicit deny for unlisted flows).
+#
+# Enforcement behavior: ApplicationNetworkPolicy enforces FQDN rules
+# via the VPC CNI's DNS proxy (returns empty DNS answer for denied
+# FQDNs) and L3/L4 rules via eBPF on the pod's veth. The reference
+# agent's Step 4 (FQDN block) exercises the DNS-proxy path; Step 5
+# (IP block) exercises the L3/L4 path.
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: sandbox-llm-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+spec:
+  podSelector:
+    matchLabels:
+      egress-tier: sandbox
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS resolution (CoreDNS in kube-system).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. EKS Pod Identity credential endpoint (169.254.170.23).
+    #    Preserved for standard-tier workloads that use Pod Identity.
+    #    gVisor workloads use IRSA over the regular network path.
+    - to:
+        - networks:
+            - 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+
+    # 3. Allowed FQDNs — Bedrock + STS + PyPI.
+    - to:
+        - domainNames:
+            - "bedrock-runtime.*.amazonaws.com"
+            - "bedrock.*.amazonaws.com"
+            - "sts.*.amazonaws.com"
+            - "pypi.org"
+            - "*.pypi.org"
+            - "*.pythonhosted.org"
+      ports:
+        - protocol: TCP
+          port: 443
