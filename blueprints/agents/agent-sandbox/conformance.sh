@@ -19,8 +19,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-INFRA_DIR="$SCRIPT_DIR"
-AGENT_DIR="$SCRIPT_DIR/../../blueprints/agents/agent-sandbox"
+# conformance.sh lives at blueprints/agents/agent-sandbox/. The manifests it
+# depends on (sandbox-agent.yaml, etc.) live at infra/solutions/agent-sandbox/.
+AGENT_DIR="$SCRIPT_DIR"
+INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/solutions/agent-sandbox" && pwd)"
 NS="agent-sandboxes"
 SA="sandbox-agent-sa"
 POD="sandbox-agent"
@@ -46,26 +48,27 @@ require_env() {
 require_cluster() {
     log "Checking cluster reachability + prerequisites..."
     kubectl cluster-info >/dev/null 2>&1 || fail "kubectl cannot reach the cluster; run 'aws eks update-kubeconfig --name $CLUSTER_NAME --region $REGION'"
-    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; run 'infra/agent-sandbox/install.sh manifests'"
-    kubectl get runtimeclass gvisor >/dev/null 2>&1 || fail "RuntimeClass 'gvisor' missing; run 'infra/agent-sandbox/install.sh manifests'"
-    kubectl get sandboxtemplate sandbox-gvisor -n "$NS" >/dev/null 2>&1 || fail "SandboxTemplate 'sandbox-gvisor' missing; run 'infra/agent-sandbox/install.sh manifests'"
-    kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; run 'infra/agent-sandbox/install.sh sandbox'"
+    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
+    kubectl get runtimeclass gvisor >/dev/null 2>&1 || fail "RuntimeClass 'gvisor' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
+    kubectl get sandboxtemplate sandbox-gvisor -n "$NS" >/dev/null 2>&1 || fail "SandboxTemplate 'sandbox-gvisor' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
+    kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; set enable_agent_sandbox=true in blueprint.tfvars and re-run install.sh"
 
-    # Egress enforcement ships in a sibling blueprint (agent-egress-chained or
-    # agent-egress-native). At least one must be installed for Step 4/5 of the
-    # reference agent to produce BLOCKED outcomes.
+    # Egress enforcement ships in an example layered on top of the solution
+    # (examples/agent-egress-chained or examples/agent-egress-native). At
+    # least one must be installed for Step 4/5 of the reference agent to
+    # produce BLOCKED outcomes.
     local chained_policy_ok=""
     local native_policy_ok=""
     kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && chained_policy_ok="yes"
     kubectl -n "$NS" get applicationnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && native_policy_ok="yes"
     if [ -z "$chained_policy_ok" ] && [ -z "$native_policy_ok" ]; then
-        fail "No egress allowlist found. Install either 'infra/agent-egress-chained/' (Standard EKS) or 'infra/agent-egress-native/' (Auto Mode) first."
+        fail "No egress allowlist found. Install one of the egress examples first: infra/solutions/agent-sandbox/examples/agent-egress-{chained,native}/install.sh"
     fi
     if [ -n "$chained_policy_ok" ]; then
-        log "Detected chained egress blueprint (Cilium CNP sandbox-llm-allowlist)."
+        log "Detected chained egress example (Cilium CNP sandbox-llm-allowlist)."
     fi
     if [ -n "$native_policy_ok" ]; then
-        log "Detected native egress blueprint (ApplicationNetworkPolicy sandbox-llm-allowlist)."
+        log "Detected native egress example (ApplicationNetworkPolicy sandbox-llm-allowlist)."
     fi
 }
 

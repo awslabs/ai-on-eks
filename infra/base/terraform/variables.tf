@@ -366,6 +366,32 @@ variable "enable_leader_worker_set" {
   default     = false
 }
 
+# kubernetes-sigs/agent-sandbox controller
+variable "enable_agent_sandbox" {
+  description = "Enable the SIG-Apps agent-sandbox controller (Sandbox / SandboxTemplate / SandboxClaim CRDs and reconciler)"
+  type        = bool
+  default     = false
+}
+
+variable "agent_sandbox_version" {
+  description = "kubernetes-sigs/agent-sandbox git ref (tag or branch) for the ArgoCD sync"
+  type        = string
+  default     = "v0.4.3"
+}
+
+# Kube Resource Orchestrator (kro)
+variable "enable_kro" {
+  description = "Enable kro (Kube Resource Orchestrator) for ResourceGraphDefinition-based composition"
+  type        = bool
+  default     = false
+}
+
+variable "kro_version" {
+  description = "kro Helm chart version (oci://registry.k8s.io/kro/charts/kro)"
+  type        = string
+  default     = "0.9.1"
+}
+
 # Enable NVIDIA DRA Driver addon
 variable "enable_nvidia_dra_driver" {
   description = "Enable NVIDIA DRA Driver addon"

@@ -1,49 +1,44 @@
 #!/bin/bash
-# Agent Egress (Chained) blueprint installer.
+# Agent Sandbox — Chained egress example.
 #
 # Installs Cilium in aws-cni chaining mode on top of the base EKS VPC
-# CNI, plus Hubble for flow observability, plus the default admin-tier
-# CiliumClusterwideNetworkPolicy + sandbox-tier CiliumNetworkPolicy.
-# Use this blueprint when running on Standard EKS, where native
-# ApplicationNetworkPolicy is not yet available.
+# CNI, plus Hubble for flow observability, plus the admin-tier
+# CiliumClusterwideNetworkPolicy + sandbox-tier CiliumNetworkPolicy
+# for FQDN egress enforcement. Use this example on Standard EKS
+# clusters (not Auto Mode), where native ApplicationNetworkPolicy is
+# not yet available.
 #
-# Target audience: customers running Standard EKS (not Auto Mode) who
-# need FQDN egress enforcement for agent workloads today. Cilium is
-# one of several service-mesh options that can provide this — Istio,
-# Linkerd, and others support similar FQDN patterns via chaining.
-# Cilium is used here for convenience (single dependency, native
-# Hubble observability, stable CNCF-graduated project), not out of
-# architectural necessity.
+# Cilium is one of several service-mesh options that can provide FQDN
+# filtering — Istio, Linkerd, and others support similar patterns via
+# chaining. Cilium is used here for convenience (single dependency,
+# native Hubble observability, stable CNCF-graduated project), not
+# out of architectural necessity.
 #
-# When `ApplicationNetworkPolicy` extends to Standard EKS, customers
-# can migrate from this blueprint to `infra/agent-egress-native/` by
-# replacing the CiliumNetworkPolicy manifests with equivalent
-# ApplicationNetworkPolicy resources. See allowlists/README.md for
-# the side-by-side CNP/ANP template pairs.
+# When ApplicationNetworkPolicy extends to Standard EKS, customers
+# can migrate from this example to the sibling agent-egress-native
+# by replacing the CiliumNetworkPolicy manifests with equivalent
+# ApplicationNetworkPolicy resources. The allowlist templates ship
+# as CNP/ANP pairs so migration is mechanical.
 #
-# Prerequisite: install `infra/agent-sandbox/` first. This blueprint
-# assumes the agent-sandboxes namespace + sandbox controller exist.
+# Prerequisite: the parent agent-sandbox solution must be deployed
+# first (provides the cluster + agent-sandboxes namespace + SIG-Apps
+# controller). This example assumes kubectl is configured for that
+# cluster.
 #
-# Usage (full install):
-#   cd infra/agent-egress-chained
-#   ./install.sh
-#
-# Usage (phased):
-#   ./install.sh cilium     # Cilium chaining + Hubble (3-5 min)
-#   ./install.sh policies   # Admin + app-tier CNPs (~10s)
-#
-# Each phase is idempotent.
-#
-# Destroy:
-#   ./install.sh uninstall
+# Usage:
+#   cd infra/solutions/agent-sandbox/examples/agent-egress-chained
+#   ./install.sh                # Install Cilium + apply policies
+#   ./install.sh cilium         # Cilium chaining + Hubble only
+#   ./install.sh policies       # Policies only (Cilium already installed)
+#   ./install.sh uninstall      # Remove policies + Cilium
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PHASE="${1:-all}"
+PHASE="${1:-install}"
 
 install_cilium() {
-    echo "=== Phase 1: Installing Cilium (chaining mode) + Hubble ==="
+    echo "=== Installing Cilium (chaining mode) + Hubble ==="
     helm repo add cilium https://helm.cilium.io/ 2>/dev/null || true
     helm repo update cilium
     # Chaining mode: VPC CNI keeps allocating pod IPs + setting up the
@@ -59,14 +54,8 @@ install_cilium() {
     #     that lives in the host network namespace. Use 10.100.0.0/16
     #     which is outside both common VPC CIDRs (10.0.0.0/16 primary,
     #     100.64.0.0/16 EKS secondary).
-    #     The ipam.mode=kubernetes alternative needs every Node to
-    #     have spec.podCIDR populated, which EKS does not do.
-    #     The ipam.mode=delegated-plugin alternative needs per-node
-    #     local-router-ipv4 annotation, which is too intricate for
-    #     this blueprint.
     #   - routingMode=native — no encapsulation; VPC CNI handles all
-    #     underlay networking. (tunnel=disabled was removed in 1.15;
-    #     routingMode=native implies it.)
+    #     underlay networking.
     #   - kubeProxyReplacement=false — chaining doesn't replace
     #     kube-proxy; VPC CNI relies on it.
     #   - enableIPv4Masquerade=false — VPC CNI handles SNAT via the
@@ -91,7 +80,7 @@ install_cilium() {
 
 install_policies() {
     echo ""
-    echo "=== Phase 2: Applying admin + app-tier CiliumNetworkPolicies ==="
+    echo "=== Applying admin + app-tier CiliumNetworkPolicies ==="
     kubectl apply -f "$SCRIPT_DIR/manifests/ciliumclusterwidenetworkpolicy-admin.yaml"
     kubectl apply -f "$SCRIPT_DIR/manifests/ciliumnetworkpolicy-sandbox-llm.yaml"
 
@@ -116,7 +105,7 @@ finish_message() {
     echo "Next steps:"
     echo "  - Open the Hubble UI:          kubectl port-forward -n kube-system svc/hubble-ui 12000:80"
     echo "  - Browse allowlist templates:  ls manifests/allowlists/"
-    echo "  - Run end-to-end conformance:  cd ../agent-sandbox && ./conformance.sh"
+    echo "  - Run end-to-end conformance:  cd ../../../../../blueprints/agents/agent-sandbox && ./conformance.sh"
 }
 
 case "$PHASE" in
@@ -126,7 +115,7 @@ case "$PHASE" in
     policies)
         install_policies
         ;;
-    all)
+    install)
         install_cilium
         install_policies
         finish_message
@@ -136,7 +125,7 @@ case "$PHASE" in
         ;;
     *)
         echo "Unknown phase: $PHASE"
-        echo "Valid phases: cilium | policies | all | uninstall"
+        echo "Valid phases: cilium | policies | install | uninstall"
         exit 1
         ;;
 esac

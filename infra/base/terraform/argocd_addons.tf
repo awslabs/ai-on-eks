@@ -261,3 +261,27 @@ resource "kubectl_manifest" "gateway_api_inference_crds_yaml" {
     helm_release.argocd
   ]
 }
+
+# kubernetes-sigs/agent-sandbox controller
+resource "kubectl_manifest" "agent_sandbox_yaml" {
+  count = var.enable_agent_sandbox ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/agent-sandbox.yaml", {
+    agent_sandbox_version = var.agent_sandbox_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# KRO (Kube Resource Orchestrator)
+resource "kubectl_manifest" "kro_yaml" {
+  count = var.enable_kro ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/kro.yaml", {
+    kro_version = var.kro_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
