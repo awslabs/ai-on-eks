@@ -262,17 +262,10 @@ resource "kubectl_manifest" "gateway_api_inference_crds_yaml" {
   ]
 }
 
-# kubernetes-sigs/agent-sandbox controller
-resource "kubectl_manifest" "agent_sandbox_yaml" {
-  count = var.enable_agent_sandbox ? 1 : 0
-  yaml_body = templatefile("${path.module}/argocd-addons/agent-sandbox.yaml", {
-    agent_sandbox_version = var.agent_sandbox_version
-  })
-
-  depends_on = [
-    helm_release.argocd
-  ]
-}
+# kubernetes-sigs/agent-sandbox is installed via raw release YAMLs
+# (kubectl_manifest in agent-sandbox.tf) rather than ArgoCD because
+# the SIG-Apps project doesn't ship a kustomize-friendly directory
+# tree. See agent-sandbox.tf for the install pattern.
 
 # KRO (Kube Resource Orchestrator)
 resource "kubectl_manifest" "kro_yaml" {

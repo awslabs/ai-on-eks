@@ -34,7 +34,7 @@ flowchart TB
 
     A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
 
-    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>ArgoCD-managed addon (enable_agent_sandbox=true)</i>"]:::controller
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>base-module addon (enable_agent_sandbox=true)</i>"]:::controller
 
     subgraph C["RuntimeClass selection"]
         direction LR
@@ -64,8 +64,8 @@ flowchart TB
 The solution deploys in layers:
 
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
-- **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
-- **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
+- **kubernetes-sigs/agent-sandbox controller** (installed via the SIG-Apps release manifests as a base-module addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
+- **KRO (Kube Resource Orchestrator)** (ArgoCD-managed base-module addon) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
 - **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
 - **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the solution with one of:
   - [agent-egress-chained](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress-chained) — Cilium + Hubble chaining for Standard EKS.

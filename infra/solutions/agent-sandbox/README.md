@@ -42,7 +42,7 @@ flowchart TB
 
     A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
 
-    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox / SandboxTemplate / SandboxClaim lifecycle<br/><i>ArgoCD addon, enable_agent_sandbox=true</i>"]:::controller
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox / SandboxTemplate / SandboxClaim lifecycle<br/><i>base-module addon, enable_agent_sandbox=true</i>"]:::controller
 
     subgraph C["RuntimeClass selection"]
         direction LR
@@ -177,7 +177,7 @@ cd ai-on-eks/infra/solutions/agent-sandbox
 ./install.sh                                             # 20-30 min
 ```
 
-The solution's `blueprint.tfvars` enables the `agent-sandbox` controller and `kro` as ArgoCD-managed addons via the base module. After `install.sh` completes, the cluster is up with:
+The solution's `blueprint.tfvars` enables the `agent-sandbox` controller (installed directly from the SIG-Apps release manifests) and `kro` (deployed via ArgoCD) as base-module addons. After `install.sh` completes, the cluster is up with:
 
 - Karpenter ready for Node provisioning
 - `agent-sandbox-system` namespace with the controller running
