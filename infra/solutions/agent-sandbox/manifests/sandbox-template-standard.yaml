@@ -1,13 +1,20 @@
 # SandboxTemplate — standard tier (runc).
 #
-# This is the baseline tier per SPEC §3.1 — namespace + cgroup
-# isolation via runc, the default Kubernetes container runtime. Use
-# for orchestration-only agents making LLM calls without executing
-# untrusted code. Cold start ~1s; no additional isolation cost.
+# This is the baseline tier per SPEC §3.1 — namespace + cgroup isolation
+# via runc, the default Kubernetes container runtime. Use for orchestration-
+# only agents making LLM calls without executing untrusted code, or on
+# clusters where gVisor isn't available (e.g., EKS Auto Mode does not
+# expose node-level hooks for installing the runsc shim).
 #
-# Tier selection: orchestration-only agents (LLM calls, no code
-# execution) claim this template; agents that execute untrusted
-# code should claim the gVisor template instead.
+# Mode compatibility:
+#   - Standard EKS (Karpenter / MNG): yes
+#   - EKS Auto Mode: yes (this is the only tier available on Auto Mode)
+#
+# The reference agent claims this template via SandboxClaim when running
+# on Auto Mode; on Standard EKS it claims sandbox-gvisor for stronger
+# isolation. The runtime spec (image, env vars, agent-script mount,
+# securityContext) is identical between the two templates so claims
+# can switch freely between tiers without re-plumbing the workload.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
@@ -16,41 +23,58 @@ metadata:
   labels:
     agent-sandbox/tier: standard
 spec:
-  # Let Cilium be the sole policy enforcement path. The controller's
-  # default is Managed, which auto-creates a kubernetes.io/v1
-  # NetworkPolicy alongside the Sandbox — functionally equivalent
-  # for default-allow workloads but creates two policy surfaces to
-  # reason about when debugging. Unmanaged = one policy surface,
-  # easier to audit.
+  # Cilium / VPC CNI ANP is the sole policy enforcement path. The
+  # controller's default is Managed, which auto-creates a kubernetes.io/v1
+  # NetworkPolicy alongside the Sandbox — functionally equivalent for
+  # default-allow workloads but creates two policy surfaces to reason about
+  # when debugging. Unmanaged = one policy surface, easier to audit.
   networkPolicyManagement: Unmanaged
   podTemplate:
     metadata:
       labels:
-        # Propagated to the child Sandbox pod so the per-sandbox
-        # CiliumNetworkPolicy can match on egress-tier=sandbox.
+        # Matched by the per-sandbox CiliumNetworkPolicy / ApplicationNetworkPolicy
+        # podSelector — sandbox pods without this label don't get the FQDN allowlist.
         egress-tier: sandbox
         agent-sandbox/tier: standard
     spec:
+      # IRSA-bound ServiceAccount provisioned alongside the SandboxClaim.
+      # See sandbox-agent.yaml for the SA + ConfigMap that pair with this template.
+      serviceAccountName: sandbox-agent-sa
       # No runtimeClassName → runc (cluster default).
       containers:
         - name: agent-runtime
           image: python:3.12-slim
           imagePullPolicy: IfNotPresent
-          # Keep the sandbox alive until the agent explicitly shuts it
-          # down. The reference agent runs inside via kubectl exec
-          # rather than as the pod entrypoint — matches the SIG-Apps
-          # singleton-stateful pattern.
-          command: ["/bin/sh", "-c", "sleep infinity"]
+          # cp the agent script from the mounted ConfigMap to a writable
+          # workspace, then sleep so operators drive the agent via
+          # `kubectl exec`. Matches the SIG-Apps singleton-stateful pattern.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/agent.py /workspace/agent.py
+              chmod +x /workspace/agent.py
+              echo "sandbox ready"
+              echo "run: kubectl exec -n agent-sandboxes <sandbox-name> -c agent-runtime -- python /workspace/agent.py"
+              sleep infinity
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_MODEL_ID
+              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+            # Override HOME so `pip install --user` has a writable target.
+            # readOnlyRootFilesystem means /.local under the default $HOME
+            # isn't writable; /workspace is an emptyDir.
+            - name: HOME
+              value: /workspace
           resources:
             requests:
-              cpu: "250m"
-              memory: "256Mi"
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              cpu: "1"
-              memory: "1Gi"
+              cpu: "2"
+              memory: "2Gi"
           securityContext:
-            # Non-root + read-only root filesystem as baseline hardening.
-            # The agent writes only to /tmp and /workspace (emptyDir).
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
@@ -62,8 +86,17 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
+            - name: agent-script
+              mountPath: /config
+              readOnly: true
       volumes:
         - name: workspace
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        - name: agent-script
+          configMap:
+            name: sandbox-agent-script
+            items:
+              - key: agent.py
+                path: agent.py

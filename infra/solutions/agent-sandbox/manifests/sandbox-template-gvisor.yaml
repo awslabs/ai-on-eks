@@ -1,13 +1,23 @@
 # SandboxTemplate — gVisor tier.
 #
-# gVisor's Sentry intercepts syscalls in userspace, providing a
-# significantly stronger isolation boundary than runc's
-# namespace+cgroup-only model at ~1.5s cold start cost (SPEC §3.1).
+# gVisor's Sentry intercepts syscalls in userspace, providing a significantly
+# stronger isolation boundary than runc's namespace+cgroup-only model at
+# ~1.5s cold start cost (SPEC §3.1). Use for agents that execute untrusted
+# code — the reference agent claims this template on Standard EKS to exercise
+# syscall-level isolation during the code-execution step.
 #
-# Use for agents that execute code — the reference agent claims this
-# template to exercise syscall-level isolation during the code-execution
-# step. Scheduling is constrained to gVisor-capable nodes via the
-# runtimeClassName + NodePool label selector.
+# Mode compatibility:
+#   - Standard EKS (Karpenter / MNG): yes — requires the gVisor RuntimeClass
+#     + a NodePool with the runsc containerd shim installed (see
+#     runtimeclass-gvisor.yaml + karpenter-nodepool-gvisor.yaml).
+#   - EKS Auto Mode: NO — Auto Mode does not expose node-level hooks for
+#     installing custom containerd shims. Auto Mode workloads claim
+#     sandbox-standard instead.
+#
+# The runtime spec (image, env vars, agent-script mount, securityContext)
+# is identical to sandbox-template-standard.yaml so claims can switch
+# freely between tiers without re-plumbing the workload — the only
+# differences are runtimeClassName and the matching NoSchedule toleration.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
@@ -16,8 +26,7 @@ metadata:
   labels:
     agent-sandbox/tier: gvisor
 spec:
-  # Let Cilium be the sole policy enforcement path. See
-  # sandbox-template-standard.yaml for rationale.
+  # See sandbox-template-standard.yaml for the Unmanaged-vs-Managed rationale.
   networkPolicyManagement: Unmanaged
   podTemplate:
     metadata:
@@ -25,8 +34,11 @@ spec:
         egress-tier: sandbox
         agent-sandbox/tier: gvisor
     spec:
+      serviceAccountName: sandbox-agent-sa
       runtimeClassName: gvisor
-      # Tolerate the NoSchedule taint on gVisor nodes.
+      # Tolerate the NoSchedule taint on gVisor nodes. Standard-runtime
+      # workloads don't tolerate this taint, so the gVisor-shim install
+      # cost is only paid for pods that actually use it.
       tolerations:
         - key: agent-sandbox/runtime
           operator: Equal
@@ -36,19 +48,34 @@ spec:
         - name: agent-runtime
           image: python:3.12-slim
           imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c", "sleep infinity"]
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/agent.py /workspace/agent.py
+              chmod +x /workspace/agent.py
+              echo "sandbox ready"
+              echo "run: kubectl exec -n agent-sandboxes <sandbox-name> -c agent-runtime -- python /workspace/agent.py"
+              sleep infinity
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_MODEL_ID
+              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+            - name: HOME
+              value: /workspace
           resources:
             requests:
-              cpu: "250m"
-              memory: "256Mi"
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              cpu: "1"
-              memory: "1Gi"
+              cpu: "2"
+              memory: "2Gi"
           securityContext:
-            # gVisor doesn't require seccomp (Sentry's syscall
-            # interception is the primary boundary), but keeping the
-            # hardened PodSecurityContext aligns with the standard
-            # template so tier comparisons are apples-to-apples.
+            # gVisor's Sentry handles syscall interception so seccomp isn't
+            # the primary boundary, but we keep the hardened PodSecurityContext
+            # aligned with the standard template so tier comparisons are
+            # apples-to-apples — only the runtime + toleration vary.
             runAsNonRoot: true
             runAsUser: 1000
             readOnlyRootFilesystem: true
@@ -60,8 +87,17 @@ spec:
               mountPath: /workspace
             - name: tmp
               mountPath: /tmp
+            - name: agent-script
+              mountPath: /config
+              readOnly: true
       volumes:
         - name: workspace
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+        - name: agent-script
+          configMap:
+            name: sandbox-agent-script
+            items:
+              - key: agent.py
+                path: agent.py

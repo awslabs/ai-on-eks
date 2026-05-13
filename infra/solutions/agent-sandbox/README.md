@@ -71,10 +71,10 @@ flowchart TB
 
 Two composition paths ship with this solution:
 
-- **Direct Sandbox** (`manifests/sandbox-agent.yaml`) — three Kubernetes resources applied explicitly: `ServiceAccount`, `ConfigMap` (agent script), `Sandbox`. Useful when building your own agent manifests and seeing the full spec.
-- **KRO AgentSandbox** (`manifests/agent-sandbox-instance.yaml` + `manifests/rgd-agent-sandbox.yaml`) — the same three resources composed from a single `AgentSandbox` custom resource via kro. The `ResourceGraphDefinition` takes an `iamRoleArn`, `runtimeClass`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the full pod with the same hardened execution context (readOnlyRootFilesystem, runAsNonRoot, writable workspace + tmp volumes, HOME override for `pip install --user`). Useful when exposing a simpler surface to your team.
+- **SandboxClaim** (`manifests/sandbox-agent.yaml`) — a thin claim that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
+- **KRO AgentSandbox** (`manifests/kro/instance.yaml` + `manifests/kro/rgd.yaml`) — the same workload composed via a single `AgentSandbox` custom resource. The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap`, and Bedrock region/model and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce an equivalent running pod on a gVisor node with IRSA credentials plumbed.
+Both paths produce equivalent running pods. Each tier (standard, gvisor) is a SandboxTemplate the claim or AgentSandbox can target.
 
 ## Components
 
@@ -135,7 +135,7 @@ Bedrock inference is billed per-token by the model provider and is independent o
 
 ### Identity and Access Management
 
-- **IRSA** (IAM Roles for Service Accounts) provides AWS credentials to sandboxed pods without static keys. Trust policies scope to `system:serviceaccount:<namespace>:<sa>`. Templates for Bedrock access at `manifests/iam-bedrock-trust-policy.template.json` and `manifests/iam-bedrock-permissions.template.json`.
+- **IRSA** (IAM Roles for Service Accounts) provides AWS credentials to sandboxed pods without static keys. Trust policies scope to `system:serviceaccount:<namespace>:<sa>`. Templates for Bedrock access at `manifests/iam/bedrock-trust-policy.template.json` and `manifests/iam/bedrock-permissions.template.json`.
 - **Pod Identity is intentionally NOT used for gVisor-tier sandboxes**: the credential endpoint at 169.254.170.23 is not reachable from within Sentry's network namespace. Standard-tier workloads can use Pod Identity; gVisor workloads use IRSA. See [threat model](#runtime-tiers) for the rationale.
 
 ### Network Security
@@ -192,7 +192,7 @@ kubectl get pods -n kro-system
 
 ### Apply the Workload Manifests
 
-The solution-specific Kubernetes resources (namespace, RuntimeClass, gVisor-capable Karpenter NodePool, SandboxTemplates, reference agent manifests, KRO ResourceGraphDefinition) live under `manifests/` and are applied by the user after the cluster is running. The NodePool and its EC2NodeClass reference the live cluster name and node IAM role, so substitute those in before applying:
+The solution-specific Kubernetes resources live under `manifests/` and are applied by the user after the cluster is running. See [`manifests/README.md`](manifests/README.md) for a per-file reference. The Karpenter NodePool references the live cluster name and node IAM role, so substitute those in before applying:
 
 ```bash
 cd manifests/
@@ -203,11 +203,11 @@ export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spe
 
 # Apply namespace + RuntimeClass + SandboxTemplates
 kubectl apply -f namespace.yaml
-kubectl apply -f runtimeclass-gvisor.yaml
+kubectl apply -f runtimeclass-gvisor.yaml                # Standard EKS only — skip on Auto Mode
 kubectl apply -f sandbox-template-standard.yaml
-kubectl apply -f sandbox-template-gvisor.yaml
+kubectl apply -f sandbox-template-gvisor.yaml            # Standard EKS only — skip on Auto Mode
 
-# Apply the Karpenter NodePool (substitute placeholders, then apply)
+# Apply the Karpenter NodePool (Standard EKS only; Auto Mode handles its own compute)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
     -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
     karpenter-nodepool-gvisor.yaml \
@@ -215,8 +215,10 @@ sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
 kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 
 # Apply the KRO ResourceGraphDefinition (optional — only needed for the AgentSandbox composition path)
-kubectl apply -f rgd-agent-sandbox.yaml
+kubectl apply -f kro/rgd.yaml
 ```
+
+The reference SandboxClaim (`sandbox-agent.yaml`) and KRO instance (`kro/instance.yaml`) are applied by `conformance.sh` with the right tier substitution for your cluster's compute mode. To apply them by hand instead, set `__SANDBOX_TEMPLATE__` (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode) and pipe through `sed`.
 
 ### Add Egress Enforcement
 

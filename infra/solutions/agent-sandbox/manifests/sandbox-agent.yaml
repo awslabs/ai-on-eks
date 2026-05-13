@@ -1,30 +1,27 @@
-# Reference Sandbox — a direct Sandbox resource demonstrating the
-# blueprint's isolation + egress story end-to-end. Uses a plain
-# `Sandbox` CR (not a `SandboxClaim` against a SandboxTemplate) so
-# the full spec is visible in one file for readers. Production
-# workloads are equally supported via the SandboxClaim pattern;
-# see the sibling `sandbox-template-{standard,gvisor}.yaml`.
+# Reference SandboxClaim — the per-instance binding that points at one
+# of the SandboxTemplates and provides the per-deployment glue
+# (ServiceAccount + agent-script ConfigMap).
 #
-# Usage:
-#   1. Apply this manifest + the ConfigMap that carries agent.py.
-#      `install.sh` populates the ConfigMap from the reference
-#      agent at blueprints/agents/agent-sandbox/agent.py.
-#   2. Sandbox controller provisions the pod on a gVisor node
-#      (the NodePool in karpenter-nodepool-gvisor.yaml supplies
-#      nodes with the `runsc` containerd shim installed).
-#   3. Execute the reference agent:
-#        kubectl exec -n agent-sandboxes sandbox-agent \
-#            -c agent-runtime -- python /workspace/agent.py
-#      The agent walks five steps (pip install, Bedrock call,
-#      snippet execution, FQDN block, IP block) and prints
-#      PASS/BLOCKED outcomes.
+# This is the SandboxClaim variant of the SIG-Apps agent-sandbox API
+# pattern: the runtime spec (image, env vars, security context, volume
+# layout) lives in the SandboxTemplate; the claim adds only the bits
+# that are deployment-specific — IRSA wiring on the SA, the script
+# ConfigMap the agent reads, and a pointer to the chosen template.
 #
-# IAM: the ServiceAccount is annotated with an IRSA role via
-# `install.sh` / `conformance.sh` runtime setup. Pod Identity is
-# NOT used for gVisor-tier sandboxes because the Sentry network
-# namespace doesn't forward the link-local route to the Pod
-# Identity credential endpoint at 169.254.170.23 — IRSA routes
-# through STS over the regular network path, which the CNP allows.
+# Template selection is deferred to apply time:
+#   - Standard EKS → templateRef.name = sandbox-gvisor
+#   - EKS Auto Mode → templateRef.name = sandbox-standard
+# The conformance script and the install path render the right value
+# into __SANDBOX_TEMPLATE__ before applying. Customers adopting the
+# blueprint can hardcode whichever tier matches their cluster.
+#
+# IAM:
+#   - The ServiceAccount is annotated with the IRSA role at install
+#     time. Pod Identity is NOT used because gVisor's Sentry network
+#     namespace doesn't forward the link-local route to the Pod
+#     Identity credential endpoint at 169.254.170.23 — IRSA routes
+#     through STS over the regular network path, which works on both
+#     gVisor and standard tiers.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -40,92 +37,19 @@ metadata:
   labels:
     agent-sandbox/role: runtime
 data:
-  # Actual contents populated by install.sh via
+  # Actual contents populated by install.sh / conformance.sh via
   #   kubectl create configmap --from-file=agent.py=...
   # This placeholder keeps the manifest self-contained for review.
   agent.py: "# populated by install.sh from blueprints/agents/agent-sandbox/agent.py"
 ---
-apiVersion: agents.x-k8s.io/v1alpha1
-kind: Sandbox
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxClaim
 metadata:
   name: sandbox-agent
   namespace: agent-sandboxes
   labels:
     agent-sandbox/role: runtime
-    agent-sandbox/tier: gvisor
 spec:
-  podTemplate:
-    metadata:
-      labels:
-        # This label is what the CiliumNetworkPolicy selector matches
-        # — sandbox pods without it don't get the FQDN allowlist.
-        egress-tier: sandbox
-        agent-sandbox/tier: gvisor
-    spec:
-      serviceAccountName: sandbox-agent-sa
-      runtimeClassName: gvisor
-      tolerations:
-        - key: agent-sandbox/runtime
-          operator: Equal
-          value: gvisor
-          effect: NoSchedule
-      containers:
-        - name: agent-runtime
-          image: python:3.12-slim
-          imagePullPolicy: IfNotPresent
-          command:
-            - /bin/sh
-            - -c
-            - |
-              cp /config/agent.py /workspace/agent.py
-              chmod +x /workspace/agent.py
-              echo "sandbox ready"
-              echo "run: kubectl exec -n agent-sandboxes sandbox-agent -c agent-runtime -- python /workspace/agent.py"
-              sleep infinity
-          env:
-            - name: AWS_REGION
-              value: us-east-1
-            - name: BEDROCK_MODEL_ID
-              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
-            # Override HOME so pip install --user has a writable
-            # target. readOnlyRootFilesystem means /.local (the
-            # default $HOME when uid=1000 isn't in /etc/passwd) is
-            # not writable; /workspace is an emptyDir.
-            - name: HOME
-              value: /workspace
-          resources:
-            requests:
-              cpu: "500m"
-              memory: "512Mi"
-            limits:
-              cpu: "2"
-              memory: "2Gi"
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            # Read-only root FS + writable /workspace + /tmp. pip
-            # install --user writes to ~/.local which resolves to
-            # /workspace/.local via HOME=/workspace above.
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-          volumeMounts:
-            - name: workspace
-              mountPath: /workspace
-            - name: tmp
-              mountPath: /tmp
-            - name: agent-script
-              mountPath: /config
-              readOnly: true
-      volumes:
-        - name: workspace
-          emptyDir: {}
-        - name: tmp
-          emptyDir: {}
-        - name: agent-script
-          configMap:
-            name: sandbox-agent-script
-            items:
-              - key: agent.py
-                path: agent.py
+  # Patched at apply time. See header comment for tier-selection rules.
+  templateRef:
+    name: __SANDBOX_TEMPLATE__

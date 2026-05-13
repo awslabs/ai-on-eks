@@ -42,19 +42,36 @@ require_auto_mode() {
     # Confirm the cluster is Auto Mode. ANP enforcement only works on
     # Auto Mode-launched EC2 instances; applying the manifests to
     # Standard EKS creates the CRDs but they won't enforce anything.
-    local cluster_name region auto_mode
+    #
+    # Retry the describe-cluster call up to 3 times with a brief
+    # backoff — transient AWS API failures (DNS hiccups, throttling)
+    # would otherwise produce a false-negative and mislead users into
+    # thinking they're not on Auto Mode.
+    local cluster_name region auto_mode attempt
     cluster_name=$(kubectl config current-context | awk -F'/' '{print $NF}')
     region=$(kubectl config current-context | awk -F':' '{print $4}')
-    auto_mode=$(aws eks describe-cluster --name "$cluster_name" --region "$region" \
-        --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
-    if [ "$auto_mode" != "True" ] && [ "$auto_mode" != "true" ]; then
-        echo "WARNING: Cluster '$cluster_name' is not in EKS Auto Mode."
-        echo "         ApplicationNetworkPolicy DNS-based rules will not enforce."
-        echo "         Flip enable_eks_auto_mode=true in the parent solution's"
-        echo "         blueprint.tfvars and re-run its install.sh, or use the"
-        echo "         sibling agent-egress-chained example for Standard EKS."
-        exit 1
-    fi
+    for attempt in 1 2 3; do
+        auto_mode=$(aws eks describe-cluster --name "$cluster_name" --region "$region" \
+            --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
+        if [ "$auto_mode" = "True" ] || [ "$auto_mode" = "true" ]; then
+            return 0
+        fi
+        if [ "$auto_mode" = "False" ] || [ "$auto_mode" = "false" ]; then
+            # API explicitly says Standard EKS — don't retry.
+            break
+        fi
+        # Empty or unexpected response — could be transient API failure.
+        # Brief backoff and try again.
+        if [ "$attempt" -lt 3 ]; then
+            sleep 2
+        fi
+    done
+    echo "WARNING: Cluster '$cluster_name' is not in EKS Auto Mode."
+    echo "         ApplicationNetworkPolicy DNS-based rules will not enforce."
+    echo "         Flip enable_eks_auto_mode=true in the parent solution's"
+    echo "         blueprint.tfvars and re-run its install.sh, or use the"
+    echo "         sibling agent-egress-chained example for Standard EKS."
+    exit 1
 }
 
 install_policies() {
@@ -94,8 +111,8 @@ install_policies() {
 # accidental drift.
 bootstrap_irsa() {
     resolve_cluster_context
-    local trust_template="$SOLUTION_DIR/manifests/iam-bedrock-trust-policy.template.json"
-    local perms_template="$SOLUTION_DIR/manifests/iam-bedrock-permissions.template.json"
+    local trust_template="$SOLUTION_DIR/manifests/iam/bedrock-trust-policy.template.json"
+    local perms_template="$SOLUTION_DIR/manifests/iam/bedrock-permissions.template.json"
     local trust_rendered=$(mktemp -t agent-sandbox-trust.XXXXXX.json)
     local perms_rendered=$(mktemp -t agent-sandbox-perms.XXXXXX.json)
     trap "rm -f $trust_rendered $perms_rendered" RETURN

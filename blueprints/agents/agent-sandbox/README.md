@@ -37,7 +37,7 @@ Step 4 proves the FQDN-layer contract; Step 5 proves the L3/L4 contract. Both bl
 
 - The [agent-sandbox solution](../../../infra/solutions/agent-sandbox/) installed: run `../../../infra/solutions/agent-sandbox/install.sh` from a clone of the repo. See its README for solution-level steps (cluster provisioning, manifest application, egress enforcement).
 - One of the egress examples applied ([agent-egress-chained](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/) for Standard EKS, [agent-egress-native](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/) for EKS Auto Mode).
-- An IAM role with `bedrock:InvokeModel` permission for the target Claude model, plus an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. See [`iam-bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json) and [`iam-bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-permissions.template.json) for starting points.
+- An IAM role with `bedrock:InvokeModel` permission for the target Claude model, plus an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. The `irsa` phase of either egress example's `install.sh` provisions this automatically; templates at [`iam/bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-trust-policy.template.json) and [`iam/bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-permissions.template.json) for hand-rolled setups.
 - `kubectl` configured against the cluster (`aws eks update-kubeconfig --name agent-sandbox --region <region>`).
 
 ## Quick Start
@@ -52,13 +52,19 @@ kubectl annotate serviceaccount sandbox-agent-sa -n agent-sandboxes \
     "eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel>" \
     --overwrite
 
-# 2. Load this agent.py into the ConfigMap the Sandbox mounts.
+# 2. Load this agent.py into the ConfigMap the SandboxTemplate mounts.
 kubectl -n agent-sandboxes create configmap sandbox-agent-script \
     --from-file=agent.py=./agent.py \
     --dry-run=client -o yaml | kubectl apply -f -
 
-# 3. Create the Sandbox.
-kubectl apply -f ../../../infra/solutions/agent-sandbox/manifests/sandbox-agent.yaml
+# 3. Render + apply the SandboxClaim. Set SANDBOX_TEMPLATE based on your
+#    cluster's compute mode:
+#      Standard EKS → sandbox-gvisor
+#      EKS Auto Mode → sandbox-standard
+SANDBOX_TEMPLATE=sandbox-gvisor   # or sandbox-standard for Auto Mode
+sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
+    ../../../infra/solutions/agent-sandbox/manifests/sandbox-agent.yaml \
+    | kubectl apply -f -
 
 # 4. Wait for Ready, then run the agent.
 kubectl -n agent-sandboxes wait --for=condition=Ready pod/sandbox-agent --timeout=120s
@@ -114,7 +120,7 @@ To build your own agent on this pattern:
 
 1. Copy `agent.py` as a starting point — the boilerplate around user-site-packages import, `HOME=/workspace` handling, and the `try_egress` / `try_ip_egress` helpers all carry over.
 2. Update the FQDN allowlist to cover your agent's outbound domains. For the chained path, edit [`ciliumnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/manifests/ciliumnetworkpolicy-sandbox-llm.yaml). For the native path, edit [`applicationnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/manifests/applicationnetworkpolicy-sandbox-llm.yaml).
-3. If your agent needs different IAM permissions, update the IAM role (templates at [`iam-bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json) and [`iam-bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-permissions.template.json)).
+3. If your agent needs different IAM permissions, update the IAM role (templates at [`iam/bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-trust-policy.template.json) and [`iam/bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-permissions.template.json)).
 4. Mount your agent code into a Sandbox the same way this one does — via a ConfigMap referenced in the `Sandbox` spec.
 
 For larger agents where a ConfigMap mount is impractical, bake `agent.py` into a container image and reference it in `Sandbox.spec.podTemplate.spec.containers[].image` instead. Keep the `readOnlyRootFilesystem`, `runAsNonRoot`, `capabilities.drop: [ALL]`, and writable-workspace patterns from [`sandbox-agent.yaml`](../../../infra/solutions/agent-sandbox/manifests/sandbox-agent.yaml).

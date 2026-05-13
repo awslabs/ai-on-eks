@@ -141,8 +141,8 @@ restart_sandbox_controller() {
 # accidental drift.
 bootstrap_irsa() {
     resolve_cluster_context
-    local trust_template="$SOLUTION_DIR/manifests/iam-bedrock-trust-policy.template.json"
-    local perms_template="$SOLUTION_DIR/manifests/iam-bedrock-permissions.template.json"
+    local trust_template="$SOLUTION_DIR/manifests/iam/bedrock-trust-policy.template.json"
+    local perms_template="$SOLUTION_DIR/manifests/iam/bedrock-permissions.template.json"
     local trust_rendered=$(mktemp -t agent-sandbox-trust.XXXXXX.json)
     local perms_rendered=$(mktemp -t agent-sandbox-perms.XXXXXX.json)
     trap "rm -f $trust_rendered $perms_rendered" RETURN

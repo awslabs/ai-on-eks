@@ -2,17 +2,20 @@
 # Agent Sandbox blueprint — end-to-end conformance test.
 #
 # Validates the full chain that the blueprint installs:
-#   - agent-sandbox controller resolves a Sandbox resource
-#   - Karpenter provisions a gVisor-runtime node on demand
+#   - agent-sandbox controller resolves a SandboxClaim against its template
+#   - On Standard EKS: Karpenter provisions a gVisor-runtime node on demand
+#   - On Auto Mode: managed compute provisions a standard-runtime node
 #   - IRSA injects Bedrock credentials into the sandbox pod
-#   - Cilium FQDN allowlist permits pypi.org + bedrock-runtime + sts
-#   - Cilium FQDN allowlist blocks a non-allowlisted domain
+#   - Egress allowlist permits pypi.org + bedrock-runtime + sts
+#   - Egress allowlist blocks a non-allowlisted FQDN and raw IP
 #
-# Run after `infra/agent-sandbox/install.sh` completes successfully.
-# Exits 0 on pass, 1 on any failure. No interactive prompts.
+# Run after `infra/solutions/agent-sandbox/install.sh` and one of the
+# egress examples have completed successfully. Exits 0 on pass, 1 on
+# any failure. No interactive prompts.
 #
 # Usage:
 #   CLUSTER_NAME=agent-sandbox \
+#   AWS_REGION=us-east-1 \
 #   BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
 #     ./conformance.sh
 
@@ -20,15 +23,28 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # conformance.sh lives at blueprints/agents/agent-sandbox/. The manifests it
-# depends on (sandbox-agent.yaml, etc.) live at infra/solutions/agent-sandbox/.
+# depends on (sandbox-agent.yaml, sandbox-template-*.yaml) live at
+# infra/solutions/agent-sandbox/manifests/.
 AGENT_DIR="$SCRIPT_DIR"
 INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/solutions/agent-sandbox" && pwd)"
+MANIFEST_DIR="$INFRA_DIR/manifests"
 NS="agent-sandboxes"
 SA="sandbox-agent-sa"
 POD="sandbox-agent"
 CONFIGMAP="sandbox-agent-script"
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
 REGION="${AWS_REGION:-us-east-1}"
+
+# Compute-mode detection. Auto Mode clusters cannot run gVisor (no
+# node-level hooks for installing the runsc containerd shim), so the
+# SandboxClaim's templateRef and the runtime-class assertion vary by
+# mode. detect_compute_mode() resolves both at startup.
+COMPUTE_MODE=""
+SANDBOX_TEMPLATE=""
+
+# Rendered SandboxClaim manifest (templateRef substituted). Created in
+# setup_configmap_with_real_agent and reused at cleanup time.
+RENDERED_SANDBOX_MANIFEST=""
 
 fail() {
     echo "FAIL: $*" >&2
@@ -45,13 +61,47 @@ require_env() {
     fi
 }
 
+detect_compute_mode() {
+    # Set COMPUTE_MODE + SANDBOX_TEMPLATE based on the cluster's compute
+    # config. Retry up to 3 times to absorb transient API failures so
+    # we don't false-positive into the wrong code path.
+    local enabled attempt
+    for attempt in 1 2 3; do
+        enabled=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
+            --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
+        if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
+            COMPUTE_MODE="automode"
+            SANDBOX_TEMPLATE="sandbox-standard"
+            log "Detected EKS Auto Mode — claiming SandboxTemplate '$SANDBOX_TEMPLATE' (gVisor unavailable on Auto Mode)."
+            return 0
+        fi
+        if [ "$enabled" = "False" ] || [ "$enabled" = "false" ]; then
+            COMPUTE_MODE="standard"
+            SANDBOX_TEMPLATE="sandbox-gvisor"
+            log "Detected Standard EKS — claiming SandboxTemplate '$SANDBOX_TEMPLATE'."
+            return 0
+        fi
+        if [ "$attempt" -lt 3 ]; then sleep 2; fi
+    done
+    fail "Could not determine cluster compute mode after 3 attempts. Check 'aws eks describe-cluster --name $CLUSTER_NAME --region $REGION' connectivity."
+}
+
 require_cluster() {
     log "Checking cluster reachability + prerequisites..."
     kubectl cluster-info >/dev/null 2>&1 || fail "kubectl cannot reach the cluster; run 'aws eks update-kubeconfig --name $CLUSTER_NAME --region $REGION'"
-    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
-    kubectl get runtimeclass gvisor >/dev/null 2>&1 || fail "RuntimeClass 'gvisor' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
-    kubectl get sandboxtemplate sandbox-gvisor -n "$NS" >/dev/null 2>&1 || fail "SandboxTemplate 'sandbox-gvisor' missing; apply manifests from infra/solutions/agent-sandbox/manifests/ first"
+    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply $MANIFEST_DIR/namespace.yaml first"
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; set enable_agent_sandbox=true in blueprint.tfvars and re-run install.sh"
+
+    # SandboxTemplate for the chosen tier must exist. Tier-specific
+    # cluster prerequisites (RuntimeClass, NodePool) are only relevant
+    # for the gVisor tier on Standard EKS.
+    kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1 \
+        || fail "SandboxTemplate '$SANDBOX_TEMPLATE' missing; apply $MANIFEST_DIR/sandbox-template-*.yaml first"
+
+    if [ "$COMPUTE_MODE" = "standard" ]; then
+        kubectl get runtimeclass gvisor >/dev/null 2>&1 \
+            || fail "RuntimeClass 'gvisor' missing; apply $MANIFEST_DIR/runtimeclass-gvisor.yaml first"
+    fi
 
     # Egress enforcement ships in an example layered on top of the solution
     # (examples/agent-egress-chained or examples/agent-egress-native). At
@@ -62,7 +112,7 @@ require_cluster() {
     kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && chained_policy_ok="yes"
     kubectl -n "$NS" get applicationnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && native_policy_ok="yes"
     if [ -z "$chained_policy_ok" ] && [ -z "$native_policy_ok" ]; then
-        fail "No egress allowlist found. Install one of the egress examples first: infra/solutions/agent-sandbox/examples/agent-egress-{chained,native}/install.sh"
+        fail "No egress allowlist found. Install one of the egress examples first: $INFRA_DIR/examples/agent-egress-{chained,native}/install.sh"
     fi
     if [ -n "$chained_policy_ok" ]; then
         log "Detected chained egress example (Cilium CNP sandbox-llm-allowlist)."
@@ -73,24 +123,27 @@ require_cluster() {
 }
 
 setup_configmap_with_real_agent() {
-    # sandbox-agent.yaml embeds a ConfigMap with a placeholder
-    # agent.py. We apply sandbox-agent.yaml first (which creates the
-    # SA + placeholder ConfigMap + Sandbox), then overwrite the
-    # ConfigMap with the real agent.py contents, then bounce the pod
-    # so the container's startup `cp /config/agent.py
-    # /workspace/agent.py` picks up the real content. This order
-    # avoids races where the placeholder content is copied into
-    # /workspace and sticks there.
-    log "Applying Sandbox manifest (creates SA + placeholder ConfigMap + Sandbox)..."
-    kubectl apply -f "$INFRA_DIR/manifests/sandbox-agent.yaml" >/dev/null
+    # sandbox-agent.yaml ships as a SandboxClaim with a templateRef
+    # placeholder and a placeholder ConfigMap. We:
+    #   1. Render the manifest with the resolved SandboxTemplate name
+    #      and apply it (creates SA + placeholder ConfigMap + Claim).
+    #   2. Overwrite the ConfigMap with the real agent.py contents.
+    #   3. Delete the controller-owned pod so it's recreated and the
+    #      container's startup `cp /config/agent.py /workspace/agent.py`
+    #      picks up the real content.
+    RENDERED_SANDBOX_MANIFEST=$(mktemp -t agent-sandbox-claim.XXXXXX.yaml)
+    sed -e "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
+        "$MANIFEST_DIR/sandbox-agent.yaml" \
+        > "$RENDERED_SANDBOX_MANIFEST"
+
+    log "Applying SandboxClaim (template: $SANDBOX_TEMPLATE)..."
+    kubectl apply -f "$RENDERED_SANDBOX_MANIFEST" >/dev/null
 
     log "Replacing placeholder ConfigMap with real agent.py contents..."
     kubectl -n "$NS" create configmap "$CONFIGMAP" \
         --from-file=agent.py="$AGENT_DIR/agent.py" \
         --dry-run=client -o yaml | kubectl apply -f - >/dev/null
 
-    # Force pod recreation so the container's one-shot `cp` at
-    # startup reads the real ConfigMap content.
     log "Recreating Sandbox pod so it mounts the real agent.py..."
     kubectl -n "$NS" delete pod "$POD" --ignore-not-found --wait=true >/dev/null 2>&1 || true
 }
@@ -103,14 +156,8 @@ setup_irsa_annotation() {
     # gVisor's Sentry network namespace doesn't forward the link-local
     # route to 169.254.170.23, so EKS Pod Identity doesn't work for
     # sandboxes on the gVisor tier. IRSA routes through STS over the
-    # regular network path (covered by the Cilium FQDN allowlist) and
-    # works transparently.
-    #
-    # Environment variables expected:
-    #   BEDROCK_ROLE_ARN  — IAM role ARN with bedrock:InvokeModel +
-    #                       IRSA trust policy allowing the cluster's
-    #                       OIDC provider for
-    #                       system:serviceaccount:agent-sandboxes:sandbox-agent-sa
+    # regular network path (covered by the egress allowlist) and works
+    # transparently on both tiers.
     log "Ensuring ServiceAccount $SA exists + has IRSA annotation..."
     if ! kubectl -n "$NS" get serviceaccount "$SA" >/dev/null 2>&1; then
         kubectl -n "$NS" create serviceaccount "$SA" >/dev/null
@@ -122,8 +169,8 @@ setup_irsa_annotation() {
 
 wait_for_pod() {
     log "Waiting for Sandbox pod Ready (up to 5 min)..."
-    # Sandbox controller recreates the pod after our delete; give it
-    # a moment to spawn a fresh one before waiting on Ready.
+    # The controller recreates the pod after our delete; give it a
+    # moment to spawn a fresh one before waiting on Ready.
     sleep 5
     if ! kubectl -n "$NS" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null; then
         kubectl -n "$NS" describe "pod/$POD" >&2
@@ -133,16 +180,26 @@ wait_for_pod() {
 }
 
 assert_runtime_class() {
-    log "Asserting pod is scheduled with runtimeClassName=gvisor..."
-    local rc
+    # Mode-aware runtime class assertion:
+    #   - Standard EKS → expect runtimeClassName=gvisor
+    #   - Auto Mode    → expect empty (default runc)
+    local rc expected
     rc=$(kubectl -n "$NS" get "pod/$POD" -o jsonpath='{.spec.runtimeClassName}')
-    [ "$rc" = "gvisor" ] || fail "Expected runtimeClassName=gvisor, got '$rc'"
+    if [ "$COMPUTE_MODE" = "automode" ]; then
+        expected=""
+        log "Asserting pod runs on default runtime (Auto Mode does not support gVisor)..."
+        [ "$rc" = "$expected" ] || fail "Expected empty runtimeClassName on Auto Mode, got '$rc'"
+    else
+        expected="gvisor"
+        log "Asserting pod is scheduled with runtimeClassName=gvisor..."
+        [ "$rc" = "$expected" ] || fail "Expected runtimeClassName=gvisor, got '$rc'"
+    fi
 }
 
 assert_policies_valid() {
     log "Asserting egress policies are Valid..."
-    # Policies live in the installed egress blueprint. Check whichever
-    # is present — both blueprints share the same resource names.
+    # Policies live in the installed egress example. Check whichever is
+    # present — both examples share the same resource names.
     local chained_admin chained_app native_admin native_app
     chained_admin=$(kubectl get ciliumclusterwidenetworkpolicy admin-block-imds -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
     chained_app=$(kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist -o jsonpath='{.status.conditions[?(@.type=="Valid")].status}' 2>/dev/null || echo "")
@@ -179,22 +236,29 @@ run_agent_and_validate() {
 }
 
 cleanup() {
-    # Default: leave the sandbox running so repeat conformance runs
-    # are fast (no re-provisioning gVisor nodes). Pass CLEANUP=1 to
-    # tear down the sandbox resources on exit.
-    if [ "${CLEANUP:-0}" != "1" ]; then
+    # Default: leave the sandbox running so repeat conformance runs are
+    # fast (no re-provisioning gVisor nodes). Pass CLEANUP=1 to tear down
+    # the sandbox resources on exit. The rendered claim manifest is
+    # always cleaned up.
+    if [ "${CLEANUP:-0}" = "1" ]; then
+        log "Removing test-run resources (SandboxClaim + ConfigMap)..."
+        if [ -n "$RENDERED_SANDBOX_MANIFEST" ] && [ -f "$RENDERED_SANDBOX_MANIFEST" ]; then
+            kubectl delete -f "$RENDERED_SANDBOX_MANIFEST" --ignore-not-found >/dev/null 2>&1 || true
+        fi
+        kubectl -n "$NS" delete configmap "$CONFIGMAP" --ignore-not-found >/dev/null 2>&1 || true
+        log "Cleanup complete. IAM role + IRSA annotation retained for re-runs."
+    else
         log "Leaving Sandbox + ConfigMap in place (set CLEANUP=1 to remove)."
-        return 0
     fi
-    log "Removing test-run resources (Sandbox pod + ConfigMap)..."
-    kubectl delete -f "$INFRA_DIR/manifests/sandbox-agent.yaml" --ignore-not-found >/dev/null 2>&1 || true
-    kubectl -n "$NS" delete configmap "$CONFIGMAP" --ignore-not-found >/dev/null 2>&1 || true
-    log "Cleanup complete. IAM role + IRSA annotation retained for re-runs."
+    if [ -n "$RENDERED_SANDBOX_MANIFEST" ] && [ -f "$RENDERED_SANDBOX_MANIFEST" ]; then
+        rm -f "$RENDERED_SANDBOX_MANIFEST"
+    fi
 }
 
 main() {
     trap cleanup EXIT
     require_env
+    detect_compute_mode
     require_cluster
     setup_irsa_annotation
     setup_configmap_with_real_agent
