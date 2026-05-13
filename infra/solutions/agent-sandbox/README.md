@@ -207,10 +207,12 @@ kubectl apply -f runtimeclass-gvisor.yaml
 kubectl apply -f sandbox-template-standard.yaml
 kubectl apply -f sandbox-template-gvisor.yaml
 
-# Apply the Karpenter NodePool (substitute placeholders)
+# Apply the Karpenter NodePool (substitute placeholders, then apply)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
     -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
-    karpenter-nodepool-gvisor.yaml | kubectl apply -f -
+    karpenter-nodepool-gvisor.yaml \
+    > /tmp/karpenter-nodepool-gvisor.rendered.yaml
+kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 
 # Apply the KRO ResourceGraphDefinition (optional — only needed for the AgentSandbox composition path)
 kubectl apply -f rgd-agent-sandbox.yaml
@@ -301,8 +303,8 @@ Hubble UI's default Service Map filters blacklist DNS events and pods without su
 ## Cleanup
 
 ```bash
-cd terraform/_LOCAL
+cd infra/solutions/agent-sandbox
 ./cleanup.sh
 ```
 
-This destroys the EKS cluster and all managed resources. IAM roles created outside the solution (e.g., the Bedrock role) are not deleted.
+The wrapper drops Karpenter finalizers (so EC2NodeClass + NodePool deletes don't stall when the controller is gone), then runs the base module's `cleanup.sh`, then sweeps any auxiliary AWS resources by tag (orphan placement groups, ENIs, KMS aliases, CloudWatch log groups). IAM roles created outside the solution (e.g., the Bedrock role) are not deleted.

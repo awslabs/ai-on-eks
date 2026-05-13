@@ -92,6 +92,27 @@ install_policies() {
     kubectl get ciliumnetworkpolicies -A 2>/dev/null || true
 }
 
+restart_sandbox_controller() {
+    # Bounce the agent-sandbox controller so it reconnects through
+    # the new chained datapath. Cilium's chaining install replaces
+    # the eBPF programs on every veth, and any pod that opened its
+    # kube-API connection before chaining (including the
+    # agent-sandbox controller deployed by the parent solution's
+    # ArgoCD addon) holds a stale connection that won't recover on
+    # its own — symptom is the controller logging "context deadline
+    # exceeded" against kube-apiserver and failing to reconcile new
+    # Sandbox resources.
+    #
+    # Skipped silently if the deployment isn't present (parent
+    # solution may have been deployed without enable_agent_sandbox).
+    if kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1; then
+        echo ""
+        echo "=== Bouncing agent-sandbox controller (post-Cilium chaining) ==="
+        kubectl -n agent-sandbox-system rollout restart deployment agent-sandbox-controller
+        kubectl -n agent-sandbox-system rollout status deployment agent-sandbox-controller --timeout=2m
+    fi
+}
+
 uninstall() {
     echo "=== Removing CNPs and Cilium ==="
     kubectl delete -f "$SCRIPT_DIR/manifests/ciliumnetworkpolicy-sandbox-llm.yaml" --ignore-not-found
@@ -120,6 +141,7 @@ case "$PHASE" in
     install)
         install_cilium
         install_policies
+        restart_sandbox_controller
         finish_message
         ;;
     uninstall)
