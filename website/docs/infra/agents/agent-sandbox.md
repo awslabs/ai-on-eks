@@ -24,6 +24,43 @@ This solution delivers both. A [reference agent](../../../blueprints/agents/agen
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    classDef workload fill:#e8f4ff,stroke:#0366d6,color:#000
+    classDef controller fill:#fff4e8,stroke:#b45309,color:#000
+    classDef runtime fill:#f0fdf4,stroke:#15803d,color:#000
+    classDef egress fill:#fef2f2,stroke:#b91c1c,color:#000
+    classDef node fill:#f3f4f6,stroke:#4b5563,color:#000
+
+    A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
+
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>ArgoCD-managed addon (enable_agent_sandbox=true)</i>"]:::controller
+
+    subgraph C["RuntimeClass selection"]
+        direction LR
+        C1["<b>standard</b><br/>(runc)<br/>Default K8s runtime<br/>Cold start ~1s"]:::runtime
+        C2["<b>gvisor</b><br/>(runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
+    end
+
+    subgraph D["Egress enforcement (examples/)"]
+        direction LR
+        D1["<b>agent-egress-chained</b><br/>Cilium + Hubble<br/>Standard EKS"]:::egress
+        D2["<b>agent-egress-native</b><br/>VPC CNI ANP + CNP<br/>EKS Auto Mode"]:::egress
+    end
+
+    subgraph E["EKS Node Groups"]
+        direction LR
+        E1["Karpenter-provisioned<br/>(Standard EKS default)"]:::node
+        E2["Auto Mode-managed<br/>(EKS Auto Mode)"]:::node
+        E3["Managed Node Group<br/>(documented alternative<br/>for gVisor)"]:::node
+    end
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+```
+
 The solution deploys in layers:
 
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
@@ -140,7 +177,7 @@ cd examples/agent-egress-native
 ./install.sh
 ```
 
-Each example ships its own README with allowlist-template usage, observability caveats, and migration paths between chained and native enforcement.
+Each example ships its own README with allowlist-template usage, observability caveats, and portability notes for workloads moving between the two enforcement backends.
 
 ### Step 6: Validate the Deployment
 

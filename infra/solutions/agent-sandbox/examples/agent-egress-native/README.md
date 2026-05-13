@@ -6,7 +6,7 @@ Applies native EKS `ClusterNetworkPolicy` + `ApplicationNetworkPolicy` for FQDN-
 
 Running on EKS Auto Mode, want native network policy enforcement without a third-party CNI dependency.
 
-For Standard EKS, use the sibling [agent-egress-chained](../agent-egress-chained/) example instead. When AWS extends `ApplicationNetworkPolicy` to Standard EKS, customers can migrate from chained to native by replacing the CNP manifests with the ANP equivalents shipped here. Pod-level labels (`allowlist: <name>`) are identical across both examples.
+For Standard EKS, use the sibling [agent-egress-chained](../agent-egress-chained/) example instead. The two examples ship the same allowlist templates in their respective policy formats (ANP here, CNP there) and use identical pod-level labels (`allowlist: <name>`), so agent workloads are portable between the two enforcement backends regardless of cluster compute mode.
 
 ## Positioning
 
@@ -105,11 +105,14 @@ kubectl delete -f manifests/test-pod.yaml
 
 For the full 5-step reference agent run (exercises both enforcement layers end-to-end), see the [reference agent blueprint](../../../../../blueprints/agents/agent-sandbox/).
 
-## Migration path from chained to native (when ANP extends to Standard EKS)
+## Migration path from chained to native
 
-1. Apply the ANP templates from this example's `manifests/allowlists/` to the existing Standard EKS cluster.
-2. Verify ANP enforcement is working (check `aws eks describe-cluster` to confirm the required VPC CNI version is installed, and that the Network Policy Controller is enabled).
-3. Remove the Cilium CNPs from [`../agent-egress-chained/`](../agent-egress-chained/).
-4. Optionally uninstall Cilium (`../agent-egress-chained/install.sh uninstall`) — Cilium can stay for Hubble observability even when enforcement moves to native.
+EKS-native `ApplicationNetworkPolicy` enforcement is currently available only on EKS Auto Mode — AWS has not announced plans to bring `ApplicationNetworkPolicy` to Standard EKS. If you migrate an existing cluster from Standard EKS to Auto Mode (e.g., for operational simplification), you can switch from the chained example to this native example by:
 
-Pod-level allowlist labels do not change.
+1. Confirm Auto Mode is enabled on your target cluster (`aws eks describe-cluster --query 'cluster.computeConfig.enabled'`).
+2. Apply the ANP templates from this example's `manifests/allowlists/` to the Auto Mode cluster.
+3. Verify the Network Policy Controller is enabled (`amazon-vpc-cni` ConfigMap in `kube-system` with `enable-network-policy-controller: "true"`).
+4. Remove the Cilium CNPs from [`../agent-egress-chained/`](../agent-egress-chained/) on the source cluster.
+5. Optionally uninstall Cilium (`../agent-egress-chained/install.sh uninstall`) — Cilium can stay for Hubble observability even when enforcement moves to native.
+
+Pod-level allowlist labels do not change — the two examples are designed to be portable swaps at the policy layer.

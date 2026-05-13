@@ -231,7 +231,7 @@ cd examples/agent-egress-native
 ./install.sh                                             # Auto Mode
 ```
 
-Each example installs its own README with allowlist-template usage and migration paths.
+Each example installs its own README with allowlist-template usage and portability notes between the two enforcement backends.
 
 ### Validate the Deployment
 

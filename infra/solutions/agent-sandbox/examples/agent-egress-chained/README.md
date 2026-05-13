@@ -4,7 +4,7 @@ Installs [Cilium](https://cilium.io/) in aws-cni chaining mode plus [Hubble](htt
 
 ## When to use this example
 
-Running on Standard EKS, where native `ApplicationNetworkPolicy` is not yet available. The chained Cilium path provides the same FQDN-based egress capability today, with a clean migration to native policies when AWS extends `ApplicationNetworkPolicy` to Standard EKS (announced December 2025, timing TBD).
+Running on Standard EKS. The chained Cilium path provides FQDN-based egress filtering today and is the canonical enforcement mechanism for Standard EKS — native `ApplicationNetworkPolicy` is available only on EKS Auto Mode and has not been announced for Standard EKS.
 
 For EKS Auto Mode, use the sibling [agent-egress-native](../agent-egress-native/) example instead.
 
@@ -98,10 +98,11 @@ kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium monitor --type
 
 L3/L4 blocks (raw-IP egress not covered by FQDN allowlist) DO appear as DROPPED flows in the default Hubble Service Map. The [reference agent](../../../../../blueprints/agents/agent-sandbox/) has a Step 5 that exercises this path explicitly to produce a visible red DROP flow.
 
-## Migration path to native ApplicationNetworkPolicy
+## Portability to native ApplicationNetworkPolicy
 
-When AWS extends `ApplicationNetworkPolicy` to Standard EKS:
+If you migrate to EKS Auto Mode (where native `ApplicationNetworkPolicy` is available), the sibling [agent-egress-native](../agent-egress-native/) example ships the same four allowlist bundles translated into ANP format. Pod-level labels (`allowlist: <name>`) are identical across both examples — agent workloads don't need to be relabeled to switch enforcement backends.
 
-1. Apply the same allowlists from [`../agent-egress-native/manifests/allowlists/`](../agent-egress-native/manifests/allowlists/) — they're ApplicationNetworkPolicy equivalents of the CNPs shipped here. Pod labels (`allowlist: <name>`) are identical.
-2. Delete the CNPs from this example.
-3. Uninstall Cilium via `./install.sh uninstall` (optional — Cilium can stay for Hubble observability even when enforcement moves to native).
+1. Provision an Auto Mode cluster (set `enable_eks_auto_mode = true` in the parent solution's `blueprint.tfvars` and run `./install.sh`).
+2. Apply the ANP allowlists from [`../agent-egress-native/manifests/allowlists/`](../agent-egress-native/manifests/allowlists/).
+3. Delete the CNPs from this example on the source cluster.
+4. Optionally uninstall Cilium (`./install.sh uninstall`) — Cilium can stay for Hubble observability even when enforcement moves to native.

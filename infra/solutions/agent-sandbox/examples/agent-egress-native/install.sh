@@ -12,8 +12,8 @@
 # before running the parent solution's install.sh.
 #
 # For Standard EKS, use the sibling agent-egress-chained example
-# instead (Cilium + Hubble chaining provides equivalent FQDN
-# filtering until AWS extends ANP to Standard EKS).
+# instead (Cilium + Hubble chaining is the canonical FQDN-filtering
+# path for Standard EKS clusters).
 #
 # Usage:
 #   cd infra/solutions/agent-sandbox/examples/agent-egress-native

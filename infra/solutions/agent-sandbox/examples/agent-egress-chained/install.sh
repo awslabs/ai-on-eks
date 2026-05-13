@@ -5,8 +5,9 @@
 # CNI, plus Hubble for flow observability, plus the admin-tier
 # CiliumClusterwideNetworkPolicy + sandbox-tier CiliumNetworkPolicy
 # for FQDN egress enforcement. Use this example on Standard EKS
-# clusters (not Auto Mode), where native ApplicationNetworkPolicy is
-# not yet available.
+# clusters (not Auto Mode) — native ApplicationNetworkPolicy is
+# available only on EKS Auto Mode and is the canonical path there;
+# this example is the canonical path for Standard EKS.
 #
 # Cilium is one of several service-mesh options that can provide FQDN
 # filtering — Istio, Linkerd, and others support similar patterns via
@@ -14,9 +15,10 @@
 # native Hubble observability, stable CNCF-graduated project), not
 # out of architectural necessity.
 #
-# When ApplicationNetworkPolicy extends to Standard EKS, customers
-# can migrate from this example to the sibling agent-egress-native
-# by replacing the CiliumNetworkPolicy manifests with equivalent
+# When you migrate to EKS Auto Mode (where ApplicationNetworkPolicy
+# is available), you can switch from this example to the sibling
+# agent-egress-native by replacing the CiliumNetworkPolicy manifests
+# with equivalent
 # ApplicationNetworkPolicy resources. The allowlist templates ship
 # as CNP/ANP pairs so migration is mechanical.
 #
