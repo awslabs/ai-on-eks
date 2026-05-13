@@ -13,7 +13,7 @@ Agents that execute model-generated code need two guarantees the default Kuberne
 - **Kernel boundary isolation.** Untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; Kata+Firecracker (documented as a future tier) adds hardware-virtualization boundaries.
 - **Egress policy enforcement.** Agents call LLM APIs, package registries, and developer tools. Without an allowlist, a compromised agent can exfiltrate data or probe internal services. FQDN filtering limits egress to a pre-approved set of destinations.
 
-This solution delivers both. A [reference agent](../../../blueprints/agents/agent-sandbox/README.md) exercises the full chain — provisions inside a gVisor-isolated Sandbox, authenticates to AWS via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
+This solution delivers both. A [reference agent](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agents/agent-sandbox/README.md) exercises the full chain — provisions inside a gVisor-isolated Sandbox, authenticates to AWS via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
 
 ## Use Cases
 
@@ -34,7 +34,7 @@ flowchart TB
 
     A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
 
-    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>base-module addon (enable_agent_sandbox=true)</i>"]:::controller
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>ArgoCD-managed addon (enable_agent_sandbox=true)</i>"]:::controller
 
     subgraph C["RuntimeClass selection"]
         direction LR
@@ -64,8 +64,8 @@ flowchart TB
 The solution deploys in layers:
 
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
-- **kubernetes-sigs/agent-sandbox controller** (installed via the SIG-Apps release manifests as a base-module addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
-- **KRO (Kube Resource Orchestrator)** (ArgoCD-managed base-module addon) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
+- **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
+- **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
 - **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
 - **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the solution with one of:
   - [agent-egress-chained](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress-chained) — Cilium + Hubble chaining for Standard EKS.
@@ -227,6 +227,6 @@ This destroys the EKS cluster and all managed resources. IAM roles created outsi
 
 ## Next Steps
 
-- Adapt the [reference agent](../../../blueprints/agents/agent-sandbox/README.md) to your own workload — replace `agent.py` with your code, update the FQDN allowlist to cover your outbound domains, and adjust IAM permissions.
+- Adapt the [reference agent](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agents/agent-sandbox/README.md) to your own workload — replace `agent.py` with your code, update the FQDN allowlist to cover your outbound domains, and adjust IAM permissions.
 - Explore the [allowlist templates](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples) under each egress example — aws-services, llm-apis, dev-tools, package-registries — for ready-made policy bundles you can compose per workload.
 - Review the [threat model per tier](#runtime-tier-threat-model) to select the right isolation level for your security posture.
