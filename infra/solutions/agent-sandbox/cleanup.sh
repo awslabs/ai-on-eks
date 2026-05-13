@@ -10,7 +10,16 @@
 #      chained) AND the Bedrock IRSA role it provisioned. Skipped
 #      silently if the example was never installed.
 #
-#   1. Pre-cleanup: drop Karpenter finalizers on EC2NodeClass +
+#   1. Pre-cleanup: scale Karpenter controller to 0 replicas to stop
+#      it from launching new nodes during teardown. Karpenter's
+#      reconcile loop is the only thing that provisions instances;
+#      scaling it down halts the launch path globally before we
+#      attempt to terminate existing nodes. This prevents the race
+#      where Phase 3's scan terminates the visible set, only to
+#      have Karpenter spin up a replacement before the subnet can
+#      release its ENIs.
+#
+#   2. Pre-cleanup: drop Karpenter finalizers on EC2NodeClass +
 #      NodePool resources before the base destroy starts. Karpenter's
 #      finalizer (`karpenter.k8s.aws/termination`) waits for the
 #      controller to drain managed instances; once the EKS cluster
@@ -18,16 +27,15 @@
 #      finalizers stall indefinitely. Dropping finalizers up front
 #      lets the base destroy walk through cleanly.
 #
-#   2. Pre-cleanup: terminate any lingering Karpenter-provisioned
+#   3. Pre-cleanup: terminate any lingering Karpenter-provisioned
 #      EC2 instances directly. Subnet deletion blocks on attached
-#      ENIs; if Karpenter didn't get a chance to drain instances
-#      before its controller was deleted, the instances outlive the
-#      controller and block VPC teardown. Terminating them up front
-#      releases the ENIs so the base destroy completes.
+#      ENIs; terminating instances up front releases the ENIs so
+#      the base destroy completes. Single scan is sufficient because
+#      Phase 1 stopped the controller from launching replacements.
 #
-#   3. Base teardown: cd terraform/_LOCAL && ./cleanup.sh
+#   4. Base teardown: cd terraform/_LOCAL && ./cleanup.sh
 #
-#   4. Post-cleanup: sweep auxiliary AWS resources by tag. Terraform
+#   5. Post-cleanup: sweep auxiliary AWS resources by tag. Terraform
 #      should handle these on a clean destroy, but state-loss or
 #      partial-destroy scenarios leave behind:
 #        - EC2 placement groups (e.g., agent-sandbox-nvidia-gpu)
@@ -68,7 +76,29 @@ for example_dir in "$SCRIPT_DIR/examples/agent-egress-chained" "$SCRIPT_DIR/exam
 done
 
 echo ""
-echo "=== Phase 1: Drop Karpenter finalizers on EC2NodeClass + NodePool ==="
+echo "=== Phase 1: Scale Karpenter controller to 0 (stop new node launches) ==="
+# Karpenter's reconcile loop is the only thing that provisions
+# instances. Scaling it to 0 replicas halts the launch path before
+# we attempt to terminate existing nodes — without this, Karpenter
+# may spin up a replacement during Phase 3's wait, leaving a
+# never-tagged orphan that blocks subnet deletion.
+#
+# Best-effort — if Karpenter isn't deployed (cluster already partly
+# destroyed) the kubectl call fails harmlessly.
+if kubectl -n kube-system get deployment karpenter >/dev/null 2>&1; then
+    echo "  Scaling karpenter deployment to 0 replicas..."
+    kubectl -n kube-system scale deployment karpenter --replicas=0 >/dev/null 2>&1 || true
+    # Wait briefly so any in-flight launch decision can drain. Karpenter
+    # commits launches via cloudprovider call before the reconcile
+    # iteration completes, so most pending launches will fly even
+    # after scale-down — that's fine, Phase 3 catches them.
+    sleep 10
+else
+    echo "  Karpenter deployment not present — skipping (cluster already partly destroyed)."
+fi
+
+echo ""
+echo "=== Phase 2: Drop Karpenter finalizers on EC2NodeClass + NodePool ==="
 # Best-effort — kubectl may already be unable to reach the cluster
 # if a prior destroy partially completed. `|| true` keeps the script
 # moving in that case.
@@ -86,7 +116,7 @@ if kubectl get nodepools -o name >/dev/null 2>&1; then
 fi
 
 echo ""
-echo "=== Phase 2: Terminate any Karpenter-provisioned EC2 instances ==="
+echo "=== Phase 3: Terminate any Karpenter-provisioned EC2 instances ==="
 # Filter by presence of the karpenter.sh/nodepool tag key. Compound
 # tag filters with `Values=*` don't behave like a wildcard match in
 # the EC2 API — `tag-key` is the right filter shape for "instances
@@ -94,6 +124,8 @@ echo "=== Phase 2: Terminate any Karpenter-provisioned EC2 instances ==="
 # tag so we only terminate instances belonging to this deployment
 # (multi-cluster accounts may have other agent-sandbox-flavored
 # clusters running alongside).
+#
+# Single scan is sufficient because Phase 1 stopped the controller.
 KARPENTER_INSTANCES=$(aws ec2 describe-instances \
     --region "$REGION" \
     --filters "Name=tag-key,Values=karpenter.sh/nodepool" \
@@ -114,7 +146,7 @@ else
 fi
 
 echo ""
-echo "=== Phase 3: Run base module cleanup ==="
+echo "=== Phase 4: Run base module cleanup ==="
 if [ -d "$LOCAL_DIR" ]; then
     # Pre-step: remove in-cluster helm/kubectl resources from state.
     # These resources live inside the cluster and will be deleted with
@@ -151,7 +183,36 @@ else
 fi
 
 echo ""
-echo "=== Phase 4: Sweep auxiliary AWS resources ==="
+echo "=== Phase 5: Sweep auxiliary AWS resources ==="
+
+# Cluster security groups — EKS auto-creates `eks-cluster-sg-<cluster>-<id>`
+# and is responsible for deleting it on cluster delete. Stale ENI
+# references can leave it dangling, blocking VPC destroy. If a VPC
+# matching this deployment still exists, sweep its SGs (everything
+# but `default`) and retry VPC delete via terraform.
+LINGERING_VPC=$(aws ec2 describe-vpcs \
+    --region "$REGION" \
+    --filters "Name=tag:Name,Values=${CLUSTER_NAME}" \
+    --query "Vpcs[].VpcId" \
+    --output text 2>/dev/null || echo "")
+if [ -n "$LINGERING_VPC" ]; then
+    echo "  VPC $LINGERING_VPC still present after base destroy — sweeping cluster SGs..."
+    SG_IDS=$(aws ec2 describe-security-groups \
+        --region "$REGION" \
+        --filters "Name=vpc-id,Values=$LINGERING_VPC" \
+        --query "SecurityGroups[?GroupName!='default'].GroupId" \
+        --output text 2>/dev/null || echo "")
+    if [ -n "$SG_IDS" ]; then
+        for sg in $SG_IDS; do
+            echo "    Deleting security group $sg"
+            aws ec2 delete-security-group --region "$REGION" --group-id "$sg" >/dev/null 2>&1 || true
+        done
+    fi
+    if [ -d "$LOCAL_DIR" ]; then
+        echo "  Retrying VPC destroy via terraform..."
+        ( cd "$LOCAL_DIR" && terraform destroy -auto-approve -var-file=../blueprint.tfvars -target=module.vpc ) || true
+    fi
+fi
 
 # Placement groups — Terraform's destroy of an EKS managed node
 # group with placement strategy doesn't always release these on
