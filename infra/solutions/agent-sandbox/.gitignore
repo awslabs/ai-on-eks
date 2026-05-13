@@ -1,4 +1,2 @@
 *.log
 terraform/_LOCAL/
-manifests/iam/bedrock-*.json
-!manifests/iam/bedrock-*.template.json

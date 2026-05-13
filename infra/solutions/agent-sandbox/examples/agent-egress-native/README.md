@@ -70,12 +70,11 @@ Each file has a comment header describing what's included and pointing at the eq
 ```
 agent-egress-native/
 ├── README.md                                      # This file
-├── install.sh                                     # Installer (install | uninstall)
+├── install.sh                                     # Installer (install | uninstall | irsa | policies)
 └── manifests/
     ├── network-policy-controller-enable.yaml      # ConfigMap enabling the Auto Mode NP Controller
     ├── clusternetworkpolicy-admin.yaml            # Admin tier: deny IMDS (cluster-scoped CNP)
     ├── applicationnetworkpolicy-sandbox-llm.yaml  # App tier: default sandbox allowlist
-    ├── test-pod.yaml                              # Minimal test pod for validating enforcement
     └── allowlists/
         ├── aws-services.yaml
         ├── llm-apis.yaml
@@ -85,25 +84,15 @@ agent-egress-native/
 
 ## Validating enforcement
 
-A minimal test pod ships at `manifests/test-pod.yaml`:
+Run the reference agent's conformance test — it auto-detects whether you're on Standard EKS or Auto Mode, claims the right SandboxTemplate (`sandbox-standard` on Auto Mode), and asserts all 5 PASS / BLOCKED outcomes including the Step 4 (FQDN block) and Step 5 (raw IP block) paths.
 
 ```bash
-kubectl apply -f manifests/test-pod.yaml
-kubectl -n agent-sandboxes wait --for=condition=Ready pod/egress-test --timeout=120s
-
-# Allowed FQDN (from the default sandbox-llm-allowlist ANP):
-kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://pypi.org
-
-# Blocked FQDN (not in the allowlist — expect DNS failure):
-kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://blocked-example.example.com
-
-# Blocked raw IP (not in the allowlist — expect connection timeout):
-kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://8.8.8.8
-
-kubectl delete -f manifests/test-pod.yaml
+cd ../../../../../blueprints/agents/agent-sandbox
+BEDROCK_ROLE_ARN=$(aws iam get-role --role-name agent-sandbox-bedrock-irsa --query 'Role.Arn' --output text) \
+    ./conformance.sh
 ```
 
-For the full 5-step reference agent run (exercises both enforcement layers end-to-end), see the [reference agent blueprint](../../../../../blueprints/agents/agent-sandbox/).
+For ad-hoc validation against the policy without the full reference agent, exec into any pod in the `agent-sandboxes` namespace with the `egress-tier: sandbox` label and run `curl` / `socket.connect` tests.
 
 ## Migration path from chained to native
 
