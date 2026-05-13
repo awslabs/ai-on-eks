@@ -153,8 +153,8 @@ Bedrock inference is billed per-token by the model provider and is independent o
 ## Prerequisites
 
 - AWS credentials with permissions for VPC, EKS, IAM, EC2.
-- For the reference agent: an IAM role with `bedrock:InvokeModel` on the target Claude model and an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`.
-- `terraform >=1.0`, `kubectl >=1.30`, `helm >=3.0`, `aws` CLI v2.
+- For the reference agent: `jq` and `aws` CLI v2 — the egress install script provisions a Bedrock IRSA role for the sandbox ServiceAccount automatically (idempotent; safe to re-run).
+- `terraform >=1.0`, `kubectl >=1.30`, `helm >=3.0`, `aws` CLI v2, `jq`.
 
 ### Verify Setup
 
@@ -233,6 +233,8 @@ cd examples/agent-egress-native
 ./install.sh                                             # Auto Mode
 ```
 
+Each example's `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent; updates the trust policy on cluster recreation so OIDC drift doesn't break re-runs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
+
 Each example installs its own README with allowlist-template usage and portability notes between the two enforcement backends.
 
 ### Validate the Deployment
@@ -241,8 +243,10 @@ A reference agent lives under [`../../../blueprints/agents/agent-sandbox/`](../.
 
 ```bash
 cd ../../../blueprints/agents/agent-sandbox
+# BEDROCK_ROLE_ARN was provisioned + echoed by the egress install.sh.
+# It defaults to <cluster-name>-bedrock-irsa.
 CLUSTER_NAME=agent-sandbox \
-BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
+BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
     ./conformance.sh
 ```
 

@@ -1,8 +1,14 @@
 #!/bin/bash
 # Agent Sandbox solution — hierarchical teardown.
 #
-# Wraps the base module's cleanup.sh with three pre/post phases that
-# the base flow doesn't know about:
+# Wraps the base module's cleanup.sh with pre/post phases that the
+# base flow doesn't know about:
+#
+#   0. Pre-cleanup: invoke whichever egress example is installed
+#      (chained or native) with its `uninstall` phase. Each example's
+#      uninstall removes its own resources (CNPs/ANPs, Cilium for
+#      chained) AND the Bedrock IRSA role it provisioned. Skipped
+#      silently if the example was never installed.
 #
 #   1. Pre-cleanup: drop Karpenter finalizers on EC2NodeClass +
 #      NodePool resources before the base destroy starts. Karpenter's
@@ -49,6 +55,19 @@ fi
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
 REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
 
+echo "=== Phase 0: Run egress example uninstall (releases CNPs/ANPs + IRSA role) ==="
+# Try each example's uninstall phase. Each one is idempotent — if
+# the example wasn't installed, its uninstall is a no-op. We don't
+# know which example the user picked, so try both. Failures are
+# tolerated (best-effort cleanup).
+for example_dir in "$SCRIPT_DIR/examples/agent-egress-chained" "$SCRIPT_DIR/examples/agent-egress-native"; do
+    if [ -x "$example_dir/install.sh" ]; then
+        echo "  Running $(basename "$example_dir") uninstall..."
+        ( cd "$example_dir" && ./install.sh uninstall ) || true
+    fi
+done
+
+echo ""
 echo "=== Phase 1: Drop Karpenter finalizers on EC2NodeClass + NodePool ==="
 # Best-effort — kubectl may already be unable to reach the cluster
 # if a prior destroy partially completed. `|| true` keeps the script
@@ -68,14 +87,17 @@ fi
 
 echo ""
 echo "=== Phase 2: Terminate any Karpenter-provisioned EC2 instances ==="
-# Filter by the cluster name tag Karpenter stamps on every node it
-# launches. Don't match by tag:Blueprint because the base module
-# tags the EKS-managed core node group with that too — Karpenter
-# nodes are the ones tied to the cluster's name tag.
+# Filter by presence of the karpenter.sh/nodepool tag key. Compound
+# tag filters with `Values=*` don't behave like a wildcard match in
+# the EC2 API — `tag-key` is the right filter shape for "instances
+# carrying this tag at all". Cross-reference against the cluster-name
+# tag so we only terminate instances belonging to this deployment
+# (multi-cluster accounts may have other agent-sandbox-flavored
+# clusters running alongside).
 KARPENTER_INSTANCES=$(aws ec2 describe-instances \
     --region "$REGION" \
-    --filters "Name=tag:karpenter.sh/nodepool,Values=*" \
-              "Name=tag:eks:cluster-name,Values=$CLUSTER_NAME" \
+    --filters "Name=tag-key,Values=karpenter.sh/nodepool" \
+              "Name=tag:aws:eks:cluster-name,Values=$CLUSTER_NAME" \
               "Name=instance-state-name,Values=running,pending,stopping" \
     --query "Reservations[].Instances[].InstanceId" \
     --output text 2>/dev/null || echo "")
@@ -94,9 +116,36 @@ fi
 echo ""
 echo "=== Phase 3: Run base module cleanup ==="
 if [ -d "$LOCAL_DIR" ]; then
-    cd "$LOCAL_DIR"
-    source ./cleanup.sh
-    cd "$SCRIPT_DIR"
+    # Pre-step: remove in-cluster helm/kubectl resources from state.
+    # These resources live inside the cluster and will be deleted with
+    # the cluster itself — but if terraform tries to destroy them
+    # *through the cluster API* during the destroy run, the API may
+    # already be flaky (helm provider reports "context deadline
+    # exceeded" against karpenter-crd or similar). Removing them from
+    # state first lets the base destroy walk through cleanly without
+    # needing a healthy cluster API for each in-cluster resource.
+    pushd "$LOCAL_DIR" >/dev/null
+    for stale_resource in $(terraform state list 2>/dev/null \
+            | grep -E '^helm_release\.|^kubectl_manifest\.' \
+            || true); do
+        # Skip ArgoCD itself — the destroy needs argocd to clean up
+        # its child Application resources cleanly. Everything else
+        # (kubectl_manifest.<addon>, helm_release.karpenter_crd, etc.)
+        # is fair game for state-removal since the cluster destroy
+        # will sweep them.
+        if [[ "$stale_resource" == *"argocd"* ]]; then
+            continue
+        fi
+        echo "  Removing $stale_resource from state (cluster destroy will sweep)"
+        terraform state rm "$stale_resource" >/dev/null 2>&1 || true
+    done
+    popd >/dev/null
+
+    # Run base cleanup in a subshell so its non-zero exits (e.g.,
+    # `kubectl delete rayjob` against a cluster that has no Ray CRDs)
+    # don't kill our wrapper's `set -e`. The base script was written
+    # with best-effort semantics; we honor that here.
+    ( cd "$LOCAL_DIR" && bash ./cleanup.sh ) || true
 else
     echo "  $LOCAL_DIR not present — skipping base destroy (already complete)."
 fi
@@ -160,6 +209,8 @@ fi
 echo ""
 echo "=== Cleanup complete ==="
 echo ""
-echo "Note: IAM roles created outside this solution (e.g., a Bedrock"
-echo "IRSA role for the reference agent) are not deleted by this"
-echo "script. Remove them manually if no longer needed."
+echo "Resources removed:"
+echo "  - All terraform-managed resources (EKS, VPC, IAM, KMS, log groups)"
+echo "  - Bedrock IRSA role (via the egress example's uninstall phase)"
+echo "  - Karpenter-provisioned EC2 instances"
+echo "  - Auxiliary AWS resources (placement groups, KMS aliases, log groups)"
