@@ -200,7 +200,7 @@ Conformance exits 0 on success, asserting all five expected PASS/BLOCKED outcome
 | `region` | AWS region | Base module default (`us-west-2`) |
 | `eks_cluster_version` | EKS version | `1.34` |
 | `enable_agent_sandbox` | Deploy the kubernetes-sigs agent-sandbox controller via ArgoCD | `true` |
-| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox git ref | `v0.4.3` |
+| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox git ref | `v0.4.5` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
 | `kro_version` | kro Helm chart version | `0.9.1` |
 | `enable_eks_auto_mode` | Use EKS Auto Mode instead of Karpenter-managed compute | `false` |

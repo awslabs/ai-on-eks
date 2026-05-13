@@ -80,7 +80,7 @@ Both paths produce an equivalent running pod on a gVisor node with IRSA credenti
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v0.4.3 | Sandbox / SandboxTemplate / SandboxClaim controller |
+| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v0.4.5 | Sandbox / SandboxTemplate / SandboxClaim controller |
 | [kro](https://kro.run/) | 0.9.1 | ResourceGraphDefinition-based composition |
 | [gVisor](https://gvisor.dev/) | runsc (AL2023) | Userspace syscall interception for gvisor tier |
 | [Karpenter](https://karpenter.sh/) | Bundled with base module | Node autoscaling with a dedicated gVisor NodePool |
@@ -254,7 +254,7 @@ Conformance exits 0 on success and asserts all 5 expected PASS/BLOCKED outcomes.
 | `region` | AWS region | Base module default (`us-west-2`); uncomment to override |
 | `eks_cluster_version` | EKS version | `1.34` |
 | `enable_agent_sandbox` | Deploy the SIG-Apps agent-sandbox controller via ArgoCD | `true` |
-| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v0.4.3` |
+| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v0.4.5` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
 | `kro_version` | kro Helm chart version | `0.9.1` |
 | `enable_eks_auto_mode` | Use EKS Auto Mode instead of Karpenter-managed compute | `false` |
