@@ -1,60 +1,44 @@
-# Agent Egress (Native) — Blueprint
+# Agent Egress (Native) — Example
 
-Applies native EKS network policies (`ClusterNetworkPolicy` + `ApplicationNetworkPolicy`) for FQDN-aware egress enforcement. Requires **EKS Auto Mode** — the DNS-based FQDN filtering this blueprint relies on is available only on Auto Mode-launched EC2 instances today.
+Applies native EKS `ClusterNetworkPolicy` + `ApplicationNetworkPolicy` for FQDN-based egress enforcement on top of an EKS Auto Mode cluster. Pairs with the parent [agent-sandbox solution](../../).
 
-**When to use this blueprint**: running on EKS Auto Mode, want native network policy enforcement without a third-party CNI dependency.
+## When to use this example
 
-**When to use the chained alternative**: running on Standard EKS, where `ApplicationNetworkPolicy` is not yet available. See `infra/agent-egress-chained/`. When AWS extends ANP to Standard EKS, customers can migrate from chained to native by replacing the CNP manifests with the ANP equivalents shipped here. Pod-level labels (`allowlist: <name>`) are identical across both blueprints.
+Running on EKS Auto Mode, want native network policy enforcement without a third-party CNI dependency.
 
-This blueprint can provision its own EKS Auto Mode cluster (via the standard ai-on-eks base module with `enable_eks_auto_mode = true`) or apply policies to an existing Auto Mode cluster.
+For Standard EKS, use the sibling [agent-egress-chained](../agent-egress-chained/) example instead. When AWS extends `ApplicationNetworkPolicy` to Standard EKS, customers can migrate from chained to native by replacing the CNP manifests with the ANP equivalents shipped here. Pod-level labels (`allowlist: <name>`) are identical across both examples.
 
-## What gets installed
+## Positioning
 
-| Layer | Component | Notes |
-|---|---|---|
-| Cluster (optional) | EKS Auto Mode v1.34 | Via `./install.sh cluster`. Skip this phase if you already have an Auto Mode cluster. |
-| Admin-tier policy | `ClusterNetworkPolicy` | Blocks IMDS + ECS task metadata for the `agent-sandboxes` namespace |
-| App-tier policy | `ApplicationNetworkPolicy` | Default sandbox allowlist: Bedrock + STS + PyPI |
-| Allowlist templates | 4 additional ANPs | LLM APIs, package registries, dev tools, AWS services — apply the ones your agents need |
+Uses the DNS-based FQDN filtering available in EKS Auto Mode (per [AWS docs](https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html)) via the VPC CNI's Network Policy Controller. No Cilium dependency, no service mesh required. Enforcement happens at the VPC CNI's eBPF hooks.
 
 ## Prerequisites
 
-- An existing EKS Auto Mode cluster (or provision one via `./install.sh cluster`).
-- `infra/agent-sandbox/` installed against the same cluster (provides the `agent-sandboxes` namespace + sandbox controller).
+- The parent [agent-sandbox solution](../../) installed with `enable_eks_auto_mode = true` in its `terraform/blueprint.tfvars` (provides an Auto Mode cluster + `agent-sandboxes` namespace + agent-sandbox controller).
 - `kubectl >=1.30`, `aws` CLI v2.
+- `kubectl` configured for the Auto Mode cluster.
 
-Note on enforcement: EKS Auto Mode ships the `ApplicationNetworkPolicy` / `ClusterNetworkPolicy` CRDs but disables the Network Policy Controller by default. `./install.sh policies` enables the controller via the `amazon-vpc-cni` ConfigMap in `kube-system` before applying the policies. Without that ConfigMap, policies are accepted silently but nothing is enforced (per [Use Network Policies with EKS Auto Mode](https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html)). If you already enforce the controller cluster-wide, the install is idempotent.
+### Enforcement requirements
 
-Note on FQDN wildcards: native ApplicationNetworkPolicy accepts `*` only as the leftmost label (e.g., `*.amazonaws.com`). Patterns like `bedrock-runtime.*.amazonaws.com` are rejected at admission. The default allowlist therefore enumerates the most-common AWS regions (us-east-1 + us-west-2) explicitly; consumers in other regions should add matching entries. The chained blueprint's `CiliumNetworkPolicy` variant uses `matchPattern` which supports embedded wildcards, so its templates are more compact.
+EKS Auto Mode ships the `ApplicationNetworkPolicy` / `ClusterNetworkPolicy` CRDs but **disables the Network Policy Controller by default**. `./install.sh` enables the controller via the `amazon-vpc-cni` ConfigMap in `kube-system` before applying the policies. Without that ConfigMap, policies are accepted silently but nothing is enforced (per [Use Network Policies with EKS Auto Mode](https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html)). If you already enforce the controller cluster-wide, the install is idempotent.
+
+### FQDN wildcard limitation
+
+Native `ApplicationNetworkPolicy` accepts `*` **only as the leftmost label** (e.g., `*.amazonaws.com`). Patterns like `bedrock-runtime.*.amazonaws.com` are rejected at admission. The default allowlist enumerates the most-common AWS regions (us-east-1 + us-west-2) explicitly; consumers in other regions should add matching entries. The chained example's `CiliumNetworkPolicy` variant uses `matchPattern` which supports embedded wildcards, so its templates are more compact.
 
 ## Usage
 
-Apply policies to an existing Auto Mode cluster:
+Install (enables Network Policy Controller + applies policies):
 
 ```bash
-cd infra/agent-egress-native
-./install.sh policies       # ~10s
+cd infra/solutions/agent-sandbox/examples/agent-egress-native
+./install.sh
 ```
 
-Provision a new Auto Mode cluster + apply policies:
-
-```bash
-cd infra/agent-egress-native
-./install.sh cluster        # ~20-30 min
-./install.sh policies       # ~10s
-```
-
-Uninstall (leaves the cluster intact):
+Uninstall:
 
 ```bash
 ./install.sh uninstall
-```
-
-Destroy the cluster (only if provisioned by this blueprint):
-
-```bash
-cd terraform/_LOCAL
-./cleanup.sh
 ```
 
 ## Applying additional allowlists
@@ -62,57 +46,70 @@ cd terraform/_LOCAL
 Label the pods that should be covered, then apply the matching template:
 
 ```bash
-# Example: a pod that needs to reach LLM APIs AND package registries.
 kubectl label pod my-agent -n agent-sandboxes \
-    allowlist=llm-apis allowlist=package-registries --overwrite
+    allowlist=llm-apis --overwrite
 
 kubectl apply -f manifests/allowlists/llm-apis.yaml
-kubectl apply -f manifests/allowlists/package-registries.yaml
 ```
 
 Each allowlist selects pods by the `allowlist: <name>` label. A pod without any `allowlist` label falls under the default `sandbox-llm-allowlist` ANP, which covers the reference agent's needs.
 
-See `manifests/allowlists/` for the four shipped templates (`aws-services.yaml`, `llm-apis.yaml`, `dev-tools.yaml`, `package-registries.yaml`). Each file has a comment header describing what's included and pointing at the equivalent `CiliumNetworkPolicy` under `infra/agent-egress-chained/`.
+Four shipped templates under `manifests/allowlists/`:
+
+| Template | Destinations |
+|----------|--------------|
+| `aws-services.yaml` | STS, Bedrock, S3, DynamoDB (us-east-1 + us-west-2) |
+| `llm-apis.yaml` | Bedrock (us-east-1 + us-west-2), Anthropic, OpenAI |
+| `dev-tools.yaml` | GitHub, GitLab, Docker Hub, ECR (us-east-1 + us-west-2), Hugging Face |
+| `package-registries.yaml` | PyPI, npm, Maven Central, Go proxy, crates.io, RubyGems |
+
+Each file has a comment header describing what's included and pointing at the equivalent `CiliumNetworkPolicy` under [`../agent-egress-chained/manifests/allowlists/`](../agent-egress-chained/manifests/allowlists/).
 
 ## Directory layout
 
 ```
-infra/agent-egress-native/
-├── README.md                                     # This file
-├── install.sh                                    # Phased installer (cluster | policies | all | uninstall)
-├── terraform/
-│   └── blueprint.tfvars                          # EKS Auto Mode enabled
+agent-egress-native/
+├── README.md                                      # This file
+├── install.sh                                     # Installer (install | uninstall)
 └── manifests/
-    ├── network-policy-controller-enable.yaml    # ConfigMap enabling the Auto Mode NP Controller
-    ├── clusternetworkpolicy-admin.yaml           # Admin tier: deny IMDS (Admin tier CNP)
-    ├── applicationnetworkpolicy-sandbox-llm.yaml # App tier: default sandbox allowlist (Bedrock + STS + PyPI)
-    ├── test-pod.yaml                             # Minimal test pod for validating enforcement
+    ├── network-policy-controller-enable.yaml      # ConfigMap enabling the Auto Mode NP Controller
+    ├── clusternetworkpolicy-admin.yaml            # Admin tier: deny IMDS (cluster-scoped CNP)
+    ├── applicationnetworkpolicy-sandbox-llm.yaml  # App tier: default sandbox allowlist
+    ├── test-pod.yaml                              # Minimal test pod for validating enforcement
     └── allowlists/
-        ├── aws-services.yaml                     # STS, Bedrock, S3, DynamoDB
-        ├── llm-apis.yaml                         # Bedrock, Anthropic, OpenAI
-        ├── dev-tools.yaml                        # GitHub, GitLab, Docker Hub, ECR, Hugging Face
-        └── package-registries.yaml               # PyPI, npm, Maven, Go, crates.io, RubyGems
+        ├── aws-services.yaml
+        ├── llm-apis.yaml
+        ├── dev-tools.yaml
+        └── package-registries.yaml
 ```
 
-## Observability
+## Validating enforcement
 
-Native EKS network policies integrate with CloudWatch Logs (configurable via NodeClass `networkPolicyEventLogs: Enabled`). For richer flow observability, install Hubble separately or chain Cilium in observability-only mode alongside the native enforcement path (Cilium ships with its own Hubble dashboard).
+A minimal test pod ships at `manifests/test-pod.yaml`:
 
-See the AWS documentation for ANP operational notes: https://docs.aws.amazon.com/eks/latest/userguide/auto-net-pol.html
+```bash
+kubectl apply -f manifests/test-pod.yaml
+kubectl -n agent-sandboxes wait --for=condition=Ready pod/egress-test --timeout=120s
 
-## Known limitations
+# Allowed FQDN (from the default sandbox-llm-allowlist ANP):
+kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://pypi.org
 
-1. **Requires EKS Auto Mode** for DNS-based FQDN enforcement. Applying these manifests to Standard EKS creates the CRDs (once `ApplicationNetworkPolicy` support extends to Standard) but DNS-based rules won't enforce until AWS ships full Standard EKS support.
-2. **Policy evaluation order matters** — Admin tier policies (this blueprint's `ClusterNetworkPolicy`) are evaluated before namespace-scoped policies. An Admin Deny cannot be overridden by namespace-level ANPs. See the AWS documentation on policy evaluation order.
-3. **FQDN enforcement is DNS-proxy-based** — just like the chained variant. Denied FQDN lookups produce an empty DNS answer; the pod's resolver sees a hostname failure. No L3/L4 DROPPED flow is generated because the pod never attempts a TCP connection to the denied FQDN.
+# Blocked FQDN (not in the allowlist — expect DNS failure):
+kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://blocked-example.example.com
 
-## Migrating from chained to native
+# Blocked raw IP (not in the allowlist — expect connection timeout):
+kubectl -n agent-sandboxes exec egress-test -- curl -sS -o /dev/null -w '%{http_code}\n' --max-time 5 https://8.8.8.8
 
-When `ApplicationNetworkPolicy` extends to Standard EKS:
+kubectl delete -f manifests/test-pod.yaml
+```
 
-1. Apply the ANP templates from this blueprint's `manifests/allowlists/` to the existing Standard EKS cluster.
-2. Verify ANP enforcement is working (check `aws eks describe-cluster` to confirm the required VPC CNI version is installed).
-3. Remove the Cilium CNPs from `infra/agent-egress-chained/manifests/`.
-4. Optionally uninstall Cilium (`./install.sh uninstall` from `infra/agent-egress-chained/`) — Cilium can stay for Hubble observability even when enforcement moves to native.
+For the full 5-step reference agent run (exercises both enforcement layers end-to-end), see the [reference agent blueprint](../../../../../blueprints/agents/agent-sandbox/).
+
+## Migration path from chained to native (when ANP extends to Standard EKS)
+
+1. Apply the ANP templates from this example's `manifests/allowlists/` to the existing Standard EKS cluster.
+2. Verify ANP enforcement is working (check `aws eks describe-cluster` to confirm the required VPC CNI version is installed, and that the Network Policy Controller is enabled).
+3. Remove the Cilium CNPs from [`../agent-egress-chained/`](../agent-egress-chained/).
+4. Optionally uninstall Cilium (`../agent-egress-chained/install.sh uninstall`) — Cilium can stay for Hubble observability even when enforcement moves to native.
 
 Pod-level allowlist labels do not change.

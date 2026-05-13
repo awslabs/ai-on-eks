@@ -1,133 +1,172 @@
-# Agent Sandbox — Reference Agent
+# Agent Sandbox — Reference Agent Blueprint
 
-A minimal Python agent that exercises the `infra/agent-sandbox/` blueprint end-to-end. Runs inside a gVisor-isolated [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) pod, calls Amazon Bedrock for content, executes model-generated code, and exercises both enforcement layers of the Cilium network policy.
+## Table of Contents
 
-Use this as a working example to build your own agent against the blueprint, or as a conformance check after deploying the infra.
+- [Overview](#overview)
+- [What the agent does](#what-the-agent-does)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+  - [Interactive run](#interactive-run)
+  - [Automated conformance run](#automated-conformance-run)
+- [Two Enforcement Layers, Two Observability Surfaces](#two-enforcement-layers-two-observability-surfaces)
+- [Adapting the agent](#adapting-the-agent)
+- [Files in this directory](#files-in-this-directory)
+- [Troubleshooting](#troubleshooting)
 
-## Prerequisites
+## Overview
 
-- The `infra/agent-sandbox/` blueprint installed: run `../../../infra/agent-sandbox/install.sh` from a clone of the repo.
-- An IAM role with `bedrock:InvokeModel` for the target Claude model and an IRSA trust policy that allows the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. See `../../../infra/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json` and `iam-bedrock-permissions.template.json` for starting points.
-- `kubectl` configured against the cluster (`aws eks update-kubeconfig --name agent-sandbox --region us-east-1`).
+A minimal Python agent that demonstrates a secure agent workload pattern on Amazon EKS using the [agent-sandbox solution](../../../infra/solutions/agent-sandbox/). The agent runs inside a gVisor-isolated sandbox, authenticates to AWS via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and exercises both enforcement layers of the egress network policy.
+
+Use this as a working example to build your own agent against the solution, or as a conformance check after deploying the infrastructure.
 
 ## What the agent does
 
-Five steps, each designed to exercise a distinct part of the blueprint:
+The agent (`agent.py`) walks five steps and prints PASS/BLOCKED markers after each:
 
-| Step | Action | Demonstrates |
-|---|---|---|
-| 1 | `pip install boto3` from PyPI | Cilium FQDN allowlist permits `pypi.org` + `files.pythonhosted.org` |
-| 2 | Call Bedrock Claude Sonnet | IRSA credential path works through gVisor; FQDN allowlist permits `bedrock-runtime.*.amazonaws.com` + `sts.*.amazonaws.com` |
-| 3 | Execute the model-generated Python snippet inside the sandbox | Sandbox can run code; syscalls flow through gVisor's Sentry userspace kernel |
-| 4 | HTTP GET to a non-allowlisted FQDN | Cilium DNS proxy returns an empty answer; Python surfaces a resolution failure |
-| 5 | Raw TCP connect to a non-allowlisted IP (8.8.8.8:443) | Cilium L3/L4 policy drops the SYN packet; produces a DROPPED flow in Hubble |
+| Step | Action | Expected outcome | Exercises |
+|------|--------|-------------------|-----------|
+| 1 | `pip install boto3` from PyPI | PASS | FQDN allowlist (allow `pypi.org`) |
+| 2 | Call Amazon Bedrock Claude for a code snippet | PASS | FQDN allowlist (allow `bedrock-runtime`) + IRSA |
+| 3 | Execute the model-generated snippet inside the sandbox | PASS | gVisor Sentry syscall boundary |
+| 4 | Attempt egress to a non-allowlisted FQDN | BLOCKED (DNS resolution failure) | Cilium/ANP DNS proxy enforcement |
+| 5 | Attempt raw TCP connect to a non-allowlisted IP | BLOCKED (connection timeout) | Cilium/ANP L3/L4 enforcement |
 
-Expected console output:
+Step 4 proves the FQDN-layer contract; Step 5 proves the L3/L4 contract. Both blocks are expected — a PASS in Step 4 or Step 5 indicates the policy isn't enforcing.
 
-```
-Step 1 (PyPI):            PASS
-Step 2 (Bedrock):         PASS
-Step 3 (snippet exec):    PASS
-Step 4 (FQDN block):      BLOCKED — at DNS proxy
-Step 5 (IP block):        BLOCKED — at L3/L4
-```
+## Prerequisites
 
-## Two enforcement layers, two observability surfaces
+- The [agent-sandbox solution](../../../infra/solutions/agent-sandbox/) installed: run `../../../infra/solutions/agent-sandbox/install.sh` from a clone of the repo. See its README for solution-level steps (cluster provisioning, manifest application, egress enforcement).
+- One of the egress examples applied ([agent-egress-chained](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/) for Standard EKS, [agent-egress-native](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/) for EKS Auto Mode).
+- An IAM role with `bedrock:InvokeModel` permission for the target Claude model, plus an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. See [`iam-bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json) and [`iam-bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-permissions.template.json) for starting points.
+- `kubectl` configured against the cluster (`aws eks update-kubeconfig --name agent-sandbox --region <region>`).
 
-Cilium enforces network policy at two distinct layers, and they show up differently in Hubble:
+## Quick Start
 
-**FQDN enforcement (Step 4)** — Cilium's DNS proxy intercepts DNS queries and filters the response. When a FQDN isn't on the allowlist, the proxy returns an empty answer. The pod sees a hostname resolution failure, never attempts a TCP connection, and produces no packet-level event to visualize. Step 4 does NOT render as a red flow in Hubble's default Service Map view. To observe the FQDN verdict directly:
+### Interactive run
 
-```bash
-# Run while the agent is executing Step 4
-kubectl -n kube-system exec ds/cilium -c cilium-agent -- \
-    cilium monitor --type l7 | grep "DNS proxy"
-```
-
-You'll see lines like `verdict Forwarded DNS proxy: blocked-example.example.com. A TTL: 4294967295 Answer: ''` — the empty `Answer: ''` is how Cilium denies FQDN egress.
-
-Alternatively, add a positive filter for the FQDN in the Hubble UI filter bar (e.g., type `blocked-example.example.com`) to un-blacklist DNS events for that specific domain.
-
-**L3/L4 enforcement (Step 5)** — Cilium's eBPF policy drops packets at the socket/network layer. When a pod attempts to connect to a non-allowlisted IP, the SYN is silently discarded. This IS visible in Hubble's default Service Map as a red DROPPED flow to `8.8.8.8:443`. No filter tuning required.
-
-This distinction matters because adopters who only look at Hubble's default view will see Step 5 but miss Step 4. Both are doing the same work (blocking unauthorized egress); they just show up in different places.
-
-## Running the agent
-
-### Interactive run (one-off)
+Walk through the agent step-by-step with direct kubectl commands. Useful when first exploring the solution or debugging a specific step.
 
 ```bash
-# 1. Annotate the ServiceAccount with the IAM role for IRSA (one time
-#    per cluster — the annotation persists across pod rebuilds).
-kubectl create serviceaccount sandbox-agent-sa -n agent-sandboxes --dry-run=client -o yaml | kubectl apply -f -
+# 1. Annotate the ServiceAccount with your Bedrock IAM role ARN.
 kubectl annotate serviceaccount sandbox-agent-sa -n agent-sandboxes \
-    eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
+    "eks.amazonaws.com/role-arn=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel>" \
     --overwrite
 
-# 2. Install the agent script into a ConfigMap the Sandbox mounts.
+# 2. Load this agent.py into the ConfigMap the Sandbox mounts.
 kubectl -n agent-sandboxes create configmap sandbox-agent-script \
-    --from-file=agent.py=./agent.py
+    --from-file=agent.py=./agent.py \
+    --dry-run=client -o yaml | kubectl apply -f -
 
 # 3. Create the Sandbox.
-kubectl apply -f ../../../infra/agent-sandbox/manifests/sandbox-agent.yaml
+kubectl apply -f ../../../infra/solutions/agent-sandbox/manifests/sandbox-agent.yaml
 
 # 4. Wait for Ready, then run the agent.
-kubectl -n agent-sandboxes wait --for=condition=Ready pod/sandbox-agent --timeout=300s
+kubectl -n agent-sandboxes wait --for=condition=Ready pod/sandbox-agent --timeout=120s
 kubectl exec -n agent-sandboxes sandbox-agent -c agent-runtime -- python /workspace/agent.py
 ```
 
-Open the Hubble UI in a second terminal to watch egress decisions live:
-
-```bash
-kubectl port-forward -n kube-system svc/hubble-ui 12000:80
-# then open http://localhost:12000 and filter to namespace=agent-sandboxes
-```
+Expected output is the 5-step sequence with PASS / PASS / PASS / BLOCKED / BLOCKED markers.
 
 ### Automated conformance run
 
-`conformance.sh` (in the infra directory, `../../../infra/agent-sandbox/conformance.sh`) wraps the interactive steps above, executes the agent, and asserts the expected PASS/BLOCKED markers appear. Exits 0 on success, 1 on any failure. Useful after a blueprint install or as a regression check.
+`conformance.sh` wraps the interactive steps above, executes the agent, and asserts the expected markers appear. Exits 0 on success, 1 on any failure. Useful after a solution install or as a regression check.
 
 ```bash
-cd ../../../infra/agent-sandbox
 CLUSTER_NAME=agent-sandbox \
 BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
     ./conformance.sh
 ```
 
-The script registers its own cleanup trap — by default it leaves the Sandbox pod + ConfigMap in place so repeat conformance runs are fast (no re-provisioning gVisor nodes). Pass `CLEANUP=1` to remove the sandbox resources on exit:
+The script auto-detects whether chained or native egress is installed and validates the expected CNP/ANP resources accordingly.
+
+## Two Enforcement Layers, Two Observability Surfaces
+
+The reference agent's Step 4 and Step 5 exercise two distinct enforcement contracts, each with a different observability surface:
+
+### Step 4 — FQDN enforcement at the DNS proxy
+
+Cilium's `toFQDNs` and native `ApplicationNetworkPolicy`'s `domainNames` both enforce at the DNS layer. When the pod queries a non-allowlisted FQDN, the DNS proxy returns an empty answer and the pod sees `[Errno -5] No address associated with hostname`. The pod never attempts a TCP connection, so **no L3/L4 flow is generated**.
+
+**Observability path**: DNS proxy logs, not flow graphs.
 
 ```bash
-CLUSTER_NAME=agent-sandbox \
-BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
-CLEANUP=1 \
-    ./conformance.sh
+# Chained (Cilium):
+CILIUM_POD=$(kubectl -n kube-system get pods -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
+kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium monitor --type l7 2>&1 | grep "DNS proxy"
+
+# Native (VPC CNI): DNS verdicts appear in the Network Policy Agent logs
+kubectl logs -n kube-system -l app=aws-node -c aws-network-policy-agent | grep -i "dns"
 ```
 
-IAM role + IRSA annotation are retained in both modes.
+Hubble UI's default Service Map filters blacklist DNS events, which is why a denied FQDN doesn't render as a red flow in the default view. This is correct behavior — the Service Map is aggregated topology, not a DNS log.
 
-## Files
+### Step 5 — L3/L4 enforcement at eBPF
 
-| File | Purpose |
-|---|---|
-| `agent.py` | The reference agent. Mounted into the Sandbox via ConfigMap; runs via `kubectl exec`. |
-| `README.md` | This file. |
+When the pod attempts a raw TCP connection to a non-allowlisted IP (bypassing DNS), the network policy's L3/L4 rules drop the SYN packet. The pod sees a connection timeout.
 
-The Sandbox resource itself (`sandbox-agent.yaml`) and the KRO composite variant (`agent-sandbox-instance.yaml`) live under `../../../infra/agent-sandbox/manifests/` alongside the rest of the blueprint manifests. The automated conformance test (`conformance.sh`) lives under `../../../infra/agent-sandbox/` to match the repo's shell-script-under-infra convention.
+**Observability path**: default Hubble UI Service Map shows a red DROPPED flow. No special filter tuning needed.
+
+This is the "visible denial" that the reference agent is structured to produce — Step 4 alone wouldn't render anything in the default observability surface.
 
 ## Adapting the agent
 
-To use this pattern for your own agent:
+To build your own agent on this pattern:
 
 1. Copy `agent.py` as a starting point — the boilerplate around user-site-packages import, `HOME=/workspace` handling, and the `try_egress` / `try_ip_egress` helpers all carry over.
-2. Update the FQDN allowlist at `../../../infra/agent-sandbox/manifests/ciliumnetworkpolicy-sandbox-llm.yaml` to cover your agent's outbound domains.
-3. If your agent needs different IAM permissions, update the IAM role (templates at `../../../infra/agent-sandbox/manifests/iam-bedrock-*.template.json`).
-4. Mount your agent code into a Sandbox the same way this one does — via a ConfigMap referenced in `sandbox-agent.yaml`.
+2. Update the FQDN allowlist to cover your agent's outbound domains. For the chained path, edit [`ciliumnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/manifests/ciliumnetworkpolicy-sandbox-llm.yaml). For the native path, edit [`applicationnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/manifests/applicationnetworkpolicy-sandbox-llm.yaml).
+3. If your agent needs different IAM permissions, update the IAM role (templates at [`iam-bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-trust-policy.template.json) and [`iam-bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam-bedrock-permissions.template.json)).
+4. Mount your agent code into a Sandbox the same way this one does — via a ConfigMap referenced in the `Sandbox` spec.
+
+For larger agents where a ConfigMap mount is impractical, bake `agent.py` into a container image and reference it in `Sandbox.spec.podTemplate.spec.containers[].image` instead. Keep the `readOnlyRootFilesystem`, `runAsNonRoot`, `capabilities.drop: [ALL]`, and writable-workspace patterns from [`sandbox-agent.yaml`](../../../infra/solutions/agent-sandbox/manifests/sandbox-agent.yaml).
+
+## Files in this directory
+
+| File | Purpose |
+|------|---------|
+| `agent.py` | The reference agent — 5 steps demonstrating FQDN + L3/L4 enforcement |
+| `conformance.sh` | Automated end-to-end test — applies manifests, runs the agent, asserts PASS/BLOCKED markers |
+| `README.md` | This file |
+
+The `Sandbox` resource (`sandbox-agent.yaml`), the KRO composition variant (`agent-sandbox-instance.yaml` + `rgd-agent-sandbox.yaml`), and supporting manifests live under [`../../../infra/solutions/agent-sandbox/manifests/`](../../../infra/solutions/agent-sandbox/manifests/).
 
 ## Troubleshooting
 
-- **`PASS: boto3 installed` missing** — Cilium policy isn't permitting PyPI. Check `kubectl -n agent-sandboxes get ciliumnetworkpolicy sandbox-llm-allowlist` is `Valid=True` and the `toFQDNs` list includes `pypi.org` + `files.pythonhosted.org`.
-- **Bedrock `AccessDeniedException`** — IRSA annotation is missing or the IAM role lacks `bedrock:InvokeModel`. Check with `kubectl get sa sandbox-agent-sa -n agent-sandboxes -o yaml | grep role-arn` and confirm the role's trust policy allows the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`.
-- **Bedrock `ResourceNotFoundException` with "Legacy" in the message** — the target model hasn't been invoked in 30+ days. Either invoke it once manually from the AWS console or update `BEDROCK_MODEL_ID` in `agent.py` to a currently-active model.
-- **Step 4 doesn't show `BLOCKED: ... No address associated with hostname`** — the agent reached the FQDN somehow. Check that the target FQDN (default: `blocked-example.example.com`) is NOT in the `toFQDNs` allowlist in `ciliumnetworkpolicy-sandbox-llm.yaml`, and that the CNP is `Valid=True`.
-- **Step 5 doesn't show `BLOCKED: ... L3/L4 policy drop`** — the connect succeeded or errored differently. Check that the sandbox pod has labels matching the CNP's `endpointSelector` (`egress-tier: sandbox`), and that Cilium policy enforcement is active: `kubectl -n kube-system exec ds/cilium -c cilium-agent -- cilium status | grep Enforcement` should show `Default` or stricter.
-- **Neither Step 4 nor Step 5 is visible in Hubble UI** — Step 4's invisibility is expected (FQDN enforcement happens at DNS proxy layer, not L3/L4). Step 5's DROPPED flow to `8.8.8.8:443` should always render in the default Hubble Service Map. If it doesn't, verify hubble-relay is connected to all peer agents: `kubectl -n kube-system logs -l k8s-app=hubble-relay --tail=20 | grep -E "Connected|No connection"`.
+### `AccessDenied: AssumeRoleWithWebIdentity` in Step 2
+
+The IAM role's trust policy subject doesn't match the ServiceAccount path. Verify:
+
+```bash
+aws iam get-role --role-name <role-name> --query 'Role.AssumeRolePolicyDocument'
+```
+
+The condition must include `system:serviceaccount:agent-sandboxes:sandbox-agent-sa` (and `:composed-sandbox` if you're using the KRO composition path). Update via `aws iam update-assume-role-policy`.
+
+### Step 4 passes instead of BLOCKS
+
+The FQDN-deny policy isn't enforcing. Most common causes:
+
+- Native path on Auto Mode: the Network Policy Controller isn't enabled. Check for the `amazon-vpc-cni` ConfigMap in `kube-system` with `enable-network-policy-controller: "true"`. Apply via [`network-policy-controller-enable.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/manifests/network-policy-controller-enable.yaml) or re-run the native egress example's install.
+- Chained path on Standard EKS: Cilium isn't installed, or hubble-relay peer list is stale after Karpenter node cycles. Run `kubectl rollout restart deployment/hubble-relay -n kube-system` if flows look frozen.
+
+### Step 5 passes instead of BLOCKS
+
+The L3/L4 policy isn't in place. The default sandbox allowlist enforces default-deny for destinations not explicitly listed — verify the policy exists:
+
+```bash
+# Chained:
+kubectl get ciliumnetworkpolicy -n agent-sandboxes sandbox-llm-allowlist
+
+# Native:
+kubectl get applicationnetworkpolicy -n agent-sandboxes sandbox-llm-allowlist
+```
+
+### Agent output is empty (silent `kubectl exec`)
+
+The container's `cp /config/agent.py /workspace/agent.py` happens once at pod start. If the ConfigMap was updated after the pod was Ready, the workspace has old content. Recreate the pod:
+
+```bash
+kubectl delete pod sandbox-agent -n agent-sandboxes
+kubectl -n agent-sandboxes wait --for=condition=Ready pod/sandbox-agent --timeout=120s
+```
+
+This is documented in detail in the parent solution's [Troubleshooting section](../../../infra/solutions/agent-sandbox/README.md#troubleshooting).
