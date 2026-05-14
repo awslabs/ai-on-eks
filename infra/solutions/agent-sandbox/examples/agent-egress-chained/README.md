@@ -20,7 +20,7 @@ Cilium is one of several service meshes that can chain on top of VPC CNI for FQD
 
 ## Usage
 
-Full install (Cilium + policies):
+Full install (Cilium + policies + Bedrock IRSA role):
 
 ```bash
 cd infra/solutions/agent-sandbox/examples/agent-egress-chained
@@ -32,13 +32,16 @@ Phased (useful when iterating on policies):
 ```bash
 ./install.sh cilium     # Cilium chaining + Hubble (3-5 min)
 ./install.sh policies   # Admin + app-tier CNPs (~10s)
+./install.sh irsa       # Bedrock IRSA role (idempotent — refreshes trust policy on cluster recreation)
 ```
 
-Uninstall:
+Uninstall (removes policies + Cilium + IRSA role):
 
 ```bash
 ./install.sh uninstall
 ```
+
+The `irsa` phase provisions a Bedrock IAM role named `<cluster-name>-bedrock-irsa` (default: `agent-sandbox-bedrock-irsa`) with the trust policy scoped to the live cluster's OIDC provider. It's idempotent and safe to re-run after a cluster recreation — the trust policy gets refreshed with the new OIDC ID. The role ARN is echoed at the end for use with `conformance.sh`.
 
 ## Applying additional allowlists
 
@@ -69,7 +72,7 @@ Each file has a comment header describing what's included and pointing at the eq
 ```
 agent-egress-chained/
 ├── README.md                                    # This file
-├── install.sh                                   # Phased installer (cilium | policies | install | uninstall)
+├── install.sh                                   # Phased installer (cilium | policies | irsa | install | uninstall)
 └── manifests/
     ├── ciliumclusterwidenetworkpolicy-admin.yaml   # Admin tier: deny IMDS (cluster-wide CNP)
     ├── ciliumnetworkpolicy-sandbox-llm.yaml         # App tier: default sandbox allowlist

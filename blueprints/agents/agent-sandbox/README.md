@@ -133,7 +133,7 @@ For larger agents where a ConfigMap mount is impractical, bake `agent.py` into a
 | `conformance.sh` | Automated end-to-end test — applies manifests, runs the agent, asserts PASS/BLOCKED markers |
 | `README.md` | This file |
 
-The `Sandbox` resource (`sandbox-agent.yaml`), the KRO composition variant (`agent-sandbox-instance.yaml` + `rgd-agent-sandbox.yaml`), and supporting manifests live under [`../../../infra/solutions/agent-sandbox/manifests/`](../../../infra/solutions/agent-sandbox/manifests/).
+The `SandboxClaim` (`sandbox-agent.yaml`), the KRO composition variant (`kro/instance.yaml` + `kro/rgd.yaml`), and supporting manifests live under [`../../../infra/solutions/agent-sandbox/manifests/`](../../../infra/solutions/agent-sandbox/manifests/). See its [`manifests/README.md`](../../../infra/solutions/agent-sandbox/manifests/README.md) for a per-file reference.
 
 ## Troubleshooting
 

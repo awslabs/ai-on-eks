@@ -192,33 +192,58 @@ kubectl get pods -n kro-system
 
 ### Apply the Workload Manifests
 
-The solution-specific Kubernetes resources live under `manifests/` and are applied by the user after the cluster is running. See [`manifests/README.md`](manifests/README.md) for a per-file reference. The Karpenter NodePool references the live cluster name and node IAM role, so substitute those in before applying:
+The workload-layer Kubernetes resources live under `manifests/` and are applied after the cluster is up. See [`manifests/README.md`](manifests/README.md) for a per-file reference.
+
+Choose the apply set that matches your cluster's compute mode:
+
+#### Standard EKS
 
 ```bash
 cd manifests/
 
-# Resolve the cluster name and Karpenter node role from the live cluster
+# Resolve cluster name + Karpenter node role from the live cluster
 export CLUSTER_NAME=$(aws eks describe-cluster --name agent-sandbox --query cluster.name --output text)
 export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spec.role}')
 
-# Apply namespace + RuntimeClass + SandboxTemplates
+# Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
-kubectl apply -f runtimeclass-gvisor.yaml                # Standard EKS only — skip on Auto Mode
+kubectl apply -f runtimeclass-gvisor.yaml
 kubectl apply -f sandbox-template-standard.yaml
-kubectl apply -f sandbox-template-gvisor.yaml            # Standard EKS only — skip on Auto Mode
+kubectl apply -f sandbox-template-gvisor.yaml
 
-# Apply the Karpenter NodePool (Standard EKS only; Auto Mode handles its own compute)
+# gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
     -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
     karpenter-nodepool-gvisor.yaml \
     > /tmp/karpenter-nodepool-gvisor.rendered.yaml
 kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 
-# Apply the KRO ResourceGraphDefinition (optional — only needed for the AgentSandbox composition path)
+# (Optional) KRO ResourceGraphDefinition for the AgentSandbox composition path
 kubectl apply -f kro/rgd.yaml
 ```
 
-The reference SandboxClaim (`sandbox-agent.yaml`) and KRO instance (`kro/instance.yaml`) are applied by `conformance.sh` with the right tier substitution for your cluster's compute mode. To apply them by hand instead, set `__SANDBOX_TEMPLATE__` (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode) and pipe through `sed`.
+#### EKS Auto Mode
+
+Auto Mode does not support gVisor (no node-level hooks for the runsc shim). Skip the gVisor RuntimeClass, the gVisor SandboxTemplate, and the Karpenter NodePool — Auto Mode manages compute itself.
+
+```bash
+cd manifests/
+
+kubectl apply -f namespace.yaml
+kubectl apply -f sandbox-template-standard.yaml
+kubectl apply -f kro/rgd.yaml             # Optional — for the AgentSandbox composition path
+```
+
+#### Reference SandboxClaim
+
+The reference SandboxClaim (`sandbox-agent.yaml`) and KRO instance (`kro/instance.yaml`) carry placeholders that need apply-time substitution. The recommended path is to let `conformance.sh` apply them — it auto-detects the cluster's compute mode and patches `__SANDBOX_TEMPLATE__` (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode) before applying. See [Validate the Deployment](#validate-the-deployment) below.
+
+To apply by hand instead, sed-substitute the placeholder and pipe through `kubectl apply`:
+
+```bash
+SANDBOX_TEMPLATE=sandbox-gvisor   # or sandbox-standard for Auto Mode
+sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" sandbox-agent.yaml | kubectl apply -f -
+```
 
 ### Add Egress Enforcement
 
@@ -313,4 +338,12 @@ cd infra/solutions/agent-sandbox
 ./cleanup.sh
 ```
 
-The wrapper drops Karpenter finalizers (so EC2NodeClass + NodePool deletes don't stall when the controller is gone), then runs the base module's `cleanup.sh`, then sweeps any auxiliary AWS resources by tag (orphan placement groups, ENIs, KMS aliases, CloudWatch log groups). IAM roles created outside the solution (e.g., the Bedrock role) are not deleted.
+The wrapper handles teardown in five phases to avoid common Karpenter + EKS race conditions that cause cluster destroy to stall:
+
+1. **Egress example uninstall** — removes any installed CNPs/ANPs and the Bedrock IRSA role provisioned by the egress example's `irsa` phase.
+2. **Karpenter scale-down** — scales the Karpenter controller deployment to zero so it stops launching replacement nodes during teardown.
+3. **Finalizer drop** — patches `EC2NodeClass` and `NodePool` finalizers to empty so the controller-less cluster doesn't deadlock on them.
+4. **Base destroy** — runs `terraform destroy` with up to three retries, verifying after each attempt that the VPC and EKS cluster are actually gone (state-driven checks against AWS, not just script exit codes).
+5. **Auxiliary sweep** — cleans up resources Terraform sometimes leaves behind on partial-destroy: orphan EKS-managed cluster security groups (which can block VPC delete), placement groups, KMS aliases, CloudWatch log groups.
+
+If Phase 4 fails after three retries, the wrapper reports "Cleanup partially complete" with manual recovery instructions and exits non-zero. IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.

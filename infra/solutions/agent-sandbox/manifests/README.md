@@ -12,7 +12,7 @@ Workload-layer Kubernetes resources for the agent-sandbox solution. The parent s
 | `mng-sample/launch-template.yaml` | Sample EKS Managed Node Group launch template — alternative to Karpenter for the gVisor tier. |
 | `sandbox-template-standard.yaml` | SandboxTemplate for the standard (runc) tier. Mode-agnostic — works on both Standard EKS and Auto Mode. |
 | `sandbox-template-gvisor.yaml` | SandboxTemplate for the gVisor tier. Standard EKS only (Auto Mode doesn't expose hooks for the runsc shim). |
-| `sandbox-agent.yaml` | Reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `templateRef.name` is patched at apply time (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode). |
+| `sandbox-agent.yaml` | Reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `sandboxTemplateRef.name` is patched at apply time (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode). |
 | `kro/rgd.yaml` | KRO ResourceGraphDefinition that exposes a single `AgentSandbox` CRD wrapping the same workload shape. |
 | `kro/instance.yaml` | Sample AgentSandbox instance. `__RUNTIME_CLASS__` and `__BEDROCK_ROLE_ARN__` are patched at apply time. |
 | `iam/bedrock-trust-policy.template.json` | IRSA trust policy template for the reference agent's Bedrock role. Substitute `<ACCOUNT_ID>`, `<REGION>`, `<OIDC_PROVIDER_ID>` (handled automatically by the egress example's `install.sh irsa` phase). |
@@ -26,7 +26,7 @@ Each tier adds three files, parallel to the gVisor set:
 - `karpenter-nodepool-<tier>.yaml` — NodePool + EC2NodeClass with the tier's runtime shim install in user-data
 - `sandbox-template-<tier>.yaml` — SandboxTemplate using `runtimeClassName: <tier>` and the matching toleration
 
-A `SandboxClaim` (or `AgentSandbox`) targets the new tier by setting `templateRef.name` (or `runtimeClass`) accordingly. No changes elsewhere in the manifests directory.
+A `SandboxClaim` (or `AgentSandbox`) targets the new tier by setting `sandboxTemplateRef.name` (or `runtimeClass`) accordingly. No changes elsewhere in the manifests directory.
 
 ## Why two reference paths
 

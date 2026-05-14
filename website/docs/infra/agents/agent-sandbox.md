@@ -83,16 +83,16 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 
 ### Two composition paths
 
-- **Direct Sandbox** — a `ServiceAccount` + `ConfigMap` (agent script) + `Sandbox` applied as three Kubernetes resources. The full spec is visible in one manifest, useful when building your own agent manifests.
-- **KRO AgentSandbox** — the same three resources composed from a single `AgentSandbox` custom resource via a kro `ResourceGraphDefinition`. The RGD takes an `iamRoleArn`, `runtimeClass`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the full pod with the same hardened execution context. Useful when exposing a simpler surface to your team.
+- **SandboxClaim** — a thin claim (`sandbox-agent.yaml`) that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
+- **KRO AgentSandbox** — the same workload composed via a single `AgentSandbox` custom resource (`kro/instance.yaml` + `kro/rgd.yaml`). The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce an equivalent running pod on a gVisor node with IRSA credentials plumbed.
+Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`) is a SandboxTemplate the claim or AgentSandbox can target — the claim's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on.
 
 ## Prerequisites
 
 - AWS credentials with permissions for VPC, EKS, IAM, and EC2.
-- For the reference agent: an IAM role with `bedrock:InvokeModel` on the target Claude model and an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`.
-- `terraform >=1.0`, `kubectl >=1.30`, `helm >=3.0`, `aws` CLI v2.
+- For the reference agent: `jq` and `aws` CLI v2 — the egress example's `install.sh` provisions a Bedrock IRSA role automatically (idempotent; safe to re-run after cluster recreation).
+- `terraform >=1.0`, `kubectl >=1.30`, `helm >=3.0`, `aws` CLI v2, `jq`.
 
 ## Deployment
 
@@ -139,29 +139,46 @@ kubectl get pods -n kro-system
 
 ### Step 4: Apply the Workload Manifests
 
-The solution-specific Kubernetes resources (namespace, RuntimeClass, gVisor-capable Karpenter NodePool, SandboxTemplates, reference agent manifests, KRO ResourceGraphDefinition) live under `manifests/` and are applied by the user after the cluster is running:
+The solution-specific Kubernetes resources (namespace, RuntimeClass, gVisor-capable Karpenter NodePool, SandboxTemplates, reference SandboxClaim, KRO ResourceGraphDefinition + instance, IAM templates) live under `manifests/`. Apply the set that matches your cluster's compute mode:
+
+#### Standard EKS
 
 ```bash
 cd manifests/
 
-# Resolve the cluster name and Karpenter node role from the live cluster
+# Resolve cluster name + Karpenter node role from the live cluster
 export CLUSTER_NAME=$(aws eks describe-cluster --name agent-sandbox --query cluster.name --output text)
 export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spec.role}')
 
-# Apply namespace + RuntimeClass + SandboxTemplates
+# Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
 kubectl apply -f runtimeclass-gvisor.yaml
 kubectl apply -f sandbox-template-standard.yaml
 kubectl apply -f sandbox-template-gvisor.yaml
 
-# Apply the Karpenter NodePool (substitute placeholders)
+# gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
     -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
-    karpenter-nodepool-gvisor.yaml | kubectl apply -f -
+    karpenter-nodepool-gvisor.yaml \
+    > /tmp/karpenter-nodepool-gvisor.rendered.yaml
+kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 
-# (Optional) Apply the KRO ResourceGraphDefinition for the AgentSandbox composition path
-kubectl apply -f rgd-agent-sandbox.yaml
+# (Optional) KRO ResourceGraphDefinition for the AgentSandbox composition path
+kubectl apply -f kro/rgd.yaml
 ```
+
+#### EKS Auto Mode
+
+Auto Mode does not support gVisor (no node-level hooks for the runsc shim). Skip the gVisor RuntimeClass, gVisor SandboxTemplate, and Karpenter NodePool — Auto Mode manages compute itself.
+
+```bash
+cd manifests/
+kubectl apply -f namespace.yaml
+kubectl apply -f sandbox-template-standard.yaml
+kubectl apply -f kro/rgd.yaml             # Optional — for the AgentSandbox composition path
+```
+
+The reference `SandboxClaim` (`sandbox-agent.yaml`) is applied at validation time by `conformance.sh`, which auto-detects the cluster's compute mode and substitutes the right SandboxTemplate name.
 
 ### Step 5: Add Egress Enforcement
 
@@ -177,6 +194,8 @@ cd examples/agent-egress-native
 ./install.sh
 ```
 
+Each example also provisions the Bedrock IRSA role used by the reference agent (idempotent — re-runs refresh the trust policy on cluster recreation so OIDC drift doesn't break repeat installs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
+
 Each example ships its own README with allowlist-template usage, observability caveats, and portability notes for workloads moving between the two enforcement backends.
 
 ### Step 6: Validate the Deployment
@@ -185,12 +204,13 @@ Run the reference agent to exercise the full chain:
 
 ```bash
 cd ../../../../blueprints/agents/agent-sandbox
+# BEDROCK_ROLE_ARN was provisioned + echoed by the egress install.sh — defaults to <cluster-name>-bedrock-irsa.
 CLUSTER_NAME=agent-sandbox \
-BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
+BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
     ./conformance.sh
 ```
 
-Conformance exits 0 on success, asserting all five expected PASS/BLOCKED outcomes: PyPI install, Bedrock call, snippet execution, FQDN block, and IP block.
+`conformance.sh` auto-detects the cluster's compute mode, claims the appropriate SandboxTemplate (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode), and asserts five expected outcomes: PyPI install (PASS), Bedrock call (PASS), snippet execution (PASS), FQDN block (BLOCKED), and IP block (BLOCKED). Exits 0 on success.
 
 ## Configuration Options
 
@@ -219,11 +239,19 @@ The reference agent produces one of each in its five-step sequence — Step 4 ex
 ## Cleanup
 
 ```bash
-cd terraform/_LOCAL
+cd infra/solutions/agent-sandbox
 ./cleanup.sh
 ```
 
-This destroys the EKS cluster and all managed resources. IAM roles created outside the solution (e.g., the Bedrock role) are not deleted.
+The wrapper handles teardown in five phases to avoid common Karpenter + EKS race conditions that cause cluster destroy to stall:
+
+1. **Egress example uninstall** — removes any installed CNPs/ANPs and the Bedrock IRSA role provisioned by the egress example's `irsa` phase.
+2. **Karpenter scale-down** — scales the Karpenter controller deployment to zero so it stops launching replacement nodes during teardown.
+3. **Finalizer drop** — patches `EC2NodeClass` and `NodePool` finalizers to empty so the controller-less cluster doesn't deadlock on them.
+4. **Base destroy** — runs `terraform destroy` with up to three retries, verifying after each attempt that the VPC and EKS cluster are actually gone (state-driven checks against AWS, not just script exit codes).
+5. **Auxiliary sweep** — cleans up resources Terraform sometimes leaves behind on partial-destroy: orphan EKS-managed cluster security groups, placement groups, KMS aliases, CloudWatch log groups.
+
+If Phase 4 fails after three retries, the wrapper reports "Cleanup partially complete" with manual recovery instructions and exits non-zero. IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.
 
 ## Next Steps
 
