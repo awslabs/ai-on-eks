@@ -147,6 +147,7 @@ fi
 
 echo ""
 echo "=== Phase 4: Run base module cleanup ==="
+PHASE_4_SUCCESS=false
 if [ -d "$LOCAL_DIR" ]; then
     # Pre-step: remove in-cluster helm/kubectl resources from state.
     # These resources live inside the cluster and will be deleted with
@@ -173,13 +174,61 @@ if [ -d "$LOCAL_DIR" ]; then
     done
     popd >/dev/null
 
-    # Run base cleanup in a subshell so its non-zero exits (e.g.,
-    # `kubectl delete rayjob` against a cluster that has no Ray CRDs)
-    # don't kill our wrapper's `set -e`. The base script was written
-    # with best-effort semantics; we honor that here.
-    ( cd "$LOCAL_DIR" && bash ./cleanup.sh ) || true
+    # Run base cleanup with retries. The cluster API gets unstable as
+    # destroy progresses (provider auth tokens expire, EKS API drops
+    # the cluster mid-flight), and the helm/kubernetes providers can
+    # error out with "Unauthorized" or "context deadline exceeded".
+    # Retry pattern: try base cleanup, check if VPC + cluster are
+    # gone, retry with raw `terraform destroy` if either is still
+    # present (state-driven destroy doesn't need cluster API).
+    for attempt in 1 2 3; do
+        echo ""
+        echo "  Base destroy attempt $attempt..."
+        # Subshell so the script's non-zero exits don't kill our set -e.
+        ( cd "$LOCAL_DIR" && bash ./cleanup.sh ) || true
+
+        # Check whether resources we expect destroyed are actually gone.
+        remaining_vpc=$(aws ec2 describe-vpcs --region "$REGION" \
+            --filters "Name=tag:Name,Values=${CLUSTER_NAME}" \
+            --query "Vpcs[].VpcId" --output text 2>/dev/null || echo "")
+        remaining_cluster=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
+            --region "$REGION" --query 'cluster.status' --output text 2>/dev/null || echo "")
+        if [ -z "$remaining_vpc" ] && [ -z "$remaining_cluster" ]; then
+            echo "  Base destroy succeeded — no VPC or cluster remaining."
+            PHASE_4_SUCCESS=true
+            break
+        fi
+
+        echo "  Resources still present (vpc='$remaining_vpc' cluster='$remaining_cluster') — retrying with raw terraform destroy..."
+        # Raw destroy (no rayjob preamble) — state-driven, doesn't need
+        # cluster API. Captures the chronic "Unauthorized"/helm-provider
+        # tail failures that don't actually leave terraform state in a
+        # corrupted shape.
+        ( cd "$LOCAL_DIR" && terraform destroy -auto-approve -var-file=../blueprint.tfvars ) || true
+
+        remaining_vpc=$(aws ec2 describe-vpcs --region "$REGION" \
+            --filters "Name=tag:Name,Values=${CLUSTER_NAME}" \
+            --query "Vpcs[].VpcId" --output text 2>/dev/null || echo "")
+        remaining_cluster=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
+            --region "$REGION" --query 'cluster.status' --output text 2>/dev/null || echo "")
+        if [ -z "$remaining_vpc" ] && [ -z "$remaining_cluster" ]; then
+            echo "  Raw destroy retry succeeded."
+            PHASE_4_SUCCESS=true
+            break
+        fi
+
+        echo "  Resources still present after retry; will try again next attempt."
+    done
+
+    if [ "$PHASE_4_SUCCESS" != "true" ]; then
+        echo ""
+        echo "  WARNING: Phase 4 did not fully complete after 3 attempts."
+        echo "  Phase 5 will run to clean up known auxiliary resources, but"
+        echo "  manual inspection of remaining VPC/EKS resources is required."
+    fi
 else
     echo "  $LOCAL_DIR not present — skipping base destroy (already complete)."
+    PHASE_4_SUCCESS=true
 fi
 
 echo ""
@@ -268,10 +317,25 @@ else
 fi
 
 echo ""
-echo "=== Cleanup complete ==="
-echo ""
-echo "Resources removed:"
-echo "  - All terraform-managed resources (EKS, VPC, IAM, KMS, log groups)"
-echo "  - Bedrock IRSA role (via the egress example's uninstall phase)"
-echo "  - Karpenter-provisioned EC2 instances"
-echo "  - Auxiliary AWS resources (placement groups, KMS aliases, log groups)"
+if [ "$PHASE_4_SUCCESS" = "true" ]; then
+    echo "=== Cleanup complete ==="
+    echo ""
+    echo "Resources removed:"
+    echo "  - All terraform-managed resources (EKS, VPC, IAM, KMS, log groups)"
+    echo "  - Bedrock IRSA role (via the egress example's uninstall phase)"
+    echo "  - Karpenter-provisioned EC2 instances"
+    echo "  - Auxiliary AWS resources (placement groups, KMS aliases, log groups)"
+else
+    echo "=== Cleanup partially complete ==="
+    echo ""
+    echo "Phase 4 (terraform destroy) did not fully succeed after 3 retries."
+    echo "Manual cleanup may be required for:"
+    echo "  - VPC tagged Name=$CLUSTER_NAME"
+    echo "  - EKS cluster $CLUSTER_NAME (if still present)"
+    echo "  - Any orphaned ENIs / EC2 instances tagged with the cluster name"
+    echo ""
+    echo "To retry the base destroy manually:"
+    echo "  cd $LOCAL_DIR"
+    echo "  terraform destroy -auto-approve -var-file=../blueprint.tfvars"
+    exit 1
+fi
