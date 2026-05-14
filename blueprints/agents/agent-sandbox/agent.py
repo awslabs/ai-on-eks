@@ -285,7 +285,7 @@ def main() -> int:
     print("\nExpected outcomes:")
     print("  Step 1 (PyPI):            PASS — allowed by FQDN policy")
     print("  Step 2 (Bedrock):         PASS — allowed by FQDN policy")
-    print("  Step 3 (snippet exec):    PASS — syscalls via Sentry (gVisor)")
+    print("  Step 3 (snippet exec):    PASS — runs in the sandbox (Sentry intercepts syscalls on gVisor tier)")
     print("  Step 4 (FQDN block):      BLOCKED — denied at DNS proxy (not in Hubble UI)")
     print("  Step 5 (IP block):        BLOCKED — dropped at L3/L4 (visible in Hubble UI)")
     print("\nCheck Hubble UI for the Step 5 DROPPED flow to 8.8.8.8:443.")

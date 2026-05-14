@@ -51,5 +51,5 @@ metadata:
     agent-sandbox/role: runtime
 spec:
   # Patched at apply time. See header comment for tier-selection rules.
-  templateRef:
+  sandboxTemplateRef:
     name: __SANDBOX_TEMPLATE__
