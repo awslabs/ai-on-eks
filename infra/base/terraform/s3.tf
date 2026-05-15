@@ -69,7 +69,7 @@ resource "aws_s3_bucket_public_access_block" "models_bucket_pab" {
 resource "aws_iam_role" "model_sync_role" {
   count = var.enable_s3_models_storage ? 1 : 0
 
-  name_prefix = "${local.name}-model-sync-role-"
+  name_prefix = "${local.name}-mdl-sync-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -97,7 +97,7 @@ resource "aws_iam_role" "model_sync_role" {
 resource "aws_iam_policy" "model_sync_policy" {
   count = var.enable_s3_models_storage ? 1 : 0
 
-  name_prefix = "${local.name}-model-sync-policy-"
+  name_prefix = "${local.name}-mdl-sync-pol-"
   description = "Policy for S3 model upload operations"
 
   policy = jsonencode({
@@ -134,7 +134,7 @@ resource "aws_iam_role_policy_attachment" "model_sync_policy_attachment" {
 resource "aws_iam_role" "model_inference_role" {
   count = var.enable_s3_models_storage ? 1 : 0
 
-  name_prefix = "${local.name}-model-inference-role-"
+  name_prefix = "${local.name}-mdl-infer-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -162,7 +162,7 @@ resource "aws_iam_role" "model_inference_role" {
 resource "aws_iam_policy" "model_inference_policy" {
   count = var.enable_s3_models_storage ? 1 : 0
 
-  name_prefix = "${local.name}-model-inference-policy-"
+  name_prefix = "${local.name}-mdl-infer-pol-"
   description = "Policy for S3 model inference operations (read-only)"
 
   policy = jsonencode({
