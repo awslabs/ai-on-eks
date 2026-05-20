@@ -13,7 +13,7 @@
 #   - RubyGems (Ruby)             — rubygems.org + api.rubygems.org
 #
 # Equivalent CiliumNetworkPolicy for Standard EKS:
-#   ../../../agent-egress-chained/manifests/allowlists/package-registries.yaml
+#   ../cilium/package-registries.yaml
 apiVersion: networking.k8s.aws/v1alpha1
 kind: ApplicationNetworkPolicy
 metadata:

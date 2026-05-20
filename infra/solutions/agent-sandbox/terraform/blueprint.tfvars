@@ -12,11 +12,18 @@ eks_cluster_version = "1.34"
 enable_agent_sandbox = true
 enable_kro           = true
 
+# Cilium in aws-cni chaining mode — required for chained-egress FQDN
+# enforcement on Standard EKS. Auto Mode users should set this to
+# false and rely on native ApplicationNetworkPolicy instead (the
+# example install.sh auto-detects compute mode and applies the right
+# enforcement layer accordingly).
+enable_cilium = true
+
 # Standard EKS (not Auto Mode) is the default compute mode. gVisor
 # shim installation is handled by a Karpenter NodePool (under
 # manifests/) that installs containerd-shim-runsc-v1 via AL2023
 # user-data — Auto Mode does not expose equivalent node-level hooks.
-# To use Auto Mode instead, flip this flag and skip the
-# karpenter-nodepool-gvisor manifest; note that gVisor tier is not
-# available on Auto Mode.
+# To use Auto Mode instead: flip this flag, set enable_cilium=false,
+# and skip the karpenter-nodepool-gvisor manifest. Note that gVisor
+# tier is not available on Auto Mode.
 enable_eks_auto_mode = false

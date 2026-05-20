@@ -59,21 +59,41 @@ LOCAL_DIR="$SCRIPT_DIR/terraform/_LOCAL"
 # destroy already removed terraform/_LOCAL).
 if [ -f "$SCRIPT_DIR/terraform/blueprint.tfvars" ]; then
     CLUSTER_NAME=$(grep -E '^name\s*=' "$SCRIPT_DIR/terraform/blueprint.tfvars" | head -1 | awk -F'"' '{print $2}')
+    # Region from tfvars takes precedence over env vars — the cluster
+    # is always in the region the tfvars declared. The line is
+    # commented out by default in the shipped tfvars (base module
+    # default is us-west-2); pick that up if no override exists.
+    TFVARS_REGION=$(grep -E '^region\s*=' "$SCRIPT_DIR/terraform/blueprint.tfvars" | head -1 | awk -F'"' '{print $2}' || echo "")
 fi
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
-REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-us-east-1}}"
+# Region precedence: tfvars > AWS_REGION env > AWS_DEFAULT_REGION env
+# > kubectl context > base module default (us-west-2). Without this,
+# Phase 3's instance sweep queries the wrong region and silently
+# misses Karpenter-provisioned nodes, leaving them as orphans that
+# block VPC delete in Phase 4.
+if [ -n "${TFVARS_REGION:-}" ]; then
+    REGION="$TFVARS_REGION"
+elif [ -n "${AWS_REGION:-}" ]; then
+    REGION="$AWS_REGION"
+elif [ -n "${AWS_DEFAULT_REGION:-}" ]; then
+    REGION="$AWS_DEFAULT_REGION"
+else
+    # Try to extract from kubectl context (format: arn:aws:eks:<region>:...)
+    REGION=$(kubectl config current-context 2>/dev/null | awk -F':' '{print $4}' || echo "")
+    REGION="${REGION:-us-west-2}"
+fi
+echo "Resolved cluster=$CLUSTER_NAME region=$REGION"
 
 echo "=== Phase 0: Run egress example uninstall (releases CNPs/ANPs + IRSA role) ==="
-# Try each example's uninstall phase. Each one is idempotent — if
-# the example wasn't installed, its uninstall is a no-op. We don't
-# know which example the user picked, so try both. Failures are
-# tolerated (best-effort cleanup).
-for example_dir in "$SCRIPT_DIR/examples/agent-egress-chained" "$SCRIPT_DIR/examples/agent-egress-native"; do
-    if [ -x "$example_dir/install.sh" ]; then
-        echo "  Running $(basename "$example_dir") uninstall..."
-        ( cd "$example_dir" && ./install.sh uninstall ) || true
-    fi
-done
+# The agent-egress example's uninstall is idempotent and mode-aware
+# — it auto-detects the cluster's compute mode and removes the
+# matching policy backend (Cilium or ANP). Failures are tolerated
+# (best-effort cleanup).
+example_dir="$SCRIPT_DIR/examples/agent-egress"
+if [ -x "$example_dir/install.sh" ]; then
+    echo "  Running agent-egress uninstall..."
+    ( cd "$example_dir" && ./install.sh uninstall ) || true
+fi
 
 echo ""
 echo "=== Phase 1: Scale Karpenter controller to 0 (stop new node launches) ==="
@@ -133,6 +153,24 @@ KARPENTER_INSTANCES=$(aws ec2 describe-instances \
               "Name=instance-state-name,Values=running,pending,stopping" \
     --query "Reservations[].Instances[].InstanceId" \
     --output text 2>/dev/null || echo "")
+
+# Secondary sweep: if the primary filter returns empty, look up
+# instances by Karpenter NodePool tag value. NodePool names follow
+# the pattern <cluster-name>-* (e.g., agent-sandbox-gvisor) which is
+# more reliable than the aws:eks:cluster-name tag — the latter has
+# observed eventual-consistency lag that can leave instances
+# transiently invisible to the primary filter, leading to orphaned
+# nodes that block VPC delete in Phase 4.
+if [ -z "$KARPENTER_INSTANCES" ]; then
+    echo "  Primary filter returned empty — running secondary NodePool-name sweep..."
+    KARPENTER_INSTANCES=$(aws ec2 describe-instances \
+        --region "$REGION" \
+        --filters "Name=tag:karpenter.sh/nodepool,Values=${CLUSTER_NAME}-*" \
+                  "Name=instance-state-name,Values=running,pending,stopping" \
+        --query "Reservations[].Instances[].InstanceId" \
+        --output text 2>/dev/null || echo "")
+fi
+
 if [ -n "$KARPENTER_INSTANCES" ]; then
     echo "  Terminating: $KARPENTER_INSTANCES"
     # shellcheck disable=SC2086

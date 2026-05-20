@@ -12,7 +12,7 @@
 # To extend with other providers, add entries under `domainNames`.
 #
 # Equivalent CiliumNetworkPolicy for Standard EKS:
-#   ../../../agent-egress-chained/manifests/allowlists/llm-apis.yaml
+#   ../cilium/llm-apis.yaml
 apiVersion: networking.k8s.aws/v1alpha1
 kind: ApplicationNetworkPolicy
 metadata:

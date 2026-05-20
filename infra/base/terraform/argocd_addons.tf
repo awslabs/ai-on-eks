@@ -287,3 +287,19 @@ resource "kubectl_manifest" "kro_yaml" {
     helm_release.argocd
   ]
 }
+
+# Cilium (aws-cni chaining mode + Hubble flow observability)
+# Provides L7 features on top of the platform VPC CNI: toFQDNs egress
+# filtering, DNS proxy interception, Hubble UI for flow visibility.
+# Required for chained-mode FQDN egress on Standard EKS; Auto Mode
+# uses native ApplicationNetworkPolicy and should leave this disabled.
+resource "kubectl_manifest" "cilium_yaml" {
+  count = var.enable_cilium ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/cilium.yaml", {
+    cilium_version = var.cilium_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}

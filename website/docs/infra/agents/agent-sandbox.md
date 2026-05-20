@@ -44,15 +44,13 @@ flowchart TB
 
     subgraph D["Egress enforcement (examples/)"]
         direction LR
-        D1["<b>agent-egress-chained</b><br/>Cilium + Hubble<br/>Standard EKS"]:::egress
-        D2["<b>agent-egress-native</b><br/>VPC CNI ANP + CNP<br/>EKS Auto Mode"]:::egress
+        D1["<b>agent-egress</b><br/>Mode-aware: Cilium (Standard EKS)<br/>or native ANP (Auto Mode)"]:::egress
     end
 
     subgraph E["EKS Node Groups"]
         direction LR
         E1["Karpenter-provisioned<br/>(Standard EKS default)"]:::node
         E2["Auto Mode-managed<br/>(EKS Auto Mode)"]:::node
-        E3["Managed Node Group<br/>(documented alternative<br/>for gVisor)"]:::node
     end
 
     A --> B
@@ -67,9 +65,7 @@ The solution deploys in layers:
 - **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
 - **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
 - **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
-- **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the solution with one of:
-  - [agent-egress-chained](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress-chained) — Cilium + Hubble chaining for Standard EKS.
-  - [agent-egress-native](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress-native) — VPC CNI `ApplicationNetworkPolicy` for EKS Auto Mode.
+- **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the solution with [agent-egress](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress) — it auto-detects compute mode and applies Cilium + Hubble chaining (Standard EKS, requires `enable_cilium = true` in the base infra) or native VPC CNI `ApplicationNetworkPolicy` (EKS Auto Mode).
 
 ### Runtime tier threat model
 
@@ -79,7 +75,7 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 |------|----------|------------------|--------------------------|
 | `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (via network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
 | `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for most syscalls. Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); Sentry itself is a trusted computing base. |
-| Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization support which EKS Managed Node Groups do not yet provide. |
+| Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization, which has limited compute support today (self-managed nodes only). |
 
 ### Two composition paths
 
@@ -117,9 +113,14 @@ eks_cluster_version = "1.34"
 enable_agent_sandbox = true
 enable_kro           = true
 
-# Standard EKS by default. Flip to true for Auto Mode (required for
-# the native egress example; note that gVisor tier is not available
-# on Auto Mode).
+# Cilium in aws-cni chaining mode — required for chained-egress FQDN
+# enforcement on Standard EKS. Auto Mode uses native ANP and should
+# leave this disabled.
+enable_cilium = true
+
+# Standard EKS by default. Flip to true for Auto Mode (and set
+# enable_cilium=false). Note that gVisor tier is not available
+# on Auto Mode.
 enable_eks_auto_mode = false
 ```
 
@@ -182,21 +183,16 @@ The reference `SandboxClaim` (`sandbox-agent.yaml`) is applied at validation tim
 
 ### Step 5: Add Egress Enforcement
 
-Pick one of the two examples based on your cluster's compute mode:
+The mode-aware [`agent-egress`](https://github.com/awslabs/ai-on-eks/tree/main/infra/solutions/agent-sandbox/examples/agent-egress) example auto-detects compute mode and applies the right enforcement layer:
 
 ```bash
-# Standard EKS
-cd examples/agent-egress-chained
-./install.sh
-
-# — or — EKS Auto Mode
-cd examples/agent-egress-native
-./install.sh
+cd examples/agent-egress
+./install.sh                                             # Auto-detects mode + applies policies + provisions IRSA
 ```
 
-Each example also provisions the Bedrock IRSA role used by the reference agent (idempotent — re-runs refresh the trust policy on cluster recreation so OIDC drift doesn't break repeat installs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
+The `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent — re-runs refresh the trust policy on cluster recreation so OIDC drift doesn't break repeat installs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
 
-Each example ships its own README with allowlist-template usage, observability caveats, and portability notes for workloads moving between the two enforcement backends.
+The example's README documents allowlist-template usage, observability caveats, and migration paths between the two enforcement backends.
 
 ### Step 6: Validate the Deployment
 

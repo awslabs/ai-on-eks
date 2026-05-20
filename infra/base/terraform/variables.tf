@@ -392,6 +392,19 @@ variable "kro_version" {
   default     = "0.9.1"
 }
 
+# Cilium CNI (chaining mode on top of AWS VPC CNI)
+variable "enable_cilium" {
+  description = "Enable Cilium in aws-cni chaining mode for L7 features (FQDN egress filtering via toFQDNs, Hubble flow observability). Standard EKS only — Auto Mode uses native ApplicationNetworkPolicy. Useful for any blueprint that needs Cilium's L7 capabilities, not just agent-sandbox egress enforcement."
+  type        = bool
+  default     = false
+}
+
+variable "cilium_version" {
+  description = "Cilium Helm chart version (https://helm.cilium.io/)"
+  type        = string
+  default     = "1.16.5"
+}
+
 # Enable NVIDIA DRA Driver addon
 variable "enable_nvidia_dra_driver" {
   description = "Enable NVIDIA DRA Driver addon"

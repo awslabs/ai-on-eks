@@ -11,7 +11,7 @@
 #   - Hugging Face  — huggingface.co, cdn-lfs.huggingface.co, cdn-lfs.hf.co
 #
 # Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
-#   ../../../agent-egress-native/manifests/allowlists/dev-tools.yaml
+#   ../anp/dev-tools.yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

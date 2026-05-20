@@ -12,7 +12,7 @@
 #   - DynamoDB     — dynamodb.*.amazonaws.com
 #
 # Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
-#   ../../../agent-egress-native/manifests/allowlists/aws-services.yaml
+#   ../anp/aws-services.yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

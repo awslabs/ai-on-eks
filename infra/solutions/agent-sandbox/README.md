@@ -52,8 +52,7 @@ flowchart TB
 
     subgraph D["Egress enforcement (examples/)"]
         direction LR
-        D1["<b>agent-egress-chained</b><br/>Cilium + Hubble<br/>Standard EKS today"]:::egress
-        D2["<b>agent-egress-native</b><br/>VPC CNI ANP + CNP<br/>EKS Auto Mode"]:::egress
+        D1["<b>agent-egress</b><br/>Mode-aware: Cilium (Standard EKS)<br/>or native ANP (Auto Mode)"]:::egress
     end
 
     subgraph E["EKS Node Groups"]
@@ -140,8 +139,8 @@ Bedrock inference is billed per-token by the model provider and is independent o
 
 ### Network Security
 
-- **Default-deny egress**: the solution does NOT apply network policies on its own. Egress behavior depends on which example you pair it with (`agent-egress-chained` for Cilium FQDN filtering, `agent-egress-native` for VPC CNI `ApplicationNetworkPolicy`). Without one of these, the sandbox has unrestricted egress.
-- **IMDS denial at admin tier**: both egress examples block 169.254.169.254 (EC2 Instance Metadata v1/v2) and 169.254.170.2 (ECS task metadata) via admin-scoped policies for the `agent-sandboxes` namespace. This prevents agents from escalating to node-level credentials.
+- **Default-deny egress**: the solution does NOT apply network policies on its own. Egress behavior depends on running the [`agent-egress`](examples/agent-egress/) example, which auto-detects compute mode and applies Cilium FQDN filtering (Standard EKS, requires `enable_cilium = true`) or VPC CNI `ApplicationNetworkPolicy` (Auto Mode). Without this example, the sandbox has unrestricted egress.
+- **IMDS denial at admin tier**: the egress example blocks 169.254.169.254 (EC2 Instance Metadata v1/v2) and 169.254.170.2 (ECS task metadata) via admin-scoped policies for the `agent-sandboxes` namespace. This prevents agents from escalating to node-level credentials.
 - **Two enforcement layers, two observability surfaces**: FQDN filtering happens at the DNS proxy (blocks resolve to empty answer, no TCP attempt follows). L3/L4 filtering happens at the data plane (SYN packet drop). The reference agent's Step 4 exercises the DNS layer; Step 5 exercises L3/L4.
 
 ### Kubernetes Security
@@ -247,22 +246,19 @@ sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" sandbox-agent.yaml | kubectl ap
 
 ### Add Egress Enforcement
 
-Pick one of the two examples based on your cluster's compute mode:
+The [`examples/agent-egress/`](examples/agent-egress/) example auto-detects compute mode and applies the right enforcement layer:
 
-- **Standard EKS** → [`examples/agent-egress-chained/`](examples/agent-egress-chained/) (Cilium + Hubble chaining)
-- **EKS Auto Mode** → [`examples/agent-egress-native/`](examples/agent-egress-native/) (VPC CNI `ApplicationNetworkPolicy`)
+- **Standard EKS** → Cilium `CiliumClusterwideNetworkPolicy` + `CiliumNetworkPolicy` (Cilium itself is deployed by the base infra when `enable_cilium = true` in `terraform/blueprint.tfvars`)
+- **EKS Auto Mode** → native `ClusterNetworkPolicy` + `ApplicationNetworkPolicy` (DNS-based, enforced by VPC CNI Network Policy Controller)
 
 ```bash
-cd examples/agent-egress-chained
-./install.sh                                             # Standard EKS
-# or
-cd examples/agent-egress-native
-./install.sh                                             # Auto Mode
+cd examples/agent-egress
+./install.sh                                             # Auto-detects mode + applies policies + provisions IRSA
 ```
 
-Each example's `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent; updates the trust policy on cluster recreation so OIDC drift doesn't break re-runs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
+The `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent; updates the trust policy on cluster recreation so OIDC drift doesn't break re-runs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
 
-Each example installs its own README with allowlist-template usage and portability notes between the two enforcement backends.
+The example's README documents allowlist-template usage and migration paths between the two enforcement backends.
 
 ### Validate the Deployment
 
@@ -290,6 +286,8 @@ Conformance exits 0 on success and asserts all 5 expected PASS/BLOCKED outcomes.
 | `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v0.4.5` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
 | `kro_version` | kro Helm chart version | `0.9.1` |
+| `enable_cilium` | Deploy Cilium in aws-cni chaining mode (Standard EKS only — leave `false` for Auto Mode) | `true` |
+| `cilium_version` | Cilium Helm chart version | `1.16.5` |
 | `enable_eks_auto_mode` | Use EKS Auto Mode instead of Karpenter-managed compute | `false` |
 
 See [`../../base/terraform/variables.tf`](../../base/terraform/variables.tf) for the full set of toggleable base-module variables.

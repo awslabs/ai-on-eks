@@ -16,7 +16,7 @@
 # gates the DNS lookup.
 #
 # Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
-#   ../../../agent-egress-native/manifests/allowlists/llm-apis.yaml
+#   ../anp/llm-apis.yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

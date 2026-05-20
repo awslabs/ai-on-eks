@@ -12,7 +12,7 @@
 #   - RubyGems (Ruby)             — rubygems.org + api.rubygems.org
 #
 # Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
-#   ../../../agent-egress-native/manifests/allowlists/package-registries.yaml
+#   ../anp/package-registries.yaml
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

@@ -9,7 +9,6 @@ Workload-layer Kubernetes resources for the agent-sandbox solution. The parent s
 | `namespace.yaml` | The `agent-sandboxes` namespace. |
 | `runtimeclass-gvisor.yaml` | RuntimeClass + scheduling block for the gVisor tier (Standard EKS only). |
 | `karpenter-nodepool-gvisor.yaml` | Karpenter NodePool + EC2NodeClass that supplies gVisor-capable nodes. AL2023 user-data installs `containerd-shim-runsc-v1`. |
-| `mng-sample/launch-template.yaml` | Sample EKS Managed Node Group launch template — alternative to Karpenter for the gVisor tier. |
 | `sandbox-template-standard.yaml` | SandboxTemplate for the standard (runc) tier. Mode-agnostic — works on both Standard EKS and Auto Mode. |
 | `sandbox-template-gvisor.yaml` | SandboxTemplate for the gVisor tier. Standard EKS only (Auto Mode doesn't expose hooks for the runsc shim). |
 | `sandbox-agent.yaml` | Reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `sandboxTemplateRef.name` is patched at apply time (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode). |

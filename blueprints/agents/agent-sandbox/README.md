@@ -36,8 +36,8 @@ Step 4 proves the FQDN-layer contract; Step 5 proves the L3/L4 contract. Both bl
 ## Prerequisites
 
 - The [agent-sandbox solution](../../../infra/solutions/agent-sandbox/) installed: run `../../../infra/solutions/agent-sandbox/install.sh` from a clone of the repo. See its README for solution-level steps (cluster provisioning, manifest application, egress enforcement).
-- One of the egress examples applied ([agent-egress-chained](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/) for Standard EKS, [agent-egress-native](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/) for EKS Auto Mode).
-- An IAM role with `bedrock:InvokeModel` permission for the target Claude model, plus an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. The `irsa` phase of either egress example's `install.sh` provisions this automatically; templates at [`iam/bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-trust-policy.template.json) and [`iam/bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-permissions.template.json) for hand-rolled setups.
+- The [agent-egress example](../../../infra/solutions/agent-sandbox/examples/agent-egress/) applied — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode).
+- An IAM role with `bedrock:InvokeModel` permission for the target Claude model, plus an IRSA trust policy allowing the cluster's OIDC provider for `system:serviceaccount:agent-sandboxes:sandbox-agent-sa`. The `irsa` phase of the egress example's `install.sh` provisions this automatically; templates at [`iam/bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-trust-policy.template.json) and [`iam/bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-permissions.template.json) for hand-rolled setups.
 - `kubectl` configured against the cluster (`aws eks update-kubeconfig --name agent-sandbox --region <region>`).
 
 ## Quick Start
@@ -83,7 +83,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
     ./conformance.sh
 ```
 
-The script auto-detects whether chained or native egress is installed and validates the expected CNP/ANP resources accordingly.
+The script auto-detects whether Cilium-based or native ANP egress is installed and validates the expected CNP/ANP resources accordingly.
 
 ## Two Enforcement Layers, Two Observability Surfaces
 
@@ -96,11 +96,11 @@ Cilium's `toFQDNs` and native `ApplicationNetworkPolicy`'s `domainNames` both en
 **Observability path**: DNS proxy logs, not flow graphs.
 
 ```bash
-# Chained (Cilium):
+# Standard EKS (Cilium):
 CILIUM_POD=$(kubectl -n kube-system get pods -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}')
 kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium monitor --type l7 2>&1 | grep "DNS proxy"
 
-# Native (VPC CNI): DNS verdicts appear in the Network Policy Agent logs
+# Auto Mode (VPC CNI): DNS verdicts appear in the Network Policy Agent logs
 kubectl logs -n kube-system -l app=aws-node -c aws-network-policy-agent | grep -i "dns"
 ```
 
@@ -119,7 +119,7 @@ This is the "visible denial" that the reference agent is structured to produce �
 To build your own agent on this pattern:
 
 1. Copy `agent.py` as a starting point — the boilerplate around user-site-packages import, `HOME=/workspace` handling, and the `try_egress` / `try_ip_egress` helpers all carry over.
-2. Update the FQDN allowlist to cover your agent's outbound domains. For the chained path, edit [`ciliumnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-chained/manifests/ciliumnetworkpolicy-sandbox-llm.yaml). For the native path, edit [`applicationnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/manifests/applicationnetworkpolicy-sandbox-llm.yaml).
+2. Update the FQDN allowlist to cover your agent's outbound domains. For Standard EKS (Cilium), edit [`ciliumnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress/manifests/cilium/ciliumnetworkpolicy-sandbox-llm.yaml). For Auto Mode (ANP), edit [`applicationnetworkpolicy-sandbox-llm.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress/manifests/anp/applicationnetworkpolicy-sandbox-llm.yaml).
 3. If your agent needs different IAM permissions, update the IAM role (templates at [`iam/bedrock-trust-policy.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-trust-policy.template.json) and [`iam/bedrock-permissions.template.json`](../../../infra/solutions/agent-sandbox/manifests/iam/bedrock-permissions.template.json)).
 4. Mount your agent code into a Sandbox the same way this one does — via a ConfigMap referenced in the `Sandbox` spec.
 
@@ -151,18 +151,18 @@ The condition must include `system:serviceaccount:agent-sandboxes:sandbox-agent-
 
 The FQDN-deny policy isn't enforcing. Most common causes:
 
-- Native path on Auto Mode: the Network Policy Controller isn't enabled. Check for the `amazon-vpc-cni` ConfigMap in `kube-system` with `enable-network-policy-controller: "true"`. Apply via [`network-policy-controller-enable.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress-native/manifests/network-policy-controller-enable.yaml) or re-run the native egress example's install.
-- Chained path on Standard EKS: Cilium isn't installed, or hubble-relay peer list is stale after Karpenter node cycles. Run `kubectl rollout restart deployment/hubble-relay -n kube-system` if flows look frozen.
+- Auto Mode (native ANP): the Network Policy Controller isn't enabled. Check for the `amazon-vpc-cni` ConfigMap in `kube-system` with `enable-network-policy-controller: "true"`. Apply via [`network-policy-controller-enable.yaml`](../../../infra/solutions/agent-sandbox/examples/agent-egress/manifests/anp/network-policy-controller-enable.yaml) or re-run the egress example's install.
+- Standard EKS (Cilium): Cilium isn't installed (set `enable_cilium = true` in the parent solution's `blueprint.tfvars`), or hubble-relay peer list is stale after Karpenter node cycles. Run `kubectl rollout restart deployment/hubble-relay -n kube-system` if flows look frozen.
 
 ### Step 5 passes instead of BLOCKS
 
 The L3/L4 policy isn't in place. The default sandbox allowlist enforces default-deny for destinations not explicitly listed — verify the policy exists:
 
 ```bash
-# Chained:
+# Standard EKS (Cilium):
 kubectl get ciliumnetworkpolicy -n agent-sandboxes sandbox-llm-allowlist
 
-# Native:
+# Auto Mode (ANP):
 kubectl get applicationnetworkpolicy -n agent-sandboxes sandbox-llm-allowlist
 ```
 

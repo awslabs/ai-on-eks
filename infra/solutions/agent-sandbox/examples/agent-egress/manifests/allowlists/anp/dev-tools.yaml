@@ -12,7 +12,7 @@
 #   - Hugging Face  — huggingface.co, cdn-lfs.huggingface.co, cdn-lfs.hf.co
 #
 # Equivalent CiliumNetworkPolicy for Standard EKS:
-#   ../../../agent-egress-chained/manifests/allowlists/dev-tools.yaml
+#   ../cilium/dev-tools.yaml
 apiVersion: networking.k8s.aws/v1alpha1
 kind: ApplicationNetworkPolicy
 metadata:
