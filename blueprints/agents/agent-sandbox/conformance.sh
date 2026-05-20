@@ -15,9 +15,15 @@
 #
 # Usage:
 #   CLUSTER_NAME=agent-sandbox \
-#   AWS_REGION=us-east-1 \
 #   BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
 #     ./conformance.sh
+#
+# Region resolution: the blueprint can run in any region where the
+# target Bedrock model is available. The script auto-resolves the
+# cluster's region from (in priority order) the solution's tfvars,
+# AWS_REGION env, AWS_DEFAULT_REGION env, the active kubectl context,
+# and finally the base module default (us-west-2). Set AWS_REGION
+# explicitly to override.
 
 set -euo pipefail
 
@@ -33,7 +39,30 @@ SA="sandbox-agent-sa"
 POD="sandbox-agent"
 CONFIGMAP="sandbox-agent-script"
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
-REGION="${AWS_REGION:-us-east-1}"
+
+# Region precedence (matches infra/solutions/agent-sandbox/cleanup.sh):
+#   tfvars > AWS_REGION env > AWS_DEFAULT_REGION env > kubectl context
+#   > base module default (us-west-2). The blueprint runs in whichever
+#   region was deployed; a hard-coded default is a silent
+#   wrong-region failure waiting to happen.
+TFVARS_REGION=""
+if [ -f "$INFRA_DIR/terraform/blueprint.tfvars" ]; then
+    TFVARS_REGION=$(grep -E '^region\s*=' "$INFRA_DIR/terraform/blueprint.tfvars" \
+        | head -1 | awk -F'"' '{print $2}' || echo "")
+fi
+if [ -n "$TFVARS_REGION" ]; then
+    REGION="$TFVARS_REGION"
+elif [ -n "${AWS_REGION:-}" ]; then
+    REGION="$AWS_REGION"
+elif [ -n "${AWS_DEFAULT_REGION:-}" ]; then
+    REGION="$AWS_DEFAULT_REGION"
+else
+    # kubectl context ARN format: arn:aws:eks:<region>:<account>:cluster/<name>
+    REGION=$(kubectl config current-context 2>/dev/null \
+        | awk -F':' '{print $4}' || echo "")
+    REGION="${REGION:-us-west-2}"
+fi
+echo "[$(date +%H:%M:%S)] Resolved cluster=$CLUSTER_NAME region=$REGION"
 
 # Compute-mode detection. Auto Mode clusters cannot run gVisor (no
 # node-level hooks for installing the runsc containerd shim), so the
