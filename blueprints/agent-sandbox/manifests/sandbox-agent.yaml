@@ -9,8 +9,8 @@
 # ConfigMap the agent reads, and a pointer to the chosen template.
 #
 # Template selection is deferred to apply time:
-#   - Standard EKS → templateRef.name = sandbox-agent-gvisor
-#   - EKS Auto Mode → templateRef.name = sandbox-agent-standard
+#   - Standard EKS → sandboxTemplateRef.name = sandbox-agent-gvisor
+#   - EKS Auto Mode → sandboxTemplateRef.name = sandbox-agent-runc
 # The conformance script and the install path render the right value
 # into __SANDBOX_TEMPLATE__ before applying. Customers adopting the
 # blueprint can hardcode whichever tier matches their cluster.

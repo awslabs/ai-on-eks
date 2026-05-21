@@ -133,7 +133,7 @@ L3/L4 blocks (raw-IP egress not covered by FQDN allowlist) DO appear as DROPPED 
 
 ## Validating enforcement
 
-Run the reference agent's conformance test — it auto-detects compute mode, claims the right agent-shaped SandboxTemplate (`sandbox-agent-standard` on Auto Mode, `sandbox-agent-gvisor` on Standard EKS), and asserts all 5 PASS / BLOCKED outcomes including Step 4 (FQDN block) and Step 5 (raw IP block).
+Run the reference agent's conformance test — it auto-detects compute mode, claims the right agent-shaped SandboxTemplate (`sandbox-agent-runc` on Auto Mode, `sandbox-agent-gvisor` on Standard EKS), and asserts all 5 PASS / BLOCKED outcomes including Step 4 (FQDN block) and Step 5 (raw IP block).
 
 ```bash
 cd ..

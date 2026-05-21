@@ -1,6 +1,6 @@
 # SandboxTemplate — gVisor tier (basic).
 #
-# Same shape as sandbox-standard with one difference: runtimeClassName=gvisor
+# Same shape as sandbox-runc with one difference: runtimeClassName=gvisor
 # plus the matching NodePool toleration. gVisor's Sentry intercepts syscalls
 # in userspace, providing a significantly stronger isolation boundary than
 # runc's namespace+cgroup-only model at ~1.5s cold start cost (SPEC §3.1).
@@ -11,15 +11,14 @@
 #     runtimeclass-gvisor.yaml + karpenter-nodepool-gvisor.yaml).
 #   - EKS Auto Mode: NO — Auto Mode does not expose node-level hooks for
 #     installing custom containerd shims. Auto Mode workloads claim
-#     sandbox-standard instead.
+#     sandbox-runc instead.
 #
-# The Pod spec mirrors sandbox-template-standard.yaml exactly so claims
-# can switch freely between tiers without re-plumbing the workload — the
-# only differences are runtimeClassName and the matching NoSchedule
-# toleration.
+# The Pod spec mirrors sandbox-runc.yaml exactly so claims can switch
+# freely between tiers without re-plumbing the workload — the only
+# differences are runtimeClassName and the matching NoSchedule toleration.
 #
 # Templates that build on this:
-#   - blueprints/agent-sandbox/manifests/sandbox-template-agent-gvisor.yaml
+#   - blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml
 #     adds python:3.12-slim + agent-script ConfigMap mount + Bedrock env vars
 #     for the reference agent.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1

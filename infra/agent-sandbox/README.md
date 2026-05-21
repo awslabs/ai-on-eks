@@ -206,8 +206,8 @@ export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spe
 # Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
 kubectl apply -f runtimeclass-gvisor.yaml
-kubectl apply -f sandbox-template-standard.yaml
-kubectl apply -f sandbox-template-gvisor.yaml
+kubectl apply -f sandbox-runc.yaml
+kubectl apply -f sandbox-gvisor.yaml
 
 # gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
@@ -225,7 +225,7 @@ Auto Mode does not support gVisor (no node-level hooks for the runsc shim). Skip
 cd manifests/
 
 kubectl apply -f namespace.yaml
-kubectl apply -f sandbox-template-standard.yaml
+kubectl apply -f sandbox-runc.yaml
 ```
 
 ### Layer a Blueprint
@@ -236,7 +236,7 @@ With the platform manifests applied, the cluster can host any SandboxClaim that 
 
 **Reference agent blueprint** ([`blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/)) — complete agent workload with FQDN egress enforcement and end-to-end conformance:
 
-- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue. Claims the agent-shaped templates ([`sandbox-template-agent-{standard,gvisor}.yaml`](../../blueprints/agent-sandbox/manifests/)) which add the Python image + Bedrock env + ConfigMap mount on top of the basic templates' shape.
+- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue. Claims the agent-shaped templates ([`sandbox-agent-runc.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-runc.yaml) / [`sandbox-agent-gvisor.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml)) which add the Python image + Bedrock env + ConfigMap mount on top of the basic templates' shape.
 - **KRO composition path** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — same workload via a single `AgentSandbox` CR backed by a `ResourceGraphDefinition`.
 - **Egress enforcement example** ([`blueprints/agent-sandbox/egress/`](../../blueprints/agent-sandbox/egress/)) — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode) plus the Bedrock IRSA role.
 - **Conformance test** ([`blueprints/agent-sandbox/conformance.sh`](../../blueprints/agent-sandbox/conformance.sh)) — claims the right agent template for the cluster's compute mode and exercises the full chain end-to-end.

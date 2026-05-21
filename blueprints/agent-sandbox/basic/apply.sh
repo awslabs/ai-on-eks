@@ -3,7 +3,7 @@
 #
 # Smallest viable Sandbox deployment, no addons. Auto-detects the
 # cluster's compute mode and claims the matching basic SandboxTemplate
-# (sandbox-standard on Auto Mode, sandbox-gvisor on Standard EKS).
+# (sandbox-runc on Auto Mode, sandbox-gvisor on Standard EKS).
 # Default workload is nginx:alpine baked into the basic template — the
 # K8s shell-demo image, picked for familiarity.
 #
@@ -60,7 +60,7 @@ detect_compute_mode() {
             --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
         if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
             COMPUTE_MODE="automode"
-            SANDBOX_TEMPLATE="sandbox-standard"
+            SANDBOX_TEMPLATE="sandbox-runc"
             echo "=== EKS Auto Mode detected — claiming SandboxTemplate '$SANDBOX_TEMPLATE' ==="
             return 0
         fi
@@ -87,7 +87,7 @@ apply_claim() {
         exit 1
     }
     kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1 || {
-        echo "FAIL: SandboxTemplate '$SANDBOX_TEMPLATE' missing. Apply $INFRA_DIR/manifests/sandbox-template-*.yaml first." >&2
+        echo "FAIL: SandboxTemplate '$SANDBOX_TEMPLATE' missing. Apply $INFRA_DIR/manifests/sandbox-{runc,gvisor}.yaml first." >&2
         exit 1
     }
 

@@ -102,7 +102,7 @@ detect_compute_mode() {
             --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
         if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
             COMPUTE_MODE="automode"
-            SANDBOX_TEMPLATE="sandbox-agent-standard"
+            SANDBOX_TEMPLATE="sandbox-agent-runc"
             log "Detected EKS Auto Mode — claiming SandboxTemplate '$SANDBOX_TEMPLATE' (gVisor unavailable on Auto Mode)."
             return 0
         fi
@@ -124,18 +124,17 @@ require_cluster() {
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; set enable_agent_sandbox=true in blueprint.tfvars and re-run install.sh"
 
     # SandboxTemplate for the chosen tier. The agent-shaped templates
-    # ship with the blueprint (sandbox-template-agent-*.yaml). If the
+    # ship with the blueprint (sandbox-agent-{runc,gvisor}.yaml). If the
     # caller hasn't applied them yet, do it now — keeps conformance
     # idempotent (the templates are stable, so reapply is a no-op).
     # Tier-specific cluster prerequisites (RuntimeClass, NodePool) come
     # from the platform infra and are only relevant for the gVisor tier
     # on Standard EKS.
     if ! kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1; then
-        # SANDBOX_TEMPLATE is `sandbox-agent-standard` (Auto Mode) or
+        # SANDBOX_TEMPLATE is `sandbox-agent-runc` (Auto Mode) or
         # `sandbox-agent-gvisor` (Standard EKS). The matching file uses
-        # `sandbox-template-agent-<tier>.yaml` shape.
-        local template_tier="${SANDBOX_TEMPLATE#sandbox-agent-}"
-        local agent_template_file="$BLUEPRINT_MANIFEST_DIR/sandbox-template-agent-${template_tier}.yaml"
+        # the same name with .yaml suffix.
+        local agent_template_file="$BLUEPRINT_MANIFEST_DIR/${SANDBOX_TEMPLATE}.yaml"
         if [ -f "$agent_template_file" ]; then
             log "Applying agent SandboxTemplate from $agent_template_file..."
             kubectl apply -f "$agent_template_file" >/dev/null

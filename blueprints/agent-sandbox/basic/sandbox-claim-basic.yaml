@@ -1,5 +1,5 @@
 # Basic SandboxClaim — points at one of the basic SandboxTemplates
-# (sandbox-standard or sandbox-gvisor) installed by the platform infra.
+# (sandbox-runc or sandbox-gvisor) installed by the platform infra.
 #
 # This is the smallest viable Sandbox: no IRSA, no agent script, no
 # Bedrock env vars, no FQDN allowlist. Default workload is the
@@ -10,8 +10,8 @@
 # on egress / IRSA / ConfigMaps as your workload needs.
 #
 # Template selection is deferred to apply time:
-#   - Standard EKS → templateRef.name = sandbox-gvisor
-#   - EKS Auto Mode → templateRef.name = sandbox-standard
+#   - Standard EKS → sandboxTemplateRef.name = sandbox-gvisor
+#   - EKS Auto Mode → sandboxTemplateRef.name = sandbox-runc
 # The accompanying apply.sh detects the cluster's compute mode and
 # substitutes the right value into __SANDBOX_TEMPLATE__ before applying.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1

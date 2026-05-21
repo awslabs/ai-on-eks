@@ -17,10 +17,10 @@ The basic blueprint defaults to `nginx:alpine` as the workload image, mirroring 
   ```bash
   cd infra/agent-sandbox/manifests
   kubectl apply -f namespace.yaml
-  kubectl apply -f sandbox-template-standard.yaml      # both modes
+  kubectl apply -f sandbox-runc.yaml      # both modes
   # Standard EKS only:
   kubectl apply -f runtimeclass-gvisor.yaml
-  kubectl apply -f sandbox-template-gvisor.yaml
+  kubectl apply -f sandbox-gvisor.yaml
   # See infra/agent-sandbox/README.md for the gVisor Karpenter NodePool.
   ```
 - `kubectl` configured against the cluster.
@@ -64,7 +64,7 @@ kubectl exec -n agent-sandboxes sandbox-basic -- /bin/sh -c "ls /var/cache/nginx
 
 ## What the basic templates give you
 
-The basic templates (`sandbox-standard` for runc and Auto Mode, `sandbox-gvisor` for gVisor on Standard EKS) ship a hardened Pod spec that any workload can adopt without re-deriving:
+The basic templates (`sandbox-runc` for runc on both modes, `sandbox-gvisor` for gVisor on Standard EKS) ship a hardened Pod spec that any workload can adopt without re-deriving:
 
 - `runAsNonRoot: true`, `runAsUser: 101`, `readOnlyRootFilesystem: true`
 - `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`
@@ -78,9 +78,9 @@ The default workload image is `nginx:alpine` so the templates produce a Pod that
 
 Two patterns:
 
-**(1) Write your own SandboxTemplate.** Copy [`sandbox-template-standard.yaml`](../../../infra/agent-sandbox/manifests/sandbox-template-standard.yaml) (or the gvisor variant) into your workload manifests, change `metadata.name`, change the container image + ports + volumeMounts, and apply it. Then point a SandboxClaim at the new template name. This is the canonical pattern — the basic templates demonstrate the shape.
+**(1) Write your own SandboxTemplate.** Copy [`sandbox-runc.yaml`](../../../infra/agent-sandbox/manifests/sandbox-runc.yaml) (or the gvisor variant) into your workload manifests, change `metadata.name`, change the container image + ports + volumeMounts, and apply it. Then point a SandboxClaim at the new template name. This is the canonical pattern — the basic templates demonstrate the shape.
 
-**(2) Use one of the agent-shaped templates.** If your workload happens to be a Python agent that wants the Bedrock + ConfigMap + IRSA scaffolding, the [reference agent's templates](../manifests/sandbox-template-agent-standard.yaml) are ready-made variants. They live in the blueprint, not the platform infra, because they bake in workload-specific assumptions.
+**(2) Use one of the agent-shaped templates.** If your workload happens to be a Python agent that wants the Bedrock + ConfigMap + IRSA scaffolding, the [reference agent's templates](../manifests/sandbox-agent-runc.yaml) are ready-made variants. They live in the blueprint, not the platform infra, because they bake in workload-specific assumptions.
 
 The pattern generalizes: every distinct workload-shape gets its own SandboxTemplate, every claim picks the template that matches the workload it's wrapping. This keeps the platform primitives (basic templates) clean and extensible, and keeps workload-specific assumptions (image, env, volumes, IRSA) in the blueprint that introduces them.
 
@@ -108,7 +108,7 @@ kubectl get nodeclaims -o wide
 If you're on Auto Mode and seeing scheduling issues, verify the basic standard template applied:
 
 ```bash
-kubectl get sandboxtemplate -n agent-sandboxes sandbox-standard
+kubectl get sandboxtemplate -n agent-sandboxes sandbox-runc
 ```
 
 ### `apply.sh` fails with "SandboxTemplate missing"
@@ -119,5 +119,5 @@ The basic SandboxTemplates haven't been applied yet. Run the prerequisite kubect
 
 Two possible causes:
 
-- The cluster is in Auto Mode (gVisor isn't available — the claim falls back to `sandbox-standard`).
+- The cluster is in Auto Mode (gVisor isn't available — the claim falls back to `sandbox-runc`).
 - On Standard EKS, the gVisor Karpenter NodePool isn't applied. Check `kubectl get nodepool agent-sandbox-gvisor` and apply [`karpenter-nodepool-gvisor.yaml`](../../../infra/agent-sandbox/manifests/karpenter-nodepool-gvisor.yaml) if missing.

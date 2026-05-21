@@ -1,6 +1,6 @@
-# SandboxTemplate — agent (standard tier).
+# SandboxTemplate — agent (runc tier).
 #
-# Reference-agent-shaped variant of sandbox-standard. Same runtime
+# Reference-agent-shaped variant of sandbox-runc. Same runtime
 # (runc), same security context, same egress labels, plus the bits the
 # reference agent needs:
 #   - python:3.12-slim image
@@ -10,14 +10,14 @@
 #   - Bedrock + HOME env vars
 #
 # This template is the workload-side counterpart to the platform-side
-# sandbox-standard. The conformance test claims sandbox-agent-standard
-# on Auto Mode (gVisor unavailable) and sandbox-agent-gvisor on
+# sandbox-runc. The conformance test claims sandbox-agent-runc on
+# Auto Mode (gVisor unavailable) and sandbox-agent-gvisor on
 # Standard EKS.
 #
 # Adopters who want a different agent runtime (Node, Go, custom image)
 # copy this template, swap the image + env, and write a SandboxClaim
 # pointing at the new template name. Platform primitives live in
-# infra/agent-sandbox/manifests/sandbox-template-standard.yaml.
+# infra/agent-sandbox/manifests/sandbox-runc.yaml.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes
@@ -25,10 +25,10 @@
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
-  name: sandbox-agent-standard
+  name: sandbox-agent-runc
   namespace: agent-sandboxes
   labels:
-    agent-sandbox/tier: standard
+    agent-sandbox/tier: runc
     agent-sandbox/role: reference-agent
 spec:
   networkPolicyManagement: Unmanaged
@@ -36,7 +36,7 @@ spec:
     metadata:
       labels:
         egress-tier: sandbox
-        agent-sandbox/tier: standard
+        agent-sandbox/tier: runc
         agent-sandbox/role: reference-agent
     spec:
       # IRSA-bound ServiceAccount provisioned alongside the SandboxClaim.

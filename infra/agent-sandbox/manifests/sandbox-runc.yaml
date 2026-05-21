@@ -1,6 +1,6 @@
-# SandboxTemplate — standard tier (basic, runc).
+# SandboxTemplate — runc tier (basic).
 #
-# This is the platform primitive for the standard tier per SPEC §3.1 —
+# This is the platform primitive for the runc tier per SPEC §3.1 —
 # namespace + cgroup isolation via runc, the default Kubernetes container
 # runtime. It is intentionally generic: a hardened Pod spec with no
 # workload-specific assumptions (no agent script, no IRSA-bound SA, no
@@ -18,16 +18,16 @@
 #   - EKS Auto Mode: yes (this is the only tier available on Auto Mode)
 #
 # Templates that build on this:
-#   - blueprints/agent-sandbox/manifests/sandbox-template-agent-standard.yaml
+#   - blueprints/agent-sandbox/manifests/sandbox-agent-runc.yaml
 #     adds python:3.12-slim + agent-script ConfigMap mount + Bedrock env vars
 #     for the reference agent.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
-  name: sandbox-standard
+  name: sandbox-runc
   namespace: agent-sandboxes
   labels:
-    agent-sandbox/tier: standard
+    agent-sandbox/tier: runc
 spec:
   # Cilium / VPC CNI ANP is the sole policy enforcement path. The
   # controller's default is Managed, which auto-creates a kubernetes.io/v1
@@ -44,7 +44,7 @@ spec:
         # not a bug, when running the basic blueprint without the egress
         # example.
         egress-tier: sandbox
-        agent-sandbox/tier: standard
+        agent-sandbox/tier: runc
     spec:
       # No runtimeClassName → runc (cluster default).
       containers:

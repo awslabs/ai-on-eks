@@ -156,8 +156,8 @@ export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spe
 # Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
 kubectl apply -f runtimeclass-gvisor.yaml
-kubectl apply -f sandbox-template-standard.yaml
-kubectl apply -f sandbox-template-gvisor.yaml
+kubectl apply -f sandbox-runc.yaml
+kubectl apply -f sandbox-gvisor.yaml
 
 # gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
 sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
@@ -174,7 +174,7 @@ Auto Mode does not support gVisor (no node-level hooks for the runsc shim). Skip
 ```bash
 cd manifests/
 kubectl apply -f namespace.yaml
-kubectl apply -f sandbox-template-standard.yaml
+kubectl apply -f sandbox-runc.yaml
 ```
 
 #### Basic Sandbox Configuration
@@ -229,7 +229,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
     ./conformance.sh
 ```
 
-`conformance.sh` resolves region from the infra's `terraform/blueprint.tfvars` (with `AWS_REGION` env override), auto-detects the cluster's compute mode, claims the appropriate agent-shaped SandboxTemplate (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-standard` on Auto Mode), and asserts five expected outcomes: PyPI install (PASS), Bedrock call (PASS), snippet execution (PASS), FQDN block (BLOCKED), and IP block (BLOCKED). Exits 0 on success.
+`conformance.sh` resolves region from the infra's `terraform/blueprint.tfvars` (with `AWS_REGION` env override), auto-detects the cluster's compute mode, claims the appropriate agent-shaped SandboxTemplate (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-runc` on Auto Mode), and asserts five expected outcomes: PyPI install (PASS), Bedrock call (PASS), snippet execution (PASS), FQDN block (BLOCKED), and IP block (BLOCKED). Exits 0 on success.
 
 ## Configuration Options
 

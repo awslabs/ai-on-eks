@@ -8,16 +8,16 @@
 #   - agent-script ConfigMap mount
 #   - Bedrock + HOME env vars
 #
-# The Pod spec mirrors sandbox-template-agent-standard exactly — the
-# only differences are runtimeClassName: gvisor and the matching
-# NoSchedule toleration on the gVisor NodePool. Claims can switch
-# freely between the two agent templates without re-plumbing.
+# The Pod spec mirrors sandbox-agent-runc exactly — the only differences
+# are runtimeClassName: gvisor and the matching NoSchedule toleration on
+# the gVisor NodePool. Claims can switch freely between the two agent
+# templates without re-plumbing.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes — requires the gVisor RuntimeClass
 #     + a NodePool with the runsc containerd shim installed.
 #   - EKS Auto Mode: NO — Auto Mode workloads claim
-#     sandbox-agent-standard instead.
+#     sandbox-agent-runc instead.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:

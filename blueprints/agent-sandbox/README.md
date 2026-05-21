@@ -33,9 +33,9 @@ This blueprint exists for two reasons:
 | Subdirectory / file | Purpose |
 |---|---|
 | `agent.py` | The reference agent (Python) — five steps exercising FQDN + L3/L4 enforcement and gVisor's syscall boundary. |
-| `manifests/sandbox-agent.yaml` | The reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `sandboxTemplateRef.name` is patched at apply time (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-standard` on Auto Mode). |
-| `manifests/sandbox-template-agent-standard.yaml` | Agent-shaped SandboxTemplate for the standard tier — adds `python:3.12-slim`, agent-script ConfigMap mount, Bedrock env vars, and `sandbox-agent-sa` IRSA-bound ServiceAccount on top of the basic-standard shape. |
-| `manifests/sandbox-template-agent-gvisor.yaml` | Same as agent-standard with `runtimeClassName: gvisor` and the gVisor NodePool toleration. Standard EKS only. |
+| `manifests/sandbox-agent.yaml` | The reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `sandboxTemplateRef.name` is patched at apply time (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-runc` on Auto Mode). |
+| `manifests/sandbox-agent-runc.yaml` | Agent-shaped SandboxTemplate for the runc tier — adds `python:3.12-slim`, agent-script ConfigMap mount, Bedrock env vars, and `sandbox-agent-sa` IRSA-bound ServiceAccount on top of the `sandbox-runc` shape. |
+| `manifests/sandbox-agent-gvisor.yaml` | Same as `sandbox-agent-runc` with `runtimeClassName: gvisor` and the gVisor NodePool toleration. Standard EKS only. |
 | `manifests/kro/rgd.yaml` | KRO `ResourceGraphDefinition` exposing a single `AgentSandbox` CRD wrapping the same workload shape. Optional. |
 | `manifests/kro/instance.yaml` | Sample `AgentSandbox` instance used by the KRO composition path. |
 | `egress/` | Egress enforcement example — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode), plus IRSA bootstrap for Bedrock access. See [`egress/README.md`](egress/README.md). |
@@ -72,15 +72,15 @@ The recommended path is `conformance.sh` — it auto-detects the cluster's compu
 The reference SandboxClaim (`manifests/sandbox-agent.yaml`) targets one of the agent-shaped SandboxTemplates that ship with this blueprint. Apply both templates first (one of them gets claimed depending on compute mode):
 
 ```bash
-kubectl apply -f manifests/sandbox-template-agent-standard.yaml
+kubectl apply -f manifests/sandbox-agent-runc.yaml
 # Standard EKS only — gVisor isn't available on Auto Mode:
-kubectl apply -f manifests/sandbox-template-agent-gvisor.yaml
+kubectl apply -f manifests/sandbox-agent-gvisor.yaml
 ```
 
 The SandboxClaim carries a `__SANDBOX_TEMPLATE__` placeholder substituted at apply time. To apply by hand:
 
 ```bash
-SANDBOX_TEMPLATE=sandbox-agent-gvisor   # or sandbox-agent-standard for Auto Mode
+SANDBOX_TEMPLATE=sandbox-agent-gvisor   # or sandbox-agent-runc for Auto Mode
 sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" manifests/sandbox-agent.yaml \
     | kubectl apply -f -
 ```
