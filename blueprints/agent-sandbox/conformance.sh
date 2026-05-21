@@ -9,9 +9,9 @@
 #   - Egress allowlist permits pypi.org + bedrock-runtime + sts
 #   - Egress allowlist blocks a non-allowlisted FQDN and raw IP
 #
-# Run after `infra/solutions/agent-sandbox/install.sh` and one of the
-# egress examples have completed successfully. Exits 0 on pass, 1 on
-# any failure. No interactive prompts.
+# Run after `infra/agent-sandbox/install.sh` and the egress example
+# (`blueprints/agent-sandbox/egress/install.sh`) have completed
+# successfully. Exits 0 on pass, 1 on any failure. No interactive prompts.
 #
 # Usage:
 #   CLUSTER_NAME=agent-sandbox \
@@ -28,19 +28,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# conformance.sh lives at blueprints/agents/agent-sandbox/. The manifests it
-# depends on (sandbox-agent.yaml, sandbox-template-*.yaml) live at
-# infra/solutions/agent-sandbox/manifests/.
+# conformance.sh lives at blueprints/agent-sandbox/. The platform manifests
+# (RuntimeClass, SandboxTemplates, namespace) live at infra/agent-sandbox/manifests/.
+# The workload manifest (SandboxClaim sandbox-agent.yaml) lives next to this
+# script under blueprints/agent-sandbox/manifests/.
 AGENT_DIR="$SCRIPT_DIR"
-INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/solutions/agent-sandbox" && pwd)"
-MANIFEST_DIR="$INFRA_DIR/manifests"
+BLUEPRINT_MANIFEST_DIR="$SCRIPT_DIR/manifests"
+INFRA_DIR="$(cd "$SCRIPT_DIR/../../infra/agent-sandbox" && pwd)"
+INFRA_MANIFEST_DIR="$INFRA_DIR/manifests"
 NS="agent-sandboxes"
 SA="sandbox-agent-sa"
 POD="sandbox-agent"
 CONFIGMAP="sandbox-agent-script"
 CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
 
-# Region precedence (matches infra/solutions/agent-sandbox/cleanup.sh):
+# Region precedence (matches infra/agent-sandbox/cleanup.sh):
 #   tfvars > AWS_REGION env > AWS_DEFAULT_REGION env > kubectl context
 #   > base module default (us-west-2). The blueprint runs in whichever
 #   region was deployed; a hard-coded default is a silent
@@ -118,18 +120,18 @@ detect_compute_mode() {
 require_cluster() {
     log "Checking cluster reachability + prerequisites..."
     kubectl cluster-info >/dev/null 2>&1 || fail "kubectl cannot reach the cluster; run 'aws eks update-kubeconfig --name $CLUSTER_NAME --region $REGION'"
-    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply $MANIFEST_DIR/namespace.yaml first"
+    kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply $INFRA_MANIFEST_DIR/namespace.yaml first"
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; set enable_agent_sandbox=true in blueprint.tfvars and re-run install.sh"
 
     # SandboxTemplate for the chosen tier must exist. Tier-specific
     # cluster prerequisites (RuntimeClass, NodePool) are only relevant
     # for the gVisor tier on Standard EKS.
     kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1 \
-        || fail "SandboxTemplate '$SANDBOX_TEMPLATE' missing; apply $MANIFEST_DIR/sandbox-template-*.yaml first"
+        || fail "SandboxTemplate '$SANDBOX_TEMPLATE' missing; apply $INFRA_MANIFEST_DIR/sandbox-template-*.yaml first"
 
     if [ "$COMPUTE_MODE" = "standard" ]; then
         kubectl get runtimeclass gvisor >/dev/null 2>&1 \
-            || fail "RuntimeClass 'gvisor' missing; apply $MANIFEST_DIR/runtimeclass-gvisor.yaml first"
+            || fail "RuntimeClass 'gvisor' missing; apply $INFRA_MANIFEST_DIR/runtimeclass-gvisor.yaml first"
     fi
 
     # Egress enforcement ships in the agent-egress example layered on top
@@ -142,7 +144,7 @@ require_cluster() {
     kubectl -n "$NS" get ciliumnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && cilium_policy_ok="yes"
     kubectl -n "$NS" get applicationnetworkpolicy sandbox-llm-allowlist >/dev/null 2>&1 && anp_policy_ok="yes"
     if [ -z "$cilium_policy_ok" ] && [ -z "$anp_policy_ok" ]; then
-        fail "No egress allowlist found. Install the egress example first: $INFRA_DIR/examples/agent-egress/install.sh"
+        fail "No egress allowlist found. Install the egress example first: $AGENT_DIR/egress/install.sh"
     fi
     if [ -n "$cilium_policy_ok" ]; then
         log "Detected Cilium-based egress (Standard EKS — CNP sandbox-llm-allowlist)."
@@ -163,7 +165,7 @@ setup_configmap_with_real_agent() {
     #      picks up the real content.
     RENDERED_SANDBOX_MANIFEST=$(mktemp -t agent-sandbox-claim.XXXXXX.yaml)
     sed -e "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
-        "$MANIFEST_DIR/sandbox-agent.yaml" \
+        "$BLUEPRINT_MANIFEST_DIR/sandbox-agent.yaml" \
         > "$RENDERED_SANDBOX_MANIFEST"
 
     log "Applying SandboxClaim (template: $SANDBOX_TEMPLATE)..."

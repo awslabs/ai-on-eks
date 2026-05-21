@@ -1,6 +1,6 @@
 # Agent Egress — Example
 
-Mode-aware FQDN egress enforcement for the agent-sandbox solution. Auto-detects whether the cluster is Standard EKS or EKS Auto Mode and applies the right enforcement layer accordingly. Pairs with the parent [agent-sandbox solution](../../).
+Mode-aware FQDN egress enforcement for the agent-sandbox blueprint. Auto-detects whether the cluster is Standard EKS or EKS Auto Mode and applies the right enforcement layer accordingly. Pairs with the parent [agent-sandbox blueprint](../).
 
 ## How it works
 
@@ -13,8 +13,8 @@ Mode-aware FQDN egress enforcement for the agent-sandbox solution. Auto-detects 
 
 ## Prerequisites
 
-- The parent [agent-sandbox solution](../../) installed.
-- For **Standard EKS**: `enable_cilium = true` in the parent solution's `terraform/blueprint.tfvars` (the base infra ArgoCD-deploys Cilium chaining mode + Hubble — this example does *not* install Cilium itself).
+- The [agent-sandbox infrastructure](../../../infra/agent-sandbox/) installed.
+- For **Standard EKS**: `enable_cilium = true` in the infra's `terraform/blueprint.tfvars` (the base infra ArgoCD-deploys Cilium chaining mode + Hubble — this example does *not* install Cilium itself).
 - For **EKS Auto Mode**: `enable_eks_auto_mode = true` and `enable_cilium = false` in `blueprint.tfvars` (no third-party CNI required).
 - `kubectl >=1.30`, `aws` CLI v2, `jq`.
 - `kubectl` configured for the target cluster.
@@ -36,7 +36,7 @@ Native `ApplicationNetworkPolicy` accepts `*` **only as the leftmost label** (e.
 Full install (mode detection + policies + Bedrock IRSA role):
 
 ```bash
-cd infra/solutions/agent-sandbox/examples/agent-egress
+cd blueprints/agent-sandbox/egress
 ./install.sh
 ```
 
@@ -89,7 +89,7 @@ Four shipped allowlist templates per backend:
 ## Directory layout
 
 ```
-agent-egress/
+egress/
 ├── README.md                                          # This file
 ├── install.sh                                         # Mode-aware installer
 └── manifests/
@@ -129,14 +129,14 @@ CILIUM_POD=$(kubectl -n kube-system get pods -l k8s-app=cilium -o jsonpath='{.it
 kubectl -n kube-system exec $CILIUM_POD -c cilium-agent -- cilium monitor --type l7 2>&1 | grep "DNS proxy"
 ```
 
-L3/L4 blocks (raw-IP egress not covered by FQDN allowlist) DO appear as DROPPED flows in the default Hubble Service Map. The [reference agent](../../../../../blueprints/agents/agent-sandbox/) has a Step 5 that exercises this path explicitly to produce a visible red DROP flow.
+L3/L4 blocks (raw-IP egress not covered by FQDN allowlist) DO appear as DROPPED flows in the default Hubble Service Map. The [reference agent](../) has a Step 5 that exercises this path explicitly to produce a visible red DROP flow.
 
 ## Validating enforcement
 
 Run the reference agent's conformance test — it auto-detects compute mode, claims the right SandboxTemplate (`sandbox-standard` on Auto Mode, `sandbox-gvisor` on Standard EKS), and asserts all 5 PASS / BLOCKED outcomes including Step 4 (FQDN block) and Step 5 (raw IP block).
 
 ```bash
-cd ../../../../../blueprints/agents/agent-sandbox
+cd ..
 BEDROCK_ROLE_ARN=$(aws iam get-role --role-name agent-sandbox-bedrock-irsa --query 'Role.Arn' --output text) \
     ./conformance.sh
 ```
@@ -145,6 +145,6 @@ For ad-hoc validation against the policy without the full reference agent, exec 
 
 ## Migrating between modes
 
-If you migrate an existing cluster from Standard EKS to Auto Mode (or vice versa), the same example covers both — flip `enable_eks_auto_mode` and `enable_cilium` in the parent solution's `blueprint.tfvars`, re-run the parent solution's `terraform apply`, and re-run this example's `./install.sh`. The mode detection picks up the new compute mode and applies the right enforcement layer.
+If you migrate an existing cluster from Standard EKS to Auto Mode (or vice versa), the same example covers both — flip `enable_eks_auto_mode` and `enable_cilium` in the infra's `blueprint.tfvars`, re-run the infra's `./install.sh`, and re-run this example's `./install.sh`. The mode detection picks up the new compute mode and applies the right enforcement layer.
 
 Pod-level allowlist labels do not change — agent workloads are portable across both backends.

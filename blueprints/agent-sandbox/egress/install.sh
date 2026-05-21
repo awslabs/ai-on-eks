@@ -22,7 +22,7 @@
 # third-party CNI required).
 #
 # Usage:
-#   cd infra/solutions/agent-sandbox/examples/agent-egress
+#   cd blueprints/agent-sandbox/egress
 #   ./install.sh                # Mode detection + policies + IRSA
 #   ./install.sh policies       # Policies only (mode-aware)
 #   ./install.sh irsa           # Bedrock IRSA role only (idempotent)
@@ -31,7 +31,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SOLUTION_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Egress lives at blueprints/agent-sandbox/egress/. The platform infra
+# (terraform tfvars, IAM templates) lives at infra/agent-sandbox/.
+INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/agent-sandbox" && pwd)"
 PHASE="${1:-install}"
 
 # Resolved on demand by phases that need it. Single source of truth so
@@ -148,8 +150,8 @@ install_policies() {
 # permission policy so it stays in sync with the template.
 bootstrap_irsa() {
     resolve_cluster_context
-    local trust_template="$SOLUTION_DIR/manifests/iam/bedrock-trust-policy.template.json"
-    local perms_template="$SOLUTION_DIR/manifests/iam/bedrock-permissions.template.json"
+    local trust_template="$INFRA_DIR/manifests/iam/bedrock-trust-policy.template.json"
+    local perms_template="$INFRA_DIR/manifests/iam/bedrock-permissions.template.json"
     local trust_rendered=$(mktemp -t agent-sandbox-trust.XXXXXX.json)
     local perms_rendered=$(mktemp -t agent-sandbox-perms.XXXXXX.json)
     trap "rm -f $trust_rendered $perms_rendered" RETURN
@@ -243,7 +245,7 @@ finish_message() {
         echo "  - Open Hubble UI:              kubectl port-forward -n kube-system svc/hubble-ui 12000:80"
     fi
     echo "  - Browse allowlist templates:  ls manifests/allowlists/$COMPUTE_MODE_DIR/"
-    echo "  - Run end-to-end conformance:  cd ../../../../../blueprints/agents/agent-sandbox && \\"
+    echo "  - Run end-to-end conformance:  cd .. && \\"
     echo "      BEDROCK_ROLE_ARN=$BEDROCK_ROLE_ARN ./conformance.sh"
 }
 

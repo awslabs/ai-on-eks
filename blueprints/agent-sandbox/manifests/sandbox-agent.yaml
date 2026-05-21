@@ -40,7 +40,7 @@ data:
   # Actual contents populated by install.sh / conformance.sh via
   #   kubectl create configmap --from-file=agent.py=...
   # This placeholder keeps the manifest self-contained for review.
-  agent.py: "# populated by install.sh from blueprints/agents/agent-sandbox/agent.py"
+  agent.py: "# populated by install.sh from blueprints/agent-sandbox/agent.py"
 ---
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxClaim

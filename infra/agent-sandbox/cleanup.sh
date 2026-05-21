@@ -45,7 +45,7 @@
 #      idempotently. Safe to re-run.
 #
 # Usage:
-#   cd infra/solutions/agent-sandbox
+#   cd infra/agent-sandbox
 #   ./cleanup.sh
 
 set -euo pipefail
@@ -88,8 +88,9 @@ echo "=== Phase 0: Run egress example uninstall (releases CNPs/ANPs + IRSA role)
 # The agent-egress example's uninstall is idempotent and mode-aware
 # — it auto-detects the cluster's compute mode and removes the
 # matching policy backend (Cilium or ANP). Failures are tolerated
-# (best-effort cleanup).
-example_dir="$SCRIPT_DIR/examples/agent-egress"
+# (best-effort cleanup). Egress example moved to blueprints/ per the
+# May 21 maintainer feedback restructure.
+example_dir="$SCRIPT_DIR/../../blueprints/agent-sandbox/egress"
 if [ -x "$example_dir/install.sh" ]; then
     echo "  Running agent-egress uninstall..."
     ( cd "$example_dir" && ./install.sh uninstall ) || true

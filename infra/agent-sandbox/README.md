@@ -28,7 +28,7 @@ Agents that execute model-generated code need two guarantees the default Kuberne
 - **Kernel boundary isolation**: untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; Kata+Firecracker (documented as a future tier) adds hardware-virtualization boundaries.
 - **Egress policy enforcement**: agents call LLM APIs, package registries, and developer tools. Without an allowlist, a compromised agent can exfiltrate data or probe internal services. FQDN filtering limits egress to a pre-approved set of destinations.
 
-This solution delivers both. The reference agent (under [`../../../blueprints/agents/agent-sandbox/`](../../../blueprints/agents/agent-sandbox/)) exercises the full chain: provisions inside a gVisor-isolated Sandbox, fetches credentials via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
+This solution delivers both. The reference agent (under [`../../blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/)) exercises the full chain: provisions inside a gVisor-isolated Sandbox, fetches credentials via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
 
 ## Architecture
 
@@ -50,16 +50,15 @@ flowchart TB
         C2["<b>gvisor</b> (runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
     end
 
-    subgraph D["Egress enforcement (examples/)"]
+    subgraph D["Egress enforcement (blueprint example)"]
         direction LR
-        D1["<b>agent-egress</b><br/>Mode-aware: Cilium (Standard EKS)<br/>or native ANP (Auto Mode)"]:::egress
+        D1["<b>blueprints/agent-sandbox/egress</b><br/>Mode-aware: Cilium (Standard EKS)<br/>or native ANP (Auto Mode)"]:::egress
     end
 
     subgraph E["EKS Node Groups"]
         direction LR
-        E1["Karpenter-provisioned<br/>(Standard)"]:::node
+        E1["Karpenter-provisioned<br/>(Standard EKS)"]:::node
         E2["Auto Mode-managed<br/>(Auto Mode)"]:::node
-        E3["Managed Node Group<br/>(documented alternative<br/>for gVisor)"]:::node
     end
 
     A --> B
@@ -68,10 +67,10 @@ flowchart TB
     D --> E
 ```
 
-Two composition paths ship with this solution:
+Two composition paths ship with the blueprint that layers on top of this infra:
 
-- **SandboxClaim** (`manifests/sandbox-agent.yaml`) — a thin claim that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
-- **KRO AgentSandbox** (`manifests/kro/instance.yaml` + `manifests/kro/rgd.yaml`) — the same workload composed via a single `AgentSandbox` custom resource. The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap`, and Bedrock region/model and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
+- **SandboxClaim** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml)) — a thin claim that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
+- **KRO AgentSandbox** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — the same workload composed via a single `AgentSandbox` custom resource. The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap`, and Bedrock region/model and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
 Both paths produce equivalent running pods. Each tier (standard, gvisor) is a SandboxTemplate the claim or AgentSandbox can target.
 
@@ -79,12 +78,12 @@ Both paths produce equivalent running pods. Each tier (standard, gvisor) is a Sa
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v0.4.5 | Sandbox / SandboxTemplate / SandboxClaim controller |
-| [kro](https://kro.run/) | 0.9.1 | ResourceGraphDefinition-based composition |
-| [gVisor](https://gvisor.dev/) | runsc (AL2023) | Userspace syscall interception for gvisor tier |
-| [Karpenter](https://karpenter.sh/) | Bundled with base module | Node autoscaling with a dedicated gVisor NodePool |
-| [Cilium](https://cilium.io/) + [Hubble](https://github.com/cilium/hubble) | 1.19.x | FQDN egress enforcement + flow observability (chained example) |
-| VPC CNI (`ApplicationNetworkPolicy`) | v1.21.1+ | Native FQDN egress enforcement on Auto Mode (native example) |
+| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v0.4.5 | Sandbox / SandboxTemplate / SandboxClaim controller (base infra ArgoCD addon, `enable_agent_sandbox`) |
+| [kro](https://kro.run/) | 0.9.1 | ResourceGraphDefinition-based composition (base infra ArgoCD addon, `enable_kro`; optional) |
+| [gVisor](https://gvisor.dev/) | runsc (AL2023) | Userspace syscall interception for gvisor tier (installed via Karpenter NodePool user-data) |
+| [Karpenter](https://karpenter.sh/) | Bundled with base module | Node autoscaling with a dedicated gVisor NodePool (Standard EKS) |
+| [Cilium](https://cilium.io/) + [Hubble](https://github.com/cilium/hubble) | 1.16.x | FQDN egress enforcement + flow observability (base infra ArgoCD addon, `enable_cilium`; optional, used by the egress blueprint example) |
+| VPC CNI (`ApplicationNetworkPolicy`) | v1.21.1+ | Native FQDN egress enforcement on Auto Mode (used by the egress blueprint example) |
 
 ### Runtime tiers
 
@@ -139,7 +138,7 @@ Bedrock inference is billed per-token by the model provider and is independent o
 
 ### Network Security
 
-- **Default-deny egress**: the solution does NOT apply network policies on its own. Egress behavior depends on running the [`agent-egress`](examples/agent-egress/) example, which auto-detects compute mode and applies Cilium FQDN filtering (Standard EKS, requires `enable_cilium = true`) or VPC CNI `ApplicationNetworkPolicy` (Auto Mode). Without this example, the sandbox has unrestricted egress.
+- **Default-deny egress**: the solution does NOT apply network policies on its own. Egress behavior depends on running the [`agent-egress`](../../blueprints/agent-sandbox/egress/) example layered on top, which auto-detects compute mode and applies Cilium FQDN filtering (Standard EKS, requires `enable_cilium = true`) or VPC CNI `ApplicationNetworkPolicy` (Auto Mode). Without this example, the sandbox has unrestricted egress.
 - **IMDS denial at admin tier**: the egress example blocks 169.254.169.254 (EC2 Instance Metadata v1/v2) and 169.254.170.2 (ECS task metadata) via admin-scoped policies for the `agent-sandboxes` namespace. This prevents agents from escalating to node-level credentials.
 - **Two enforcement layers, two observability surfaces**: FQDN filtering happens at the DNS proxy (blocks resolve to empty answer, no TCP attempt follows). L3/L4 filtering happens at the data plane (SYN packet drop). The reference agent's Step 4 exercises the DNS layer; Step 5 exercises L3/L4.
 
@@ -170,7 +169,7 @@ helm version
 
 ```bash
 git clone https://github.com/awslabs/ai-on-eks.git
-cd ai-on-eks/infra/solutions/agent-sandbox
+cd ai-on-eks/infra/agent-sandbox
 
 # (Optional) Edit terraform/blueprint.tfvars to change region or toggle Auto Mode
 ./install.sh                                             # 20-30 min
@@ -178,9 +177,9 @@ cd ai-on-eks/infra/solutions/agent-sandbox
 
 The solution's `blueprint.tfvars` enables the `agent-sandbox` controller and `kro` as ArgoCD-managed addons via the base module. After `install.sh` completes, the cluster is up with:
 
-- Karpenter ready for Node provisioning
+- Karpenter ready for Node provisioning (Standard EKS)
 - `agent-sandbox-system` namespace with the controller running
-- `kro-system` namespace with kro running
+- `kro-system` namespace with kro running (when `enable_kro = true`)
 - ArgoCD syncing both continuously
 
 ```bash
@@ -189,9 +188,9 @@ kubectl get pods -n agent-sandbox-system
 kubectl get pods -n kro-system
 ```
 
-### Apply the Workload Manifests
+### Apply the Platform Manifests
 
-The workload-layer Kubernetes resources live under `manifests/` and are applied after the cluster is up. See [`manifests/README.md`](manifests/README.md) for a per-file reference.
+The platform-layer Kubernetes resources live under `manifests/` and are applied after the cluster is up. These are the runtime primitives the agent-sandbox controller needs (RuntimeClass, SandboxTemplates, namespace, gVisor-capable Karpenter NodePool). See [`manifests/README.md`](manifests/README.md) for a per-file reference.
 
 Choose the apply set that matches your cluster's compute mode:
 
@@ -200,8 +199,8 @@ Choose the apply set that matches your cluster's compute mode:
 ```bash
 cd manifests/
 
-# Resolve cluster name + Karpenter node role from the live cluster
-export CLUSTER_NAME=$(aws eks describe-cluster --name agent-sandbox --query cluster.name --output text)
+# Resolve cluster name + Karpenter node role from terraform state (region-agnostic).
+export CLUSTER_NAME=$(terraform -chdir=../terraform/_LOCAL output -raw deployment_name)
 export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spec.role}')
 
 # Namespace + RuntimeClass + both SandboxTemplates
@@ -216,9 +215,6 @@ sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
     karpenter-nodepool-gvisor.yaml \
     > /tmp/karpenter-nodepool-gvisor.rendered.yaml
 kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
-
-# (Optional) KRO ResourceGraphDefinition for the AgentSandbox composition path
-kubectl apply -f kro/rgd.yaml
 ```
 
 #### EKS Auto Mode
@@ -230,50 +226,31 @@ cd manifests/
 
 kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-template-standard.yaml
-kubectl apply -f kro/rgd.yaml             # Optional — for the AgentSandbox composition path
 ```
 
-#### Reference SandboxClaim
+### Layer the Reference Blueprint
 
-The reference SandboxClaim (`sandbox-agent.yaml`) and KRO instance (`kro/instance.yaml`) carry placeholders that need apply-time substitution. The recommended path is to let `conformance.sh` apply them — it auto-detects the cluster's compute mode and patches `__SANDBOX_TEMPLATE__` (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode) before applying. See [Validate the Deployment](#validate-the-deployment) below.
+With the platform manifests applied, the cluster can host any SandboxClaim that targets one of the installed templates. The reference blueprint at [`../../blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/) demonstrates a complete agent workload with FQDN egress enforcement and end-to-end conformance:
 
-To apply by hand instead, sed-substitute the placeholder and pipe through `kubectl apply`:
+- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue.
+- **KRO composition path** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — same workload via a single `AgentSandbox` CR backed by a `ResourceGraphDefinition`.
+- **Egress enforcement example** ([`blueprints/agent-sandbox/egress/`](../../blueprints/agent-sandbox/egress/)) — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode) plus the Bedrock IRSA role.
+- **Conformance test** ([`blueprints/agent-sandbox/conformance.sh`](../../blueprints/agent-sandbox/conformance.sh)) — claims the right template for the cluster's compute mode and exercises the full chain end-to-end.
 
-```bash
-SANDBOX_TEMPLATE=sandbox-gvisor   # or sandbox-standard for Auto Mode
-sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" sandbox-agent.yaml | kubectl apply -f -
+See the blueprint's [README](../../blueprints/agent-sandbox/README.md) for usage. The blueprint is one example of how to consume this infra; you can also point your own SandboxClaims at the templates this README installs without using the blueprint at all.
+
+### Minimal Sandbox Configuration
+
+If you want sandboxing without KRO or Cilium (e.g., to add isolation to an existing workload like the [Jupyter blueprint](../jupyterhub/)), the minimal toggle set is:
+
+```hcl
+# terraform/blueprint.tfvars
+enable_agent_sandbox = true   # SIG-Apps controller + Sandbox CRDs
+enable_kro           = false  # Skip KRO — SandboxClaim alone is enough
+enable_cilium        = false  # Skip Cilium — bring your own egress policy or rely on default cluster networking
 ```
 
-### Add Egress Enforcement
-
-The [`examples/agent-egress/`](examples/agent-egress/) example auto-detects compute mode and applies the right enforcement layer:
-
-- **Standard EKS** → Cilium `CiliumClusterwideNetworkPolicy` + `CiliumNetworkPolicy` (Cilium itself is deployed by the base infra when `enable_cilium = true` in `terraform/blueprint.tfvars`)
-- **EKS Auto Mode** → native `ClusterNetworkPolicy` + `ApplicationNetworkPolicy` (DNS-based, enforced by VPC CNI Network Policy Controller)
-
-```bash
-cd examples/agent-egress
-./install.sh                                             # Auto-detects mode + applies policies + provisions IRSA
-```
-
-The `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent; updates the trust policy on cluster recreation so OIDC drift doesn't break re-runs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation.
-
-The example's README documents allowlist-template usage and migration paths between the two enforcement backends.
-
-### Validate the Deployment
-
-A reference agent lives under [`../../../blueprints/agents/agent-sandbox/`](../../../blueprints/agents/agent-sandbox/). It exercises the full chain — pip install, Bedrock call, snippet execution, FQDN block, IP block — and prints PASS/BLOCKED markers for each step.
-
-```bash
-cd ../../../blueprints/agents/agent-sandbox
-# BEDROCK_ROLE_ARN was provisioned + echoed by the egress install.sh.
-# It defaults to <cluster-name>-bedrock-irsa.
-CLUSTER_NAME=agent-sandbox \
-BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
-    ./conformance.sh
-```
-
-Conformance exits 0 on success and asserts all 5 expected PASS/BLOCKED outcomes.
+Then apply only the platform manifests you need (namespace, RuntimeClass, SandboxTemplate) and write your own SandboxClaim that targets one of the installed templates. The egress enforcement, KRO composition, and reference agent are layered concerns from the blueprint and remain optional.
 
 ## Configuration Options
 
@@ -332,7 +309,7 @@ Hubble UI's default Service Map filters blacklist DNS events and pods without su
 ## Cleanup
 
 ```bash
-cd infra/solutions/agent-sandbox
+cd infra/agent-sandbox
 ./cleanup.sh
 ```
 

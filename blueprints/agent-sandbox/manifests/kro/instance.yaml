@@ -29,7 +29,7 @@
 # Prerequisites:
 #   1. The reference agent ConfigMap (`sandbox-agent-script`) must
 #      exist in the target namespace. install.sh populates it from
-#      blueprints/agents/agent-sandbox/agent.py. The AgentSandbox
+#      blueprints/agent-sandbox/agent.py. The AgentSandbox
 #      mounts it at /config and cp's it to /workspace/agent.py on
 #      container start.
 #   2. The IAM role referenced by iamRoleArn must include
