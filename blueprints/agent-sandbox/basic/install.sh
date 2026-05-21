@@ -18,9 +18,9 @@
 #
 # Usage:
 #   cd blueprints/agent-sandbox/basic
-#   ./apply.sh                # Mode detection + apply + wait for Ready
-#   ./apply.sh smoke          # Apply + smoke test (kubectl exec into the pod)
-#   ./apply.sh uninstall      # Remove the SandboxClaim
+#   ./install.sh                # Mode detection + apply + wait for Ready
+#   ./install.sh smoke          # Apply + smoke test (kubectl exec into the pod)
+#   ./install.sh uninstall      # Remove the SandboxClaim
 
 set -euo pipefail
 
@@ -111,7 +111,7 @@ apply_claim() {
     echo "  kubectl exec -n $NS $CLAIM_NAME -- nginx -v"
     echo ""
     echo "Or run the smoke test:"
-    echo "  ./apply.sh smoke"
+    echo "  ./install.sh smoke"
     echo ""
     echo "Customize: copy sandbox-claim-basic.yaml + write your own SandboxTemplate"
     echo "with a different image. The Sandbox shape (security context, egress"

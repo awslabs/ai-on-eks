@@ -5,7 +5,7 @@ The smallest viable Sandbox deployment, demonstrating sandboxing alone — no IR
 ## What ships
 
 - `sandbox-claim-basic.yaml` — a SandboxClaim that targets one of the basic SandboxTemplates installed by the platform infra.
-- `apply.sh` — auto-detects the cluster's compute mode (Standard EKS vs Auto Mode), substitutes the right SandboxTemplate name, applies the claim, waits for Ready, and (with `smoke`) runs a smoke test.
+- `install.sh` — auto-detects the cluster's compute mode (Standard EKS vs Auto Mode), substitutes the right SandboxTemplate name, applies the claim, waits for Ready, and (with `smoke`) runs a smoke test.
 - `README.md` — this file.
 
 The basic blueprint defaults to `nginx:alpine` as the workload image, mirroring the canonical Kubernetes [shell-demo example](https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/). The image is a placeholder — swap it out for your own as described below.
@@ -40,19 +40,19 @@ Apply the claim and wait for the Pod to come up:
 
 ```bash
 cd blueprints/agent-sandbox/basic
-./apply.sh
+./install.sh
 ```
 
 Apply + run a smoke test (`nginx -v` inside the sandbox):
 
 ```bash
-./apply.sh smoke
+./install.sh smoke
 ```
 
 Remove the claim:
 
 ```bash
-./apply.sh uninstall
+./install.sh uninstall
 ```
 
 The Pod created by the claim is named `sandbox-basic` in the `agent-sandboxes` namespace. Drive it the same way you drive any K8s pod:
@@ -111,7 +111,7 @@ If you're on Auto Mode and seeing scheduling issues, verify the basic standard t
 kubectl get sandboxtemplate -n agent-sandboxes sandbox-runc
 ```
 
-### `apply.sh` fails with "SandboxTemplate missing"
+### `install.sh` fails with "SandboxTemplate missing"
 
 The basic SandboxTemplates haven't been applied yet. Run the prerequisite kubectl commands above, or `infra/agent-sandbox/install.sh` if the cluster isn't up at all.
 

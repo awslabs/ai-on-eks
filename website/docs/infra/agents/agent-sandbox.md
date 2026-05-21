@@ -193,8 +193,8 @@ After running `./install.sh` and applying the platform manifests above:
 
 ```bash
 cd ../../blueprints/agent-sandbox/basic
-./apply.sh                # Apply + wait for Ready
-./apply.sh smoke          # Apply + smoke test (kubectl exec → nginx -v)
+./install.sh                # Apply + wait for Ready
+./install.sh smoke          # Apply + smoke test (kubectl exec → nginx -v)
 ```
 
 See the [basic blueprint README](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/basic/README.md) for customization patterns (writing your own SandboxTemplate, layering on egress / IRSA / KRO).
