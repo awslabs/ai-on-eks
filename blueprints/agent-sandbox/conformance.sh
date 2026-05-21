@@ -102,13 +102,13 @@ detect_compute_mode() {
             --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
         if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
             COMPUTE_MODE="automode"
-            SANDBOX_TEMPLATE="sandbox-standard"
+            SANDBOX_TEMPLATE="sandbox-agent-standard"
             log "Detected EKS Auto Mode — claiming SandboxTemplate '$SANDBOX_TEMPLATE' (gVisor unavailable on Auto Mode)."
             return 0
         fi
         if [ "$enabled" = "False" ] || [ "$enabled" = "false" ]; then
             COMPUTE_MODE="standard"
-            SANDBOX_TEMPLATE="sandbox-gvisor"
+            SANDBOX_TEMPLATE="sandbox-agent-gvisor"
             log "Detected Standard EKS — claiming SandboxTemplate '$SANDBOX_TEMPLATE'."
             return 0
         fi
@@ -123,11 +123,26 @@ require_cluster() {
     kubectl get ns "$NS" >/dev/null 2>&1 || fail "Namespace '$NS' missing; apply $INFRA_MANIFEST_DIR/namespace.yaml first"
     kubectl -n agent-sandbox-system get deployment agent-sandbox-controller >/dev/null 2>&1 || fail "agent-sandbox controller missing; set enable_agent_sandbox=true in blueprint.tfvars and re-run install.sh"
 
-    # SandboxTemplate for the chosen tier must exist. Tier-specific
-    # cluster prerequisites (RuntimeClass, NodePool) are only relevant
-    # for the gVisor tier on Standard EKS.
-    kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1 \
-        || fail "SandboxTemplate '$SANDBOX_TEMPLATE' missing; apply $INFRA_MANIFEST_DIR/sandbox-template-*.yaml first"
+    # SandboxTemplate for the chosen tier. The agent-shaped templates
+    # ship with the blueprint (sandbox-template-agent-*.yaml). If the
+    # caller hasn't applied them yet, do it now — keeps conformance
+    # idempotent (the templates are stable, so reapply is a no-op).
+    # Tier-specific cluster prerequisites (RuntimeClass, NodePool) come
+    # from the platform infra and are only relevant for the gVisor tier
+    # on Standard EKS.
+    if ! kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1; then
+        # SANDBOX_TEMPLATE is `sandbox-agent-standard` (Auto Mode) or
+        # `sandbox-agent-gvisor` (Standard EKS). The matching file uses
+        # `sandbox-template-agent-<tier>.yaml` shape.
+        local template_tier="${SANDBOX_TEMPLATE#sandbox-agent-}"
+        local agent_template_file="$BLUEPRINT_MANIFEST_DIR/sandbox-template-agent-${template_tier}.yaml"
+        if [ -f "$agent_template_file" ]; then
+            log "Applying agent SandboxTemplate from $agent_template_file..."
+            kubectl apply -f "$agent_template_file" >/dev/null
+        else
+            fail "SandboxTemplate '$SANDBOX_TEMPLATE' missing and template file not found at $agent_template_file"
+        fi
+    fi
 
     if [ "$COMPUTE_MODE" = "standard" ]; then
         kubectl get runtimeclass gvisor >/dev/null 2>&1 \

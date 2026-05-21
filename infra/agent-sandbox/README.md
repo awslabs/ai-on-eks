@@ -228,29 +228,43 @@ kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-template-standard.yaml
 ```
 
-### Layer the Reference Blueprint
+### Layer a Blueprint
 
-With the platform manifests applied, the cluster can host any SandboxClaim that targets one of the installed templates. The reference blueprint at [`../../blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/) demonstrates a complete agent workload with FQDN egress enforcement and end-to-end conformance:
+With the platform manifests applied, the cluster can host any SandboxClaim that targets one of the installed templates. Two blueprints ship in this repo:
 
-- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue.
+**Basic blueprint** ([`blueprints/agent-sandbox/basic/`](../../blueprints/agent-sandbox/basic/)) — smallest viable Sandbox deployment. Claims one of the basic SandboxTemplates this infra installs, runs `nginx:alpine` (the canonical Kubernetes shell-demo image). No IRSA, no agent script, no FQDN allowlist. The right starting point if you want to add isolation to an existing workload, or as the first tier of testing before layering on the reference agent. See the [Basic Sandbox Configuration](#basic-sandbox-configuration) section below.
+
+**Reference agent blueprint** ([`blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/)) — complete agent workload with FQDN egress enforcement and end-to-end conformance:
+
+- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue. Claims the agent-shaped templates ([`sandbox-template-agent-{standard,gvisor}.yaml`](../../blueprints/agent-sandbox/manifests/)) which add the Python image + Bedrock env + ConfigMap mount on top of the basic templates' shape.
 - **KRO composition path** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — same workload via a single `AgentSandbox` CR backed by a `ResourceGraphDefinition`.
 - **Egress enforcement example** ([`blueprints/agent-sandbox/egress/`](../../blueprints/agent-sandbox/egress/)) — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode) plus the Bedrock IRSA role.
-- **Conformance test** ([`blueprints/agent-sandbox/conformance.sh`](../../blueprints/agent-sandbox/conformance.sh)) — claims the right template for the cluster's compute mode and exercises the full chain end-to-end.
+- **Conformance test** ([`blueprints/agent-sandbox/conformance.sh`](../../blueprints/agent-sandbox/conformance.sh)) — claims the right agent template for the cluster's compute mode and exercises the full chain end-to-end.
 
-See the blueprint's [README](../../blueprints/agent-sandbox/README.md) for usage. The blueprint is one example of how to consume this infra; you can also point your own SandboxClaims at the templates this README installs without using the blueprint at all.
+See each blueprint's README for usage. Both blueprints are examples of how to consume this infra; you can equally point your own SandboxClaims at the templates this README installs without using either blueprint.
 
-### Minimal Sandbox Configuration
+### Basic Sandbox Configuration
 
-If you want sandboxing without KRO or Cilium (e.g., to add isolation to an existing workload like the [Jupyter blueprint](../jupyterhub/)), the minimal toggle set is:
+The smallest viable Sandbox deployment ships in [`blueprints/agent-sandbox/basic/`](../../blueprints/agent-sandbox/basic/). It claims one of the basic SandboxTemplates this infra installs, runs `nginx:alpine` (mirroring the canonical Kubernetes [shell-demo example](https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/)), and exits when the Pod is Ready. No IRSA, no agent script, no FQDN allowlist — the right starting point if you want to add isolation to an existing workload (the [Jupyter blueprint](../jupyterhub/), an inference server, a batch job runner) without buying into the reference agent stack.
+
+The minimum tfvars set for the basic blueprint is:
 
 ```hcl
 # terraform/blueprint.tfvars
 enable_agent_sandbox = true   # SIG-Apps controller + Sandbox CRDs
-enable_kro           = false  # Skip KRO — SandboxClaim alone is enough
-enable_cilium        = false  # Skip Cilium — bring your own egress policy or rely on default cluster networking
+enable_kro           = false  # Not needed for the basic blueprint
+enable_cilium        = false  # Not needed for the basic blueprint
 ```
 
-Then apply only the platform manifests you need (namespace, RuntimeClass, SandboxTemplate) and write your own SandboxClaim that targets one of the installed templates. The egress enforcement, KRO composition, and reference agent are layered concerns from the blueprint and remain optional.
+After running `./install.sh` and applying the platform manifests above:
+
+```bash
+cd ../../blueprints/agent-sandbox/basic
+./apply.sh                # Apply + wait for Ready
+./apply.sh smoke          # Apply + smoke test (kubectl exec → nginx -v)
+```
+
+See the [basic blueprint README](../../blueprints/agent-sandbox/basic/README.md) for customization patterns (writing your own SandboxTemplate, layering on egress / IRSA / KRO).
 
 ## Configuration Options
 

@@ -177,21 +177,31 @@ kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-template-standard.yaml
 ```
 
-#### Minimal Sandbox Configuration
+#### Basic Sandbox Configuration
 
-If you want sandboxing without KRO or Cilium (e.g., to add isolation to an existing workload), the minimal toggle set in `terraform/blueprint.tfvars` is:
+The smallest viable Sandbox deployment ships in [`blueprints/agent-sandbox/basic/`](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/basic). It claims one of the basic SandboxTemplates the platform installs, runs `nginx:alpine` (the canonical Kubernetes [shell-demo image](https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/)), and exits when the Pod is Ready. No IRSA, no agent script, no FQDN allowlist — the right starting point if you want to add isolation to an existing workload (the [Jupyter blueprint](../jupyterhub/), an inference server, a batch job runner) without buying into the reference agent stack.
+
+The minimum tfvars set for the basic blueprint is:
 
 ```hcl
 enable_agent_sandbox = true   # SIG-Apps controller + Sandbox CRDs
-enable_kro           = false  # Skip KRO — SandboxClaim alone is enough
-enable_cilium        = false  # Skip Cilium — bring your own egress policy
+enable_kro           = false  # Not needed for the basic blueprint
+enable_cilium        = false  # Not needed for the basic blueprint
 ```
 
-Then apply only the platform manifests above and write your own SandboxClaim that targets one of the installed templates.
+After running `./install.sh` and applying the platform manifests above:
 
-### Step 5: Layer the Reference Blueprint
+```bash
+cd ../../blueprints/agent-sandbox/basic
+./apply.sh                # Apply + wait for Ready
+./apply.sh smoke          # Apply + smoke test (kubectl exec → nginx -v)
+```
 
-The reference blueprint at [`blueprints/agent-sandbox/`](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox) demonstrates a complete agent workload — SandboxClaim, KRO composition path, egress enforcement, agent script, and end-to-end conformance. Apply the egress enforcement portion:
+See the [basic blueprint README](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/basic/README.md) for customization patterns (writing your own SandboxTemplate, layering on egress / IRSA / KRO).
+
+### Step 5: Layer the Reference Agent Blueprint
+
+The reference agent blueprint at [`blueprints/agent-sandbox/`](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox) demonstrates a complete agent workload — SandboxClaim against the agent-shaped SandboxTemplates, KRO composition path, egress enforcement, agent script, and end-to-end conformance. Apply the egress enforcement portion:
 
 ```bash
 cd ../../blueprints/agent-sandbox/egress
@@ -219,7 +229,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
     ./conformance.sh
 ```
 
-`conformance.sh` resolves region from the infra's `terraform/blueprint.tfvars` (with `AWS_REGION` env override), auto-detects the cluster's compute mode, claims the appropriate SandboxTemplate (`sandbox-gvisor` on Standard EKS, `sandbox-standard` on Auto Mode), and asserts five expected outcomes: PyPI install (PASS), Bedrock call (PASS), snippet execution (PASS), FQDN block (BLOCKED), and IP block (BLOCKED). Exits 0 on success.
+`conformance.sh` resolves region from the infra's `terraform/blueprint.tfvars` (with `AWS_REGION` env override), auto-detects the cluster's compute mode, claims the appropriate agent-shaped SandboxTemplate (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-standard` on Auto Mode), and asserts five expected outcomes: PyPI install (PASS), Bedrock call (PASS), snippet execution (PASS), FQDN block (BLOCKED), and IP block (BLOCKED). Exits 0 on success.
 
 ## Configuration Options
 

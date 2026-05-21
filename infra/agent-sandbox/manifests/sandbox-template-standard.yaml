@@ -1,20 +1,26 @@
-# SandboxTemplate — standard tier (runc).
+# SandboxTemplate — standard tier (basic, runc).
 #
-# This is the baseline tier per SPEC §3.1 — namespace + cgroup isolation
-# via runc, the default Kubernetes container runtime. Use for orchestration-
-# only agents making LLM calls without executing untrusted code, or on
-# clusters where gVisor isn't available (e.g., EKS Auto Mode does not
-# expose node-level hooks for installing the runsc shim).
+# This is the platform primitive for the standard tier per SPEC §3.1 —
+# namespace + cgroup isolation via runc, the default Kubernetes container
+# runtime. It is intentionally generic: a hardened Pod spec with no
+# workload-specific assumptions (no agent script, no IRSA-bound SA, no
+# Bedrock env vars). Higher-level templates layer on top by adding what
+# the workload needs.
+#
+# Default workload: nginx:alpine, mirroring the canonical Kubernetes
+# shell-demo example (https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/).
+# The image is a placeholder — swap in your own by writing a SandboxTemplate
+# that copies this shape with a different image, or by patching the Pod
+# spec at the Deployment that creates the Sandbox.
 #
 # Mode compatibility:
-#   - Standard EKS (Karpenter / MNG): yes
+#   - Standard EKS (Karpenter): yes
 #   - EKS Auto Mode: yes (this is the only tier available on Auto Mode)
 #
-# The reference agent claims this template via SandboxClaim when running
-# on Auto Mode; on Standard EKS it claims sandbox-gvisor for stronger
-# isolation. The runtime spec (image, env vars, agent-script mount,
-# securityContext) is identical between the two templates so claims
-# can switch freely between tiers without re-plumbing the workload.
+# Templates that build on this:
+#   - blueprints/agent-sandbox/manifests/sandbox-template-agent-standard.yaml
+#     adds python:3.12-slim + agent-script ConfigMap mount + Bedrock env vars
+#     for the reference agent.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:
@@ -33,70 +39,47 @@ spec:
     metadata:
       labels:
         # Matched by the per-sandbox CiliumNetworkPolicy / ApplicationNetworkPolicy
-        # podSelector — sandbox pods without this label don't get the FQDN allowlist.
+        # podSelector when the egress example is layered on. Sandbox pods
+        # without this label don't get the FQDN allowlist — that's a feature,
+        # not a bug, when running the basic blueprint without the egress
+        # example.
         egress-tier: sandbox
         agent-sandbox/tier: standard
     spec:
-      # IRSA-bound ServiceAccount provisioned alongside the SandboxClaim.
-      # See sandbox-agent.yaml for the SA + ConfigMap that pair with this template.
-      serviceAccountName: sandbox-agent-sa
       # No runtimeClassName → runc (cluster default).
       containers:
-        - name: agent-runtime
-          image: python:3.12-slim
+        - name: workload
+          image: nginx:alpine
           imagePullPolicy: IfNotPresent
-          # cp the agent script from the mounted ConfigMap to a writable
-          # workspace, then sleep so operators drive the agent via
-          # `kubectl exec`. Matches the SIG-Apps singleton-stateful pattern.
-          command:
-            - /bin/sh
-            - -c
-            - |
-              cp /config/agent.py /workspace/agent.py
-              chmod +x /workspace/agent.py
-              echo "sandbox ready"
-              echo "run: kubectl exec -n agent-sandboxes <sandbox-name> -c agent-runtime -- python /workspace/agent.py"
-              sleep infinity
-          env:
-            - name: AWS_REGION
-              value: us-east-1
-            - name: BEDROCK_MODEL_ID
-              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
-            # Override HOME so `pip install --user` has a writable target.
-            # readOnlyRootFilesystem means /.local under the default $HOME
-            # isn't writable; /workspace is an emptyDir.
-            - name: HOME
-              value: /workspace
+          ports:
+            - containerPort: 80
           resources:
             requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
               cpu: "500m"
               memory: "512Mi"
-            limits:
-              cpu: "2"
-              memory: "2Gi"
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1000
+            runAsUser: 101
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
           volumeMounts:
-            - name: workspace
-              mountPath: /workspace
+            # nginx:alpine writes its PID file + temp config to a few paths
+            # under /var. Carve out emptyDirs so readOnlyRootFilesystem holds.
+            - name: var-cache
+              mountPath: /var/cache/nginx
+            - name: var-run
+              mountPath: /var/run
             - name: tmp
               mountPath: /tmp
-            - name: agent-script
-              mountPath: /config
-              readOnly: true
       volumes:
-        - name: workspace
+        - name: var-cache
+          emptyDir: {}
+        - name: var-run
           emptyDir: {}
         - name: tmp
           emptyDir: {}
-        - name: agent-script
-          configMap:
-            name: sandbox-agent-script
-            items:
-              - key: agent.py
-                path: agent.py
