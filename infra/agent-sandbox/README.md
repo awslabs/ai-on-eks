@@ -281,7 +281,7 @@ See the [basic blueprint README](../../blueprints/agent-sandbox/basic/README.md)
 | `cilium_version` | Cilium Helm chart version | `1.16.5` |
 | `enable_eks_auto_mode` | Use EKS Auto Mode instead of Karpenter-managed compute | `false` |
 
-See [`../../base/terraform/variables.tf`](../../base/terraform/variables.tf) for the full set of toggleable base-module variables.
+See [`../base/terraform/variables.tf`](../base/terraform/variables.tf) for the full set of toggleable base-module variables.
 
 ## Troubleshooting
 
