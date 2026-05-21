@@ -1,25 +1,22 @@
 # SandboxTemplate — gVisor tier (basic).
 #
-# Same shape as sandbox-runc with one difference: runtimeClassName=gvisor
-# plus the matching NodePool toleration. gVisor's Sentry intercepts syscalls
-# in userspace, providing a significantly stronger isolation boundary than
-# runc's namespace+cgroup-only model at ~1.5s cold start cost (SPEC §3.1).
+# Same shape as sandbox-runc plus runtimeClassName: gvisor and the matching
+# NodePool toleration. gVisor's Sentry intercepts syscalls in userspace,
+# providing a significantly stronger isolation boundary than runc's
+# namespace+cgroup-only model at ~1.5s cold-start cost.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes — requires the gVisor RuntimeClass
 #     + a NodePool with the runsc containerd shim installed (see
 #     runtimeclass-gvisor.yaml + karpenter-nodepool-gvisor.yaml).
-#   - EKS Auto Mode: NO — Auto Mode does not expose node-level hooks for
-#     installing custom containerd shims. Auto Mode workloads claim
-#     sandbox-runc instead.
+#   - EKS Auto Mode: NO — Auto Mode workloads claim sandbox-runc instead.
 #
-# The Pod spec mirrors sandbox-runc.yaml exactly so claims can switch
-# freely between tiers without re-plumbing the workload — the only
-# differences are runtimeClassName and the matching NoSchedule toleration.
+# Pod spec mirrors sandbox-runc.yaml exactly so claims can switch freely
+# between tiers without re-plumbing the workload.
 #
 # Templates that build on this:
-#   - blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml
-#     adds python:3.12-slim + agent-script ConfigMap mount + Bedrock env vars
+#   - blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml adds
+#     python:3.12-slim + agent-script ConfigMap mount + Bedrock env
 #     for the reference agent.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
@@ -61,7 +58,7 @@ spec:
           securityContext:
             # gVisor's Sentry handles syscall interception so seccomp isn't
             # the primary boundary, but we keep the hardened PodSecurityContext
-            # aligned with the standard template so tier comparisons are
+            # aligned with the runc template so tier comparisons are
             # apples-to-apples — only the runtime + toleration vary.
             runAsNonRoot: true
             runAsUser: 101

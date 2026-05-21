@@ -69,7 +69,7 @@ The basic templates (`sandbox-runc` for runc on both modes, `sandbox-gvisor` for
 - `runAsNonRoot: true`, `runAsUser: 101`, `readOnlyRootFilesystem: true`
 - `allowPrivilegeEscalation: false`, `capabilities.drop: [ALL]`
 - emptyDir mounts at `/var/cache/nginx`, `/var/run`, `/tmp` (so readOnlyRootFilesystem holds for the default nginx workload)
-- Pod labels `egress-tier: sandbox` + `agent-sandbox/tier: <standard|gvisor>` — these are matched by the egress example's network policies if you layer it on later
+- Pod labels `egress-tier: sandbox` + `agent-sandbox/tier: <runc|gvisor>` — these are matched by the egress example's network policies if you layer it on later
 - `runtimeClassName: gvisor` + matching `tolerations` (gvisor template only) — schedules onto the gVisor Karpenter NodePool
 
 The default workload image is `nginx:alpine` so the templates produce a Pod that runs out of the box. Swap it out by writing your own SandboxTemplate (copy the basic template, change the image, change the volumeMounts to fit your workload, give it a unique `metadata.name`) and pointing a SandboxClaim at it.
@@ -105,7 +105,7 @@ kubectl describe pod sandbox-basic -n agent-sandboxes
 kubectl get nodeclaims -o wide
 ```
 
-If you're on Auto Mode and seeing scheduling issues, verify the basic standard template applied:
+If you're on Auto Mode and seeing scheduling issues, verify the basic runc template applied:
 
 ```bash
 kubectl get sandboxtemplate -n agent-sandboxes sandbox-runc

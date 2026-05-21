@@ -21,7 +21,7 @@ Mode-aware FQDN egress enforcement for the agent-sandbox blueprint. Auto-detects
 
 ### Standard EKS positioning
 
-Cilium is one of several service meshes that can chain on top of VPC CNI for FQDN filtering — Istio, Linkerd, and others support similar patterns. Cilium is used in this blueprint for convenience (one dependency covers both enforcement and observability via Hubble, CNCF-graduated status, smaller operational surface than mesh alternatives), not out of architectural necessity.
+Cilium is one of several CNIs that can chain on top of VPC CNI for FQDN filtering — Calico and others support similar patterns. Cilium is used in this blueprint for convenience (one dependency covers both enforcement and observability via Hubble, CNCF-graduated status, smaller operational surface than alternatives), not out of architectural necessity.
 
 ### Auto Mode requirements
 

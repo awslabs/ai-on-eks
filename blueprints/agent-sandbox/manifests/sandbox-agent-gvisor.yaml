@@ -1,23 +1,21 @@
 # SandboxTemplate — agent (gVisor tier).
 #
 # Reference-agent-shaped variant of sandbox-gvisor. Same runtime
-# (gVisor's runsc), same security context, same egress labels, plus the
-# bits the reference agent needs:
+# (gVisor's runsc), security context, and egress labels, plus what the
+# reference agent needs:
 #   - python:3.12-slim image
 #   - sandbox-agent-sa ServiceAccount (IRSA-bound at install time)
 #   - agent-script ConfigMap mount
 #   - Bedrock + HOME env vars
 #
-# The Pod spec mirrors sandbox-agent-runc exactly — the only differences
-# are runtimeClassName: gvisor and the matching NoSchedule toleration on
-# the gVisor NodePool. Claims can switch freely between the two agent
-# templates without re-plumbing.
+# Pod spec mirrors sandbox-agent-runc exactly — only runtimeClassName
+# and the gVisor NodePool toleration differ.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes — requires the gVisor RuntimeClass
 #     + a NodePool with the runsc containerd shim installed.
-#   - EKS Auto Mode: NO — Auto Mode workloads claim
-#     sandbox-agent-runc instead.
+#   - EKS Auto Mode: NO — Auto Mode workloads claim sandbox-agent-runc
+#     instead.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxTemplate
 metadata:

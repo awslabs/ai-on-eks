@@ -12,16 +12,16 @@
 - [Prerequisites](#prerequisites)
 - [Quick Start Guide](#quick-start-guide)
   - [Deploy the Infrastructure](#deploy-the-infrastructure)
-  - [Apply the Workload Manifests](#apply-the-workload-manifests)
-  - [Add Egress Enforcement](#add-egress-enforcement)
-  - [Validate the Deployment](#validate-the-deployment)
+  - [Apply the Platform Manifests](#apply-the-platform-manifests)
+  - [Layer a Blueprint](#layer-a-blueprint)
+  - [Basic Sandbox Configuration](#basic-sandbox-configuration)
 - [Configuration Options](#configuration-options)
 - [Troubleshooting](#troubleshooting)
 - [Cleanup](#cleanup)
 
 ## Overview
 
-This solution deploys a secure, FQDN-filtered Kubernetes environment for running isolated AI agent workloads on Amazon EKS. It combines the [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller (CRD-driven sandbox lifecycle management) with runtime-level isolation tiers (`standard` = runc, `gvisor` = userspace syscall interception via [runsc](https://gvisor.dev/)) and composable egress enforcement (chained Cilium FQDN filtering today, EKS-native `ApplicationNetworkPolicy` on Auto Mode).
+This solution deploys a secure, FQDN-filtered Kubernetes environment for running isolated AI agent workloads on Amazon EKS. It combines the [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) controller (CRD-driven sandbox lifecycle management) with runtime-level isolation tiers (`runc` = Linux namespace+cgroup isolation, `gvisor` = userspace syscall interception via [runsc](https://gvisor.dev/)) and composable egress enforcement (chained Cilium FQDN filtering today, EKS-native `ApplicationNetworkPolicy` on Auto Mode).
 
 Agents that execute model-generated code need two guarantees the default Kubernetes pod doesn't provide:
 
@@ -46,7 +46,7 @@ flowchart TB
 
     subgraph C["RuntimeClass selection"]
         direction LR
-        C1["<b>standard</b> (runc)<br/>Default K8s runtime<br/>Cold start ~1s"]:::runtime
+        C1["<b>runc</b> (default)<br/>Linux namespaces + cgroups<br/>Cold start ~1s"]:::runtime
         C2["<b>gvisor</b> (runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
     end
 
@@ -72,7 +72,7 @@ Two composition paths ship with the blueprint that layers on top of this infra:
 - **SandboxClaim** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml)) — a thin claim that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
 - **KRO AgentSandbox** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — the same workload composed via a single `AgentSandbox` custom resource. The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap`, and Bedrock region/model and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce equivalent running pods. Each tier (standard, gvisor) is a SandboxTemplate the claim or AgentSandbox can target.
+Both paths produce equivalent running pods. Each tier (`runc`, `gvisor`) is a SandboxTemplate the claim or AgentSandbox can target.
 
 ## Components
 
@@ -91,7 +91,7 @@ Each tier is a weaker boundary than the one below it — tier choice maps to a t
 
 | Tier | Boundary | Protects against | Does NOT protect against |
 |------|----------|------------------|--------------------------|
-| `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
+| `runc` (basic) | Linux namespaces + seccomp | Other pods in the cluster (network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
 | `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for ~99% of common syscalls (Sentry serves restricted subset). Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); some specialized syscalls fall back to host (ptrace, certain perf paths); Sentry itself is a trusted computing base |
 | Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization support which EKS Managed Node Groups do not yet provide. See [tracking issue](https://github.com/awslabs/ai-on-eks/issues) for status. |
 
@@ -99,7 +99,7 @@ Each tier is a weaker boundary than the one below it — tier choice maps to a t
 
 1. Does your agent execute untrusted code (prompts that generate + run code, user-uploaded scripts, model-generated shell)?
    - **Yes** → `gvisor` or Kata+Firecracker (once available). Syscall isolation is the differentiator.
-   - **No** → `standard` may be sufficient; network policy + RBAC still apply.
+   - **No** → `runc` may be sufficient; network policy + RBAC still apply.
 
 2. Does your threat model include malicious first-party code (a compromised agent image, an insider-threat scenario)?
    - **Yes** → Kata+Firecracker (hardware boundary) when available.
@@ -145,7 +145,7 @@ Bedrock inference is billed per-token by the model provider and is independent o
 ### Kubernetes Security
 
 - **runAsNonRoot**, **readOnlyRootFilesystem**, **capabilities drop ALL**, **allowPrivilegeEscalation: false** in the default sandbox pod spec.
-- **RuntimeClass selection** (`gvisor` vs default) is the primary isolation signal.
+- **RuntimeClass selection** (`gvisor` vs cluster default) is the primary isolation signal.
 - **Karpenter NodePool taints** (`agent-sandbox/runtime=gvisor:NoSchedule`) ensure only tolerating pods land on gVisor-capable nodes, preventing incidental scheduling of non-sandboxed workloads.
 
 ## Prerequisites
@@ -285,40 +285,32 @@ See [`../../base/terraform/variables.tf`](../../base/terraform/variables.tf) for
 
 ## Troubleshooting
 
-### `pod/sandbox-agent` stuck in Pending
+### Sandbox pod stuck in Pending (gVisor tier)
 
-Most commonly: the gVisor Karpenter NodePool hasn't applied, or the runsc shim user-data is still installing on a fresh node. Check:
+The gVisor Karpenter NodePool hasn't applied, or the runsc shim user-data is still installing on a fresh node. Check:
 
 ```bash
-kubectl describe pod sandbox-agent -n agent-sandboxes
+kubectl describe pod <pod-name> -n agent-sandboxes
 kubectl get nodeclaims -o wide
 kubectl describe nodeclaim <gvisor-nodeclaim-name>
 ```
 
 First pod on a fresh gVisor node takes 60-90s (Karpenter bootstrap + runsc shim install via AL2023 user-data). Subsequent pods on the same node are ~1.5s.
 
-### `AccessDenied: AssumeRoleWithWebIdentity`
+### `agent-sandbox-system` namespace missing or controller not running
 
-The IAM role's trust policy subject doesn't match the ServiceAccount path. Verify:
-
-```bash
-aws iam get-role --role-name <role-name> --query 'Role.AssumeRolePolicyDocument' --output json
-```
-
-The `StringEquals`/`StringLike` condition must include `system:serviceaccount:agent-sandboxes:sandbox-agent-sa` (and `:composed-sandbox` if you're using the KRO path). Update via `aws iam update-assume-role-policy`.
-
-### Agent runs but output is empty
-
-The container's `cp /config/agent.py /workspace/agent.py` happens once at pod start. If the ConfigMap was updated after the pod was Ready, the workspace still has the old content. Recreate the pod:
+The base infra ArgoCD Application didn't sync. Check:
 
 ```bash
-kubectl delete pod sandbox-agent -n agent-sandboxes
-kubectl -n agent-sandboxes wait --for=condition=Ready pod/sandbox-agent --timeout=120s
+kubectl get applications -n argocd agent-sandbox -o jsonpath='{.status.sync.status}'
+kubectl get applications -n argocd agent-sandbox -o jsonpath='{.status.health.status}'
 ```
 
-### Hubble UI shows no flows for `agent-sandboxes` namespace
+If `OutOfSync` or `Degraded`, look at the Application events for the underlying error. Most commonly: the chart version pinned in `agent_sandbox_version` doesn't exist in the upstream repo. Override via tfvars and re-apply.
 
-Hubble UI's default Service Map filters blacklist DNS events and pods without sustained TCP traffic. The FQDN-block step (Step 4 of the reference agent) produces only DNS events (Cilium's DNS proxy returns empty answer), so nothing appears in the Service Map. This is expected — the L3/L4 block in Step 5 (raw TCP to 8.8.8.8) produces a visible DROPPED flow. Use `cilium observe --namespace agent-sandboxes` to see the DNS proxy verdicts.
+### Workload-specific troubleshooting
+
+For reference-agent specific issues (`AccessDenied` on Bedrock, empty agent output, FQDN block returning PASS), see the [reference blueprint's troubleshooting section](../../blueprints/agent-sandbox/README.md#troubleshooting).
 
 ## Cleanup
 

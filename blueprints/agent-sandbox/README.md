@@ -12,7 +12,7 @@
   - [Automated conformance run](#automated-conformance-run)
 - [KRO composition path](#kro-composition-path)
 - [Egress enforcement](#egress-enforcement)
-- [Two Enforcement Layers, Two Observability Surfaces](#two-enforcement-layers-two-observability-surfaces)
+- [Two enforcement layers, two observability surfaces](#two-enforcement-layers-two-observability-surfaces)
 - [Adapting the agent](#adapting-the-agent)
 - [Files in this directory](#files-in-this-directory)
 - [Troubleshooting](#troubleshooting)
@@ -143,7 +143,7 @@ cd egress
 
 The `install.sh` also provisions the Bedrock IRSA role used by the reference agent (idempotent; updates the trust policy on cluster recreation so OIDC drift doesn't break re-runs). The role ARN is echoed at the end for use with `conformance.sh`. Run `./install.sh irsa` to refresh the role only without re-running policy installation. See [`egress/README.md`](egress/README.md) for allowlist-template usage and migration paths between the two enforcement backends.
 
-## Two Enforcement Layers, Two Observability Surfaces
+## Two enforcement layers, two observability surfaces
 
 The reference agent's Step 4 and Step 5 exercise two distinct enforcement contracts, each with a different observability surface:
 
@@ -185,16 +185,19 @@ For larger agents where a ConfigMap mount is impractical, bake `agent.py` into a
 
 ## Files in this directory
 
-| File | Purpose |
+| File / subdirectory | Purpose |
 |------|---------|
 | `agent.py` | The reference agent — 5 steps demonstrating FQDN + L3/L4 enforcement |
 | `conformance.sh` | Automated end-to-end test — applies the SandboxClaim, runs the agent, asserts PASS/BLOCKED markers |
 | `manifests/sandbox-agent.yaml` | SandboxClaim + ServiceAccount + agent-script ConfigMap |
+| `manifests/sandbox-agent-runc.yaml` | Agent-shaped SandboxTemplate for the runc tier |
+| `manifests/sandbox-agent-gvisor.yaml` | Agent-shaped SandboxTemplate for the gVisor tier |
 | `manifests/kro/{rgd,instance}.yaml` | KRO composition path — optional |
-| `egress/` | Egress enforcement example (mode-aware, Cilium + ANP) |
+| `basic/` | Smallest viable Sandbox deployment — see [`basic/README.md`](basic/README.md) |
+| `egress/` | Egress enforcement example (mode-aware, Cilium + ANP) — see [`egress/README.md`](egress/README.md) |
 | `README.md` | This file |
 
-The platform primitives this blueprint depends on (RuntimeClass, SandboxTemplates, namespace, gVisor Karpenter NodePool, IAM templates) live in the [parent infra](../../infra/agent-sandbox/manifests/).
+The platform primitives this blueprint depends on (RuntimeClass, basic SandboxTemplates, namespace, gVisor Karpenter NodePool, IAM templates) live in the [parent infra](../../infra/agent-sandbox/manifests/).
 
 ## Troubleshooting
 

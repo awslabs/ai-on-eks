@@ -1,23 +1,19 @@
 # SandboxTemplate — agent (runc tier).
 #
-# Reference-agent-shaped variant of sandbox-runc. Same runtime
-# (runc), same security context, same egress labels, plus the bits the
-# reference agent needs:
+# Reference-agent-shaped variant of sandbox-runc. Same runtime, security
+# context, and egress labels, plus what the reference agent needs:
 #   - python:3.12-slim image
 #   - sandbox-agent-sa ServiceAccount (IRSA-bound at install time)
-#   - agent-script ConfigMap mount (`sandbox-agent-script` populated by
+#   - agent-script ConfigMap mount (sandbox-agent-script, populated by
 #     conformance.sh / install.sh)
 #   - Bedrock + HOME env vars
 #
-# This template is the workload-side counterpart to the platform-side
-# sandbox-runc. The conformance test claims sandbox-agent-runc on
-# Auto Mode (gVisor unavailable) and sandbox-agent-gvisor on
-# Standard EKS.
+# Conformance claims this template on Auto Mode (gVisor unavailable)
+# and sandbox-agent-gvisor on Standard EKS.
 #
-# Adopters who want a different agent runtime (Node, Go, custom image)
-# copy this template, swap the image + env, and write a SandboxClaim
-# pointing at the new template name. Platform primitives live in
-# infra/agent-sandbox/manifests/sandbox-runc.yaml.
+# Adopters with a different agent runtime (Node, Go, custom image) copy
+# this template, swap the image + env, and point a SandboxClaim at the
+# new name. Platform primitives live in infra/agent-sandbox/manifests/.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes

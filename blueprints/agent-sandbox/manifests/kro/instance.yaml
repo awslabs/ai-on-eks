@@ -17,9 +17,13 @@
 # so the composition is complete once both resources are applied
 # to the same namespace.
 #
-# Apply-time substitutions (handled by conformance.sh and the egress
-# install.sh paths):
-#   __RUNTIME_CLASS__   : `gvisor` on Standard EKS, `standard` on Auto Mode.
+# Apply-time substitutions:
+#   __RUNTIME_CLASS__   : `gvisor` (the only supported value today; the
+#                          KRO RGD couples runtimeClass into both
+#                          runtimeClassName and tolerations, which only
+#                          works cleanly for gvisor. Auto Mode users
+#                          should use the SandboxClaim path instead — see
+#                          ../sandbox-agent.yaml).
 #   __BEDROCK_ROLE_ARN__: IAM role with bedrock:InvokeModel and IRSA trust
 #                          for system:serviceaccount:agent-sandboxes:composed-sandbox.
 #
@@ -42,8 +46,10 @@ metadata:
   namespace: agent-sandboxes
 spec:
   image: python:3.12-slim
-  # Patched at apply time. Auto Mode does not support gVisor (no node-level
-  # hooks for the runsc shim); set `standard` on Auto Mode clusters.
+  # Patched at apply time. The KRO RGD couples runtimeClass into both
+  # runtimeClassName and tolerations, which only works cleanly for
+  # gvisor. Auto Mode users should use the SandboxClaim path instead
+  # (../sandbox-agent.yaml).
   runtimeClass: __RUNTIME_CLASS__
   # Patched at apply time. See header comment.
   iamRoleArn: "__BEDROCK_ROLE_ARN__"

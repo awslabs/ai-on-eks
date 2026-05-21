@@ -1,19 +1,16 @@
 # Basic SandboxClaim — points at one of the basic SandboxTemplates
 # (sandbox-runc or sandbox-gvisor) installed by the platform infra.
 #
-# This is the smallest viable Sandbox: no IRSA, no agent script, no
-# Bedrock env vars, no FQDN allowlist. Default workload is the
-# nginx:alpine image baked into the basic SandboxTemplate (mirroring
-# the canonical Kubernetes shell-demo example). The intent is to give
-# adopters a working starting point — copy this manifest, swap the
-# template ref, swap the workload via your own SandboxTemplate, layer
-# on egress / IRSA / ConfigMaps as your workload needs.
+# The smallest viable Sandbox: no IRSA, no agent script, no Bedrock env,
+# no FQDN allowlist. Default workload is the nginx:alpine image baked
+# into the basic SandboxTemplate (the K8s shell-demo image). Use this
+# as a working starting point — copy the manifest, swap in your own
+# SandboxTemplate, layer on egress / IRSA / ConfigMaps as needed.
 #
 # Template selection is deferred to apply time:
 #   - Standard EKS → sandboxTemplateRef.name = sandbox-gvisor
 #   - EKS Auto Mode → sandboxTemplateRef.name = sandbox-runc
-# The accompanying install.sh detects the cluster's compute mode and
-# substitutes the right value into __SANDBOX_TEMPLATE__ before applying.
+# install.sh renders the right value into __SANDBOX_TEMPLATE__.
 apiVersion: extensions.agents.x-k8s.io/v1alpha1
 kind: SandboxClaim
 metadata:

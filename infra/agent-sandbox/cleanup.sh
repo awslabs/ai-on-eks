@@ -2,47 +2,32 @@
 # Agent Sandbox solution — hierarchical teardown.
 #
 # Wraps the base module's cleanup.sh with pre/post phases that the
-# base flow doesn't know about:
+# base flow doesn't know about. Phases run in order; each is
+# idempotent and tolerates being skipped if its prerequisites are
+# missing (e.g., partial destroy already removed the cluster).
 #
-#   0. Pre-cleanup: invoke whichever egress example is installed
-#      (chained or native) with its `uninstall` phase. Each example's
-#      uninstall removes its own resources (CNPs/ANPs, Cilium for
-#      chained) AND the Bedrock IRSA role it provisioned. Skipped
-#      silently if the example was never installed.
-#
-#   1. Pre-cleanup: scale Karpenter controller to 0 replicas to stop
-#      it from launching new nodes during teardown. Karpenter's
-#      reconcile loop is the only thing that provisions instances;
-#      scaling it down halts the launch path globally before we
-#      attempt to terminate existing nodes. This prevents the race
-#      where Phase 3's scan terminates the visible set, only to
-#      have Karpenter spin up a replacement before the subnet can
-#      release its ENIs.
-#
-#   2. Pre-cleanup: drop Karpenter finalizers on EC2NodeClass +
-#      NodePool resources before the base destroy starts. Karpenter's
-#      finalizer (`karpenter.k8s.aws/termination`) waits for the
-#      controller to drain managed instances; once the EKS cluster
-#      is being torn down, the controller pod is unschedulable and
-#      finalizers stall indefinitely. Dropping finalizers up front
-#      lets the base destroy walk through cleanly.
-#
-#   3. Pre-cleanup: terminate any lingering Karpenter-provisioned
-#      EC2 instances directly. Subnet deletion blocks on attached
-#      ENIs; terminating instances up front releases the ENIs so
-#      the base destroy completes. Single scan is sufficient because
-#      Phase 1 stopped the controller from launching replacements.
-#
-#   4. Base teardown: cd terraform/_LOCAL && ./cleanup.sh
-#
-#   5. Post-cleanup: sweep auxiliary AWS resources by tag. Terraform
-#      should handle these on a clean destroy, but state-loss or
-#      partial-destroy scenarios leave behind:
-#        - EC2 placement groups (e.g., agent-sandbox-nvidia-gpu)
-#        - KMS aliases (alias/eks/<cluster>)
-#        - CloudWatch log groups (/aws/eks/<cluster>/cluster)
-#      Walk each resource type by name prefix or tag and delete
-#      idempotently. Safe to re-run.
+#   0. Egress example uninstall — removes any installed CNPs/ANPs +
+#      Bedrock IRSA role provisioned by the egress example.
+#   1. Karpenter scale-down — sets controller replicas to 0 so it
+#      stops launching replacement nodes during teardown. Without
+#      this, Phase 3's instance sweep hits a race where new nodes
+#      come up faster than ENIs can release.
+#   2. Karpenter finalizer drop — patches EC2NodeClass + NodePool
+#      finalizers to empty. The `karpenter.k8s.aws/termination`
+#      finalizer waits for the controller, which is unschedulable
+#      once the cluster destroy starts, so finalizers stall
+#      indefinitely without this step.
+#   3. Karpenter instance termination — terminates lingering
+#      Karpenter-launched EC2 instances directly. Subnet deletion
+#      blocks on attached ENIs; releasing them up front lets the
+#      base destroy walk through cleanly.
+#   4. Base teardown — `terraform destroy` with retry-and-verify.
+#      Re-runs up to 3 times if VPC or EKS cluster persist after
+#      the destroy returns; verification queries AWS state directly
+#      rather than trusting script exit codes.
+#   5. Auxiliary AWS resource sweep — placement groups, KMS aliases,
+#      CloudWatch log groups. Terraform handles these on a clean
+#      destroy; this phase covers state-loss / partial-destroy cases.
 #
 # Usage:
 #   cd infra/agent-sandbox

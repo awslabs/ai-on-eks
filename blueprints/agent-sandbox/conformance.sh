@@ -2,28 +2,26 @@
 # Agent Sandbox blueprint — end-to-end conformance test.
 #
 # Validates the full chain that the blueprint installs:
-#   - agent-sandbox controller resolves a SandboxClaim against its template
-#   - On Standard EKS: Karpenter provisions a gVisor-runtime node on demand
-#   - On Auto Mode: managed compute provisions a standard-runtime node
-#   - IRSA injects Bedrock credentials into the sandbox pod
-#   - Egress allowlist permits pypi.org + bedrock-runtime + sts
-#   - Egress allowlist blocks a non-allowlisted FQDN and raw IP
+#   - agent-sandbox controller resolves the SandboxClaim against an
+#     agent-shaped SandboxTemplate (sandbox-agent-runc on Auto Mode,
+#     sandbox-agent-gvisor on Standard EKS — auto-detected).
+#   - Compute provisions the right node tier (Karpenter gVisor on
+#     Standard EKS, EKS-managed node on Auto Mode).
+#   - IRSA injects Bedrock credentials into the sandbox pod.
+#   - Egress allowlist permits pypi.org + bedrock-runtime + sts and
+#     blocks a non-allowlisted FQDN and raw IP.
 #
 # Run after `infra/agent-sandbox/install.sh` and the egress example
-# (`blueprints/agent-sandbox/egress/install.sh`) have completed
-# successfully. Exits 0 on pass, 1 on any failure. No interactive prompts.
+# (`blueprints/agent-sandbox/egress/install.sh`) have completed.
+# Exits 0 on pass, 1 on any failure. No interactive prompts.
 #
 # Usage:
 #   CLUSTER_NAME=agent-sandbox \
 #   BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role-with-bedrock-invokemodel> \
 #     ./conformance.sh
 #
-# Region resolution: the blueprint can run in any region where the
-# target Bedrock model is available. The script auto-resolves the
-# cluster's region from (in priority order) the solution's tfvars,
-# AWS_REGION env, AWS_DEFAULT_REGION env, the active kubectl context,
-# and finally the base module default (us-west-2). Set AWS_REGION
-# explicitly to override.
+# Region is auto-resolved (tfvars > AWS_REGION > AWS_DEFAULT_REGION >
+# kubectl context > us-west-2 default). Set AWS_REGION to override.
 
 set -euo pipefail
 

@@ -1,27 +1,25 @@
-# Reference SandboxClaim — the per-instance binding that points at one
-# of the SandboxTemplates and provides the per-deployment glue
+# Reference SandboxClaim — per-instance binding that points at one
+# of the agent SandboxTemplates plus the per-deployment glue
 # (ServiceAccount + agent-script ConfigMap).
 #
-# This is the SandboxClaim variant of the SIG-Apps agent-sandbox API
-# pattern: the runtime spec (image, env vars, security context, volume
-# layout) lives in the SandboxTemplate; the claim adds only the bits
-# that are deployment-specific — IRSA wiring on the SA, the script
-# ConfigMap the agent reads, and a pointer to the chosen template.
+# The runtime spec (image, env, securityContext, volumes) lives in the
+# SandboxTemplate; the claim adds only deployment-specific bits — IRSA
+# wiring on the SA, the script ConfigMap the agent reads, and a pointer
+# to the chosen template.
 #
 # Template selection is deferred to apply time:
 #   - Standard EKS → sandboxTemplateRef.name = sandbox-agent-gvisor
 #   - EKS Auto Mode → sandboxTemplateRef.name = sandbox-agent-runc
-# The conformance script and the install path render the right value
-# into __SANDBOX_TEMPLATE__ before applying. Customers adopting the
-# blueprint can hardcode whichever tier matches their cluster.
+# conformance.sh renders the right value into __SANDBOX_TEMPLATE__
+# before applying. Adopters can hardcode the tier that matches their
+# cluster.
 #
-# IAM:
-#   - The ServiceAccount is annotated with the IRSA role at install
-#     time. Pod Identity is NOT used because gVisor's Sentry network
-#     namespace doesn't forward the link-local route to the Pod
-#     Identity credential endpoint at 169.254.170.23 — IRSA routes
-#     through STS over the regular network path, which works on both
-#     gVisor and standard tiers.
+# IRSA over Pod Identity: the SA is annotated with the IRSA role at
+# install time. Pod Identity is NOT used because gVisor's Sentry
+# network namespace doesn't forward the link-local route to the Pod
+# Identity credential endpoint at 169.254.170.23. IRSA routes through
+# STS over the regular network path, which works on both runc and
+# gVisor tiers.
 ---
 apiVersion: v1
 kind: ServiceAccount

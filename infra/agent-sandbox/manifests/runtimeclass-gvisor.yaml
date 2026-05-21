@@ -1,7 +1,7 @@
 # gVisor RuntimeClass — points at the containerd `runsc` handler that
 # the gVisor shim installs during node bootstrap. Sandboxes declaring
 # `runtimeClassName: gvisor` get scheduled onto nodes that have this
-# handler registered, and runc pods land on the standard-tier pool.
+# handler registered; runc pods land on the cluster's default pool.
 #
 # The node selector on the RuntimeClass itself ensures that any pod
 # requesting this class is constrained to gVisor-capable nodes,

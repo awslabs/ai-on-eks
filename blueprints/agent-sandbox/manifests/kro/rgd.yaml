@@ -5,15 +5,18 @@
 # container with secure execution context + script ConfigMap mount
 # in one declarative unit. Adapts the upstream
 # examples/composing-sandbox-nw-policies/rgd.yaml from the
-# kubernetes-sigs/agent-sandbox project — see SPECIFICATION.md §4.5.
+# kubernetes-sigs/agent-sandbox project.
 #
 # What this adds over the upstream example:
-#   - runtimeClass field (standard | gvisor | kata-fc) that propagates
-#     to the child Sandbox's podTemplate.runtimeClassName and the
-#     matching NoSchedule toleration.
-#   - iamRoleArn field that annotates the ServiceAccount for EKS
-#     IRSA wiring (not Pod Identity — per SPEC §4.6.1, Pod Identity
-#     can't route through gVisor's Sentry network namespace).
+#   - runtimeClass field (gvisor today; kata-fc when available) that
+#     propagates to the child Sandbox's podTemplate.runtimeClassName
+#     and the matching NoSchedule toleration. The RGD couples runtimeClass
+#     into both, so it only works cleanly for tiers that have a real
+#     RuntimeClass + matching node taint. Auto Mode (runc default, no
+#     RuntimeClass needed) uses the SandboxClaim path instead.
+#   - iamRoleArn field that annotates the ServiceAccount for IRSA
+#     wiring (not Pod Identity — Pod Identity's link-local credential
+#     endpoint isn't reachable from gVisor's Sentry network namespace).
 #   - scriptConfigMap field that mounts a user-provided agent script
 #     ConfigMap at /config and runs it from /workspace after a one-shot
 #     cp at container start. Matches the direct sandbox-agent.yaml
@@ -44,7 +47,7 @@ spec:
     group: custom.agents.x-k8s.io
     spec:
       image: string | default="python:3.12-slim"
-      runtimeClass: string | default="gvisor" enum="standard,gvisor,kata-fc"
+      runtimeClass: string | default="gvisor" enum="gvisor,kata-fc"
       iamRoleArn: string | default=""
       scriptConfigMap: string | default="sandbox-agent-script"
       awsRegion: string | default="us-east-1"
