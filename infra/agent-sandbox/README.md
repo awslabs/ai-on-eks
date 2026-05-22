@@ -133,7 +133,7 @@ Bedrock inference is billed per-token by the model provider and is independent o
 
 ### Identity and Access Management
 
-- **IRSA** (IAM Roles for Service Accounts) provides AWS credentials to sandboxed pods without static keys. Trust policies scope to `system:serviceaccount:<namespace>:<sa>`. Templates for Bedrock access at `manifests/iam/bedrock-trust-policy.template.json` and `manifests/iam/bedrock-permissions.template.json`.
+- **IRSA** (IAM Roles for Service Accounts) provides AWS credentials to sandboxed pods without static keys. Trust policies scope to `system:serviceaccount:<namespace>:<sa>`. The reference agent ships Bedrock-shaped IRSA templates at [`blueprints/agent-sandbox/manifests/iam/`](../../blueprints/agent-sandbox/manifests/iam/); workloads with different AWS API needs can adapt those templates or supply their own.
 - **Pod Identity is intentionally NOT used for gVisor-tier sandboxes**: the credential endpoint at 169.254.170.23 is not reachable from within Sentry's network namespace. Standard-tier workloads can use Pod Identity; gVisor workloads use IRSA. See [threat model](#runtime-tiers) for the rationale.
 
 ### Network Security

@@ -31,9 +31,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Egress lives at blueprints/agent-sandbox/egress/. The platform infra
-# (terraform tfvars, IAM templates) lives at infra/agent-sandbox/.
-INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/agent-sandbox" && pwd)"
+# Egress lives at blueprints/agent-sandbox/egress/. The blueprint root
+# (containing the IAM templates) is one level up.
+BLUEPRINT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PHASE="${1:-install}"
 
 # Resolved on demand by phases that need it. Single source of truth so
@@ -150,8 +150,8 @@ install_policies() {
 # permission policy so it stays in sync with the template.
 bootstrap_irsa() {
     resolve_cluster_context
-    local trust_template="$INFRA_DIR/manifests/iam/bedrock-trust-policy.template.json"
-    local perms_template="$INFRA_DIR/manifests/iam/bedrock-permissions.template.json"
+    local trust_template="$BLUEPRINT_DIR/manifests/iam/bedrock-trust-policy.template.json"
+    local perms_template="$BLUEPRINT_DIR/manifests/iam/bedrock-permissions.template.json"
     local trust_rendered=$(mktemp -t agent-sandbox-trust.XXXXXX.json)
     local perms_rendered=$(mktemp -t agent-sandbox-perms.XXXXXX.json)
     trap "rm -f $trust_rendered $perms_rendered" RETURN
