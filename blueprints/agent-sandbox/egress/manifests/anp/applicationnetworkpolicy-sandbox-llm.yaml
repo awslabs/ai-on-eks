@@ -1,0 +1,84 @@
+# Per-sandbox FQDN egress allowlist — native EKS Auto Mode variant.
+#
+# Scope: the `agent-sandboxes` namespace, pods labeled `egress-tier:
+# sandbox`. Both SandboxTemplates (standard + gVisor) apply this
+# label via podTemplate.metadata.labels so every claimed sandbox
+# inherits the allowlist automatically.
+#
+# Allowed destinations:
+#   - Bedrock runtime API                   — the reference agent's LLM call
+#   - STS                                   — IRSA auth for Bedrock
+#   - PyPI + pythonhosted                   — pip install inside the sandbox
+#
+# Everything else is denied by default (namespace-scoped ANP with
+# only explicit Allow entries = implicit deny for unlisted flows).
+#
+# Enforcement behavior: ApplicationNetworkPolicy enforces FQDN rules
+# via the VPC CNI's DNS proxy (returns empty DNS answer for denied
+# FQDNs) and L3/L4 rules via eBPF on the pod's veth. The reference
+# agent's Step 4 (FQDN block) exercises the DNS-proxy path; Step 5
+# (IP block) exercises the L3/L4 path.
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: sandbox-llm-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+spec:
+  podSelector:
+    matchLabels:
+      egress-tier: sandbox
+  policyTypes:
+    - Egress
+  egress:
+    # 1. DNS resolution.
+    #    On EKS Auto Mode, the cluster DNS (at 172.20.0.10 in the
+    #    service CIDR by default) is not backed by a visible
+    #    `kube-dns` Service — it's provided by the managed compute
+    #    layer. Allow by IP block instead of by selector, covering
+    #    the whole default service CIDR (172.20.0.0/16) so this
+    #    template works regardless of which IP the resolver lands on.
+    #    On Standard EKS / chained egress, the CNP variant uses the
+    #    k8s-app=kube-dns selector that exists there.
+    - to:
+        - ipBlock:
+            cidr: 172.20.0.0/16
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 2. EKS Pod Identity credential endpoint (169.254.170.23).
+    #    Preserved for standard-tier workloads that use Pod Identity.
+    #    gVisor workloads use IRSA over the regular network path.
+    - to:
+        - ipBlock:
+            cidr: 169.254.170.23/32
+      ports:
+        - protocol: TCP
+          port: 80
+
+    # 3. Allowed FQDNs — Bedrock + STS + PyPI.
+    #    Note: native ApplicationNetworkPolicy supports wildcards only
+    #    as the leftmost label (e.g., `*.amazonaws.com`), not between
+    #    labels. Enumerate common AWS regions explicitly; consumers in
+    #    other regions should add an entry matching their region. The
+    #    Cilium/chained equivalent uses `matchPattern` which supports
+    #    embedded wildcards, so the chained template is more compact.
+    - to:
+        - domainNames:
+            - "bedrock-runtime.us-east-1.amazonaws.com"
+            - "bedrock-runtime.us-west-2.amazonaws.com"
+            - "bedrock.us-east-1.amazonaws.com"
+            - "bedrock.us-west-2.amazonaws.com"
+            - "sts.us-east-1.amazonaws.com"
+            - "sts.us-west-2.amazonaws.com"
+            - "sts.amazonaws.com"
+            - "pypi.org"
+            - "*.pypi.org"
+            - "*.pythonhosted.org"
+      ports:
+        - protocol: TCP
+          port: 443

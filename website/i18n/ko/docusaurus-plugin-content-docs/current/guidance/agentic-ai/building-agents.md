@@ -10,7 +10,7 @@ sidebar_label: 에이전트 구축 및 배포
 
 시작하기 전에 다음을 준비하세요:
 
-- [Agents on EKS 인프라](https://awslabs.github.io/ai-on-eks/docs/infra/agents-on-eks)가 배포되어 있어야 합니다
+- [Agents on EKS 인프라](https://awslabs.github.io/ai-on-eks/docs/infra/agents/agents-on-eks)가 배포되어 있어야 합니다
 - 로컬에서 실행 가능한 에이전트 (에이전트 코드 구조화에 대한 [에이전트 개발 모범 사례](./best-practices.md)와 [Strands Agents SDK](https://strandsagents.com) 참조)
 - EKS 클러스터에 액세스할 수 있도록 `kubectl`이 구성되어 있어야 합니다
 - Docker Desktop 또는 Podman이 로컬에 설치되어 있어야 합니다

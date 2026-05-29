@@ -1,0 +1,156 @@
+# AgentSandbox ResourceGraphDefinition.
+#
+# Composes an agent-sandbox into a single user-facing CRD that picks
+# a runtime tier + ServiceAccount + IRSA annotation + workload
+# container with secure execution context + script ConfigMap mount
+# in one declarative unit. Adapts the upstream
+# examples/composing-sandbox-nw-policies/rgd.yaml from the
+# kubernetes-sigs/agent-sandbox project.
+#
+# What this adds over the upstream example:
+#   - runtimeClass field (gvisor today; kata-fc when available) that
+#     propagates to the child Sandbox's podTemplate.runtimeClassName
+#     and the matching NoSchedule toleration. The RGD couples runtimeClass
+#     into both, so it only works cleanly for tiers that have a real
+#     RuntimeClass + matching node taint. Auto Mode (runc default, no
+#     RuntimeClass needed) uses the SandboxClaim path instead.
+#   - iamRoleArn field that annotates the ServiceAccount for IRSA
+#     wiring (not Pod Identity — Pod Identity's link-local credential
+#     endpoint isn't reachable from gVisor's Sentry network namespace).
+#   - scriptConfigMap field that mounts a user-provided agent script
+#     ConfigMap at /config and runs it from /workspace after a one-shot
+#     cp at container start. Matches the direct sandbox-agent.yaml
+#     shape so the composed pod runs the reference agent with the
+#     same hardened execution context.
+#   - awsRegion + bedrockModelId env-var plumbing, default secure
+#     container context (readOnlyRootFilesystem, runAsNonRoot,
+#     capabilities drop ALL, HOME override for pip install --user),
+#     resource requests/limits, and workspace + tmp emptyDir volumes.
+#
+# Egress policy composition is deferred to a separate
+# CiliumNetworkPolicy (or ApplicationNetworkPolicy when the native-
+# egress blueprint is installed) because CEL expressions inside a
+# KRO RGD can't yet produce the list-of-object shape that toFQDNs /
+# domainNames expect cleanly. A follow-up KRO update (tracked upstream
+# in the CEL library changes described in the v0.9.0 release notes)
+# may enable composing the policy inline; until then, the policy
+# stays as a sibling manifest the user applies alongside the
+# AgentSandbox instance.
+apiVersion: kro.run/v1alpha1
+kind: ResourceGraphDefinition
+metadata:
+  name: agent-sandbox
+spec:
+  schema:
+    apiVersion: v1alpha1
+    kind: AgentSandbox
+    group: custom.agents.x-k8s.io
+    spec:
+      image: string | default="python:3.12-slim"
+      runtimeClass: string | default="gvisor" enum="gvisor,kata-fc"
+      iamRoleArn: string | default=""
+      scriptConfigMap: string | default="sandbox-agent-script"
+      awsRegion: string | default="us-east-1"
+      bedrockModelId: string | default="us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    status:
+      sandboxConditions: ${sandbox.status.conditions}
+  resources:
+    # 1. ServiceAccount with optional IRSA annotation.
+    - id: sa
+      template:
+        apiVersion: v1
+        kind: ServiceAccount
+        metadata:
+          name: ${schema.metadata.name}
+          namespace: ${schema.metadata.namespace}
+          annotations:
+            eks.amazonaws.com/role-arn: ${schema.spec.iamRoleArn}
+
+    # 2. Sandbox — the core primitive. runtimeClassName is the tier
+    #    choice cascading from the user-facing spec. podTemplate
+    #    labels inherit the egress-tier label so the sibling
+    #    CiliumNetworkPolicy / ApplicationNetworkPolicy selects this
+    #    pod without reaching into the AgentSandbox name.
+    #
+    #    Container shape matches the direct sandbox-agent.yaml: cp
+    #    the mounted agent script into a writable workspace, mark
+    #    ready, and sleep so operators can kubectl exec into the
+    #    pod to drive the agent. HOME=/workspace lets pip install
+    #    --user succeed under readOnlyRootFilesystem=true.
+    - id: sandbox
+      readyWhen:
+        - ${sandbox.status.conditions.exists(x, x.type == "Ready" && x.status == "True")}
+      template:
+        apiVersion: agents.x-k8s.io/v1alpha1
+        kind: Sandbox
+        metadata:
+          name: ${schema.metadata.name}
+          namespace: ${schema.metadata.namespace}
+        spec:
+          podTemplate:
+            metadata:
+              labels:
+                egress-tier: sandbox
+                agent-sandbox/tier: ${schema.spec.runtimeClass}
+                agent-sandbox/name: ${schema.metadata.name}
+            spec:
+              serviceAccountName: ${schema.metadata.name}
+              runtimeClassName: ${schema.spec.runtimeClass}
+              tolerations:
+                - key: agent-sandbox/runtime
+                  operator: Equal
+                  value: ${schema.spec.runtimeClass}
+                  effect: NoSchedule
+              containers:
+                - name: agent-runtime
+                  image: ${schema.spec.image}
+                  imagePullPolicy: IfNotPresent
+                  command:
+                    - /bin/sh
+                    - -c
+                    - |
+                      cp /config/agent.py /workspace/agent.py
+                      chmod +x /workspace/agent.py
+                      echo "sandbox ready"
+                      echo "run: kubectl exec -n ${schema.metadata.namespace} ${schema.metadata.name} -c agent-runtime -- python /workspace/agent.py"
+                      sleep infinity
+                  env:
+                    - name: AWS_REGION
+                      value: ${schema.spec.awsRegion}
+                    - name: BEDROCK_MODEL_ID
+                      value: ${schema.spec.bedrockModelId}
+                    - name: HOME
+                      value: /workspace
+                  resources:
+                    requests:
+                      cpu: "500m"
+                      memory: "512Mi"
+                    limits:
+                      cpu: "2"
+                      memory: "2Gi"
+                  securityContext:
+                    runAsNonRoot: true
+                    runAsUser: 1000
+                    readOnlyRootFilesystem: true
+                    allowPrivilegeEscalation: false
+                    capabilities:
+                      drop: ["ALL"]
+                  volumeMounts:
+                    - name: workspace
+                      mountPath: /workspace
+                    - name: tmp
+                      mountPath: /tmp
+                    - name: agent-script
+                      mountPath: /config
+                      readOnly: true
+              volumes:
+                - name: workspace
+                  emptyDir: {}
+                - name: tmp
+                  emptyDir: {}
+                - name: agent-script
+                  configMap:
+                    name: ${schema.spec.scriptConfigMap}
+                    items:
+                      - key: agent.py
+                        path: agent.py

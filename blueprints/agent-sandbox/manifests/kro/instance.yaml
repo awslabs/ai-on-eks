@@ -1,0 +1,59 @@
+# Reference AgentSandbox instance — demonstrates the KRO composition
+# pattern. The ResourceGraphDefinition at kro/rgd.yaml takes this
+# instance and materializes a ServiceAccount + Sandbox in a single
+# declarative unit.
+#
+# Contrast with sandbox-agent.yaml (the SandboxClaim path), which
+# requires three separate resources: SA, agent-script ConfigMap, and
+# the SandboxClaim referencing a SandboxTemplate. The AgentSandbox
+# form collapses the per-deployment glue into this single instance.
+# Both paths produce an equivalent running pod — pick whichever
+# matches your team's preferred surface.
+#
+# Egress policy enforcement is provided by the sibling
+# CiliumNetworkPolicy (chained example) or ApplicationNetworkPolicy
+# (native example) — the AgentSandbox's podTemplate stamps an
+# `egress-tier: sandbox` label that the policy's selector matches,
+# so the composition is complete once both resources are applied
+# to the same namespace.
+#
+# Apply-time substitutions:
+#   __RUNTIME_CLASS__   : `gvisor` (the only supported value today; the
+#                          KRO RGD couples runtimeClass into both
+#                          runtimeClassName and tolerations, which only
+#                          works cleanly for gvisor. Auto Mode users
+#                          should use the SandboxClaim path instead — see
+#                          ../sandbox-agent.yaml).
+#   __BEDROCK_ROLE_ARN__: IAM role with bedrock:InvokeModel and IRSA trust
+#                          for system:serviceaccount:agent-sandboxes:composed-sandbox.
+#
+# Customers adopting the blueprint can hardcode the values that match
+# their cluster.
+#
+# Prerequisites:
+#   1. The reference agent ConfigMap (`sandbox-agent-script`) must
+#      exist in the target namespace. install.sh populates it from
+#      blueprints/agent-sandbox/agent.py. The AgentSandbox
+#      mounts it at /config and cp's it to /workspace/agent.py on
+#      container start.
+#   2. The IAM role referenced by iamRoleArn must include
+#      `system:serviceaccount:agent-sandboxes:composed-sandbox` in
+#      its IRSA trust policy subject list.
+apiVersion: custom.agents.x-k8s.io/v1alpha1
+kind: AgentSandbox
+metadata:
+  name: composed-sandbox
+  namespace: agent-sandboxes
+spec:
+  image: python:3.12-slim
+  # Patched at apply time. The KRO RGD couples runtimeClass into both
+  # runtimeClassName and tolerations, which only works cleanly for
+  # gvisor. Auto Mode users should use the SandboxClaim path instead
+  # (../sandbox-agent.yaml).
+  runtimeClass: __RUNTIME_CLASS__
+  # Patched at apply time. See header comment.
+  iamRoleArn: "__BEDROCK_ROLE_ARN__"
+  # Script ConfigMap to mount at /config. Shared with the SandboxClaim
+  # path so both forms exercise the same reference agent without
+  # duplicating the ConfigMap.
+  scriptConfigMap: sandbox-agent-script

@@ -1,0 +1,51 @@
+# AWS service allowlist — ApplicationNetworkPolicy (native egress variant).
+#
+# Allows outbound HTTPS to core AWS service endpoints that agent
+# workloads most commonly need. IMDS is denied cluster-wide via the
+# admin-tier ClusterNetworkPolicy — don't add it here.
+#
+# Services included:
+#   - STS          — sts.us-east-1 / sts.us-west-2 / sts (IRSA auth)
+#   - Bedrock      — bedrock + bedrock-runtime across us-east-1 and us-west-2
+#   - S3           — s3 across us-east-1 and us-west-2 + virtual-hosted
+#   - DynamoDB     — dynamodb across us-east-1 and us-west-2
+#
+# Equivalent CiliumNetworkPolicy for Standard EKS:
+#   ../cilium/aws-services.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: allowlist-aws-services
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: aws-services
+spec:
+  podSelector:
+    matchLabels:
+      allowlist: aws-services
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - domainNames:
+            # STS — enumerated because native ANP wildcards only
+            # match as leftmost label (no embedded wildcards).
+            - "sts.us-east-1.amazonaws.com"
+            - "sts.us-west-2.amazonaws.com"
+            - "sts.amazonaws.com"
+            # Bedrock runtime + control plane (per region).
+            - "bedrock.us-east-1.amazonaws.com"
+            - "bedrock.us-west-2.amazonaws.com"
+            - "bedrock-runtime.us-east-1.amazonaws.com"
+            - "bedrock-runtime.us-west-2.amazonaws.com"
+            # S3 regional + virtual-hosted style.
+            - "s3.us-east-1.amazonaws.com"
+            - "s3.us-west-2.amazonaws.com"
+            - "*.s3.us-east-1.amazonaws.com"
+            - "*.s3.us-west-2.amazonaws.com"
+            # DynamoDB regional.
+            - "dynamodb.us-east-1.amazonaws.com"
+            - "dynamodb.us-west-2.amazonaws.com"
+      ports:
+        - protocol: TCP
+          port: 443

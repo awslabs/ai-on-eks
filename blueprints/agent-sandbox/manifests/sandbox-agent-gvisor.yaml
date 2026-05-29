@@ -1,0 +1,95 @@
+# SandboxTemplate — agent (gVisor tier).
+#
+# Reference-agent-shaped variant of sandbox-gvisor. Same runtime
+# (gVisor's runsc), security context, and egress labels, plus what the
+# reference agent needs:
+#   - python:3.12-slim image
+#   - sandbox-agent-sa ServiceAccount (IRSA-bound at install time)
+#   - agent-script ConfigMap mount
+#   - Bedrock + HOME env vars
+#
+# Pod spec mirrors sandbox-agent-runc exactly — only runtimeClassName
+# and the gVisor NodePool toleration differ.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes — requires the gVisor RuntimeClass
+#     + a NodePool with the runsc containerd shim installed.
+#   - EKS Auto Mode: NO — Auto Mode workloads claim sandbox-agent-runc
+#     instead.
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-agent-gvisor
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: gvisor
+    agent-sandbox/role: reference-agent
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: gvisor
+        agent-sandbox/role: reference-agent
+    spec:
+      serviceAccountName: sandbox-agent-sa
+      runtimeClassName: gvisor
+      tolerations:
+        - key: agent-sandbox/runtime
+          operator: Equal
+          value: gvisor
+          effect: NoSchedule
+      containers:
+        - name: agent-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/agent.py /workspace/agent.py
+              chmod +x /workspace/agent.py
+              echo "sandbox ready"
+              echo "run: kubectl exec -n agent-sandboxes <sandbox-name> -c agent-runtime -- python /workspace/agent.py"
+              sleep infinity
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_MODEL_ID
+              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+            - name: HOME
+              value: /workspace
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: agent-script
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: agent-script
+          configMap:
+            name: sandbox-agent-script
+            items:
+              - key: agent.py
+                path: agent.py

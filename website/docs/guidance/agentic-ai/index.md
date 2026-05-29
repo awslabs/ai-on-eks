@@ -4,7 +4,7 @@ sidebar_label: Agentic AI on EKS
 
 # Agentic AI on EKS
 
-This section provides guidance for building, deploying, and operating AI agents on Amazon EKS. It is built around the [Agents on EKS](../../infra/agents-on-eks.md) reference environment — an open source environment that brings together source control, CI/CD, observability, vector storage, and MCP tool management into a cohesive infrastructure for running agentic workloads.
+This section provides guidance for building, deploying, and operating AI agents on Amazon EKS. It is built around the [Agents on EKS](../../infra/agents/agents-on-eks.md) reference environment — an open source environment that brings together source control, CI/CD, observability, vector storage, and MCP tool management into a cohesive infrastructure for running agentic workloads.
 
 ## Who Is This For?
 
@@ -33,4 +33,4 @@ The Agents on EKS infrastructure deploys the following components into an EKS cl
 | [Selenium Grid](https://www.selenium.dev/documentation/grid/) | Remote browser automation for agent web browsing |
 | [Jupyter Enterprise Gateway](https://jupyter-enterprise-gateway.readthedocs.io/) | Remote kernel management for agent code execution |
 
-For deployment instructions and configuration options, see the [infrastructure guide](../../infra/agents-on-eks.md).
+For deployment instructions and configuration options, see the [infrastructure guide](../../infra/agents/agents-on-eks.md).

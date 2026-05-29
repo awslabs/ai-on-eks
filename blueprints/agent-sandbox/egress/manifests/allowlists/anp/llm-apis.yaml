@@ -1,0 +1,48 @@
+# LLM API allowlist — ApplicationNetworkPolicy (native egress variant).
+#
+# Allows outbound HTTPS to the most common LLM API providers. Scope
+# matches pods labeled `allowlist: llm-apis` in the agent-sandboxes
+# namespace.
+#
+# Providers included:
+#   - Amazon Bedrock (all regions)
+#   - Anthropic (api.anthropic.com)
+#   - OpenAI (api.openai.com)
+#
+# To extend with other providers, add entries under `domainNames`.
+#
+# Equivalent CiliumNetworkPolicy for Standard EKS:
+#   ../cilium/llm-apis.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: allowlist-llm-apis
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: llm-apis
+spec:
+  podSelector:
+    matchLabels:
+      allowlist: llm-apis
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - domainNames:
+            # Bedrock across common regions — native ANP wildcards
+            # only match as leftmost label (no embedded wildcards).
+            # Enumerate additional regions as needed.
+            - "bedrock-runtime.us-east-1.amazonaws.com"
+            - "bedrock-runtime.us-west-2.amazonaws.com"
+            - "bedrock.us-east-1.amazonaws.com"
+            - "bedrock.us-west-2.amazonaws.com"
+            # STS for IRSA auth path.
+            - "sts.us-east-1.amazonaws.com"
+            - "sts.us-west-2.amazonaws.com"
+            - "sts.amazonaws.com"
+            # Anthropic + OpenAI public endpoints.
+            - "api.anthropic.com"
+            - "api.openai.com"
+      ports:
+        - protocol: TCP
+          port: 443

@@ -261,3 +261,45 @@ resource "kubectl_manifest" "gateway_api_inference_crds_yaml" {
     helm_release.argocd
   ]
 }
+
+# kubernetes-sigs/agent-sandbox controller (Helm chart at the repo's helm/ path).
+# The chart bundles CRDs in helm/crds/; controller.extensions=true enables
+# SandboxWarmPool, SandboxTemplate, and SandboxClaim on top of the core Sandbox CRD.
+resource "kubectl_manifest" "agent_sandbox_yaml" {
+  count = var.enable_agent_sandbox ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/agent-sandbox.yaml", {
+    agent_sandbox_version = var.agent_sandbox_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# KRO (Kube Resource Orchestrator)
+resource "kubectl_manifest" "kro_yaml" {
+  count = var.enable_kro ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/kro.yaml", {
+    kro_version = var.kro_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}
+
+# Cilium (aws-cni chaining mode + Hubble flow observability)
+# Provides L7 features on top of the platform VPC CNI: toFQDNs egress
+# filtering, DNS proxy interception, Hubble UI for flow visibility.
+# Required for chained-mode FQDN egress on Standard EKS; Auto Mode
+# uses native ApplicationNetworkPolicy and should leave this disabled.
+resource "kubectl_manifest" "cilium_yaml" {
+  count = var.enable_cilium ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/cilium.yaml", {
+    cilium_version = var.cilium_version
+  })
+
+  depends_on = [
+    helm_release.argocd
+  ]
+}

@@ -1,0 +1,56 @@
+# AWS service allowlist — CiliumNetworkPolicy (chained egress variant).
+#
+# Allows outbound HTTPS to the AWS service endpoints that agent
+# workloads most commonly need. IMDS access is NOT included — block
+# that via the admin-tier CiliumClusterwideNetworkPolicy so it's
+# denied cluster-wide for the agent-sandboxes namespace.
+#
+# Services included:
+#   - STS          — sts.*.amazonaws.com (IRSA auth)
+#   - Bedrock      — bedrock.*.amazonaws.com + bedrock-runtime.*.amazonaws.com
+#   - S3           — *.s3.*.amazonaws.com + s3.*.amazonaws.com
+#   - DynamoDB     — dynamodb.*.amazonaws.com
+#
+# Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
+#   ../anp/aws-services.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allowlist-aws-services
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: aws-services
+spec:
+  description: "Allow egress to core AWS service APIs (STS, Bedrock, S3, DynamoDB)."
+  endpointSelector:
+    matchLabels:
+      allowlist: aws-services
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "sts.*.amazonaws.com"
+              - matchPattern: "bedrock.*.amazonaws.com"
+              - matchPattern: "bedrock-runtime.*.amazonaws.com"
+              - matchPattern: "s3.*.amazonaws.com"
+              - matchPattern: "*.s3.*.amazonaws.com"
+              - matchPattern: "dynamodb.*.amazonaws.com"
+
+    - toFQDNs:
+        - matchPattern: "sts.*.amazonaws.com"
+        - matchPattern: "bedrock.*.amazonaws.com"
+        - matchPattern: "bedrock-runtime.*.amazonaws.com"
+        - matchPattern: "s3.*.amazonaws.com"
+        - matchPattern: "*.s3.*.amazonaws.com"
+        - matchPattern: "dynamodb.*.amazonaws.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

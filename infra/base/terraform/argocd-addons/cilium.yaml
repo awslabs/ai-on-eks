@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cilium
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://helm.cilium.io/
+    chart: cilium
+    targetRevision: ${cilium_version}
+    helm:
+      valuesObject:
+        # Chaining mode on top of the AWS VPC CNI. VPC CNI keeps
+        # allocating pod IPs and setting up the veth pair; Cilium runs
+        # as a meta-plugin attaching eBPF programs on top. This is the
+        # supported pattern for Standard EKS clusters that want
+        # Cilium's L7 features (FQDN egress filtering, Hubble flow
+        # observability) without replacing the platform CNI.
+        cni:
+          chainingMode: aws-cni
+          exclusive: false
+        # Cluster-pool CIDR for Cilium's host-side cilium_host
+        # interface. NOT used for pod IPs in chaining mode (VPC CNI
+        # owns those). 10.100.0.0/16 is outside both the common VPC
+        # CIDR (10.0.0.0/16) and EKS secondary CIDR (100.64.0.0/16).
+        ipam:
+          mode: cluster-pool
+          operator:
+            clusterPoolIPv4PodCIDRList:
+              - 10.100.0.0/16
+        # Native routing — no encapsulation. VPC CNI handles all
+        # underlay networking.
+        routingMode: native
+        endpointRoutes:
+          enabled: true
+        # Chaining doesn't replace kube-proxy. VPC CNI relies on it.
+        kubeProxyReplacement: false
+        # VPC CNI handles SNAT via the underlying ENI, so Cilium must
+        # not double-masquerade.
+        enableIPv4Masquerade: false
+        # L7 proxy enables FQDN-based egress filtering via DNS proxy
+        # interception — required for toFQDNs CiliumNetworkPolicy.
+        l7Proxy: true
+        # Hubble for flow observability. Bundled by default; opt out
+        # by overriding hubble.enabled=false in the consuming
+        # solution if not needed.
+        hubble:
+          enabled: true
+          relay:
+            enabled: true
+          ui:
+            enabled: true
+          metrics:
+            enabled:
+              - dns
+              - drop
+              - tcp
+              - flow
+              - port-distribution
+              - icmp
+              - http
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

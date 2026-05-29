@@ -1,0 +1,84 @@
+# SandboxTemplate — runc tier (basic).
+#
+# Platform primitive for the runc tier — namespace + cgroup isolation
+# via the default Kubernetes container runtime. Intentionally generic:
+# a hardened Pod spec with no workload-specific assumptions (no agent
+# script, no IRSA-bound SA, no Bedrock env vars). Higher-level templates
+# layer on top by adding what their workload needs.
+#
+# Default workload is nginx:alpine, mirroring the canonical Kubernetes
+# shell-demo example: https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/
+# The image is a placeholder — swap in your own by writing a SandboxTemplate
+# that copies this shape.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes
+#   - EKS Auto Mode: yes (only tier available on Auto Mode — gVisor needs
+#     node-level shim install hooks Auto Mode doesn't expose)
+#
+# Templates that build on this:
+#   - blueprints/agent-sandbox/manifests/sandbox-agent-runc.yaml adds
+#     python:3.12-slim + agent-script ConfigMap mount + Bedrock env
+#     for the reference agent.
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-runc
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: runc
+spec:
+  # Cilium / VPC CNI ANP is the sole policy enforcement path. The
+  # controller's default is Managed, which auto-creates a kubernetes.io/v1
+  # NetworkPolicy alongside the Sandbox — functionally equivalent for
+  # default-allow workloads but creates two policy surfaces to reason about
+  # when debugging. Unmanaged = one policy surface, easier to audit.
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        # Matched by the per-sandbox CiliumNetworkPolicy / ApplicationNetworkPolicy
+        # podSelector when the egress example is layered on. Sandbox pods
+        # without this label don't get the FQDN allowlist — that's a feature,
+        # not a bug, when running the basic blueprint without the egress
+        # example.
+        egress-tier: sandbox
+        agent-sandbox/tier: runc
+    spec:
+      # No runtimeClassName → runc (cluster default).
+      containers:
+        - name: workload
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 101
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            # nginx:alpine writes its PID file + temp config to a few paths
+            # under /var. Carve out emptyDirs so readOnlyRootFilesystem holds.
+            - name: var-cache
+              mountPath: /var/cache/nginx
+            - name: var-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: var-cache
+          emptyDir: {}
+        - name: var-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

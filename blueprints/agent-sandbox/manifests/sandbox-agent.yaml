@@ -1,0 +1,53 @@
+# Reference SandboxClaim — per-instance binding that points at one
+# of the agent SandboxTemplates plus the per-deployment glue
+# (ServiceAccount + agent-script ConfigMap).
+#
+# The runtime spec (image, env, securityContext, volumes) lives in the
+# SandboxTemplate; the claim adds only deployment-specific bits — IRSA
+# wiring on the SA, the script ConfigMap the agent reads, and a pointer
+# to the chosen template.
+#
+# Template selection is deferred to apply time:
+#   - Standard EKS → sandboxTemplateRef.name = sandbox-agent-gvisor
+#   - EKS Auto Mode → sandboxTemplateRef.name = sandbox-agent-runc
+# conformance.sh renders the right value into __SANDBOX_TEMPLATE__
+# before applying. Adopters can hardcode the tier that matches their
+# cluster.
+#
+# IRSA over Pod Identity: the SA is annotated with the IRSA role at
+# install time. Pod Identity is NOT used because gVisor's Sentry
+# network namespace doesn't forward the link-local route to the Pod
+# Identity credential endpoint at 169.254.170.23. IRSA routes through
+# STS over the regular network path, which works on both runc and
+# gVisor tiers.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sandbox-agent-sa
+  namespace: agent-sandboxes
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sandbox-agent-script
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: runtime
+data:
+  # Actual contents populated by install.sh / conformance.sh via
+  #   kubectl create configmap --from-file=agent.py=...
+  # This placeholder keeps the manifest self-contained for review.
+  agent.py: "# populated by install.sh from blueprints/agent-sandbox/agent.py"
+---
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxClaim
+metadata:
+  name: sandbox-agent
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: runtime
+spec:
+  # Patched at apply time. See header comment for tier-selection rules.
+  sandboxTemplateRef:
+    name: __SANDBOX_TEMPLATE__

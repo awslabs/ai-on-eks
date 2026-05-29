@@ -1,0 +1,53 @@
+# Package registry allowlist — ApplicationNetworkPolicy (native egress variant).
+#
+# Allows outbound HTTPS to language-ecosystem package registries.
+# Scope matches pods labeled `allowlist: package-registries` in the
+# agent-sandboxes namespace.
+#
+# Registries included:
+#   - PyPI (Python)               — pypi.org + files.pythonhosted.org
+#   - npm (JavaScript)            — registry.npmjs.org
+#   - Maven Central (Java/JVM)    — repo1.maven.org + repo.maven.apache.org
+#   - Go proxy (Go)               — proxy.golang.org + sum.golang.org
+#   - crates.io (Rust)            — crates.io + static.crates.io
+#   - RubyGems (Ruby)             — rubygems.org + api.rubygems.org
+#
+# Equivalent CiliumNetworkPolicy for Standard EKS:
+#   ../cilium/package-registries.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: allowlist-package-registries
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: package-registries
+spec:
+  podSelector:
+    matchLabels:
+      allowlist: package-registries
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - domainNames:
+            # PyPI
+            - "pypi.org"
+            - "*.pypi.org"
+            - "*.pythonhosted.org"
+            # npm
+            - "registry.npmjs.org"
+            # Maven
+            - "repo1.maven.org"
+            - "repo.maven.apache.org"
+            # Go
+            - "proxy.golang.org"
+            - "sum.golang.org"
+            # crates.io
+            - "crates.io"
+            - "static.crates.io"
+            # RubyGems
+            - "rubygems.org"
+            - "api.rubygems.org"
+      ports:
+        - protocol: TCP
+          port: 443

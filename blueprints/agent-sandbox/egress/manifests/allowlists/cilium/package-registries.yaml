@@ -1,0 +1,74 @@
+# Package registry allowlist — CiliumNetworkPolicy (chained egress variant).
+#
+# Allows outbound HTTPS to language-ecosystem package registries.
+# Scope matches pods labeled `allowlist: package-registries`.
+#
+# Registries included:
+#   - PyPI (Python)               — pypi.org + files.pythonhosted.org
+#   - npm (JavaScript)            — registry.npmjs.org
+#   - Maven Central (Java/JVM)    — repo1.maven.org + repo.maven.apache.org
+#   - Go proxy (Go)               — proxy.golang.org + sum.golang.org
+#   - crates.io (Rust)            — crates.io + static.crates.io
+#   - RubyGems (Ruby)             — rubygems.org + api.rubygems.org
+#
+# Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
+#   ../anp/package-registries.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allowlist-package-registries
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: package-registries
+spec:
+  description: "Allow egress to language-ecosystem package registries."
+  endpointSelector:
+    matchLabels:
+      allowlist: package-registries
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              # PyPI
+              - matchName: "pypi.org"
+              - matchPattern: "*.pypi.org"
+              - matchPattern: "*.pythonhosted.org"
+              # npm
+              - matchName: "registry.npmjs.org"
+              # Maven
+              - matchName: "repo1.maven.org"
+              - matchName: "repo.maven.apache.org"
+              # Go
+              - matchName: "proxy.golang.org"
+              - matchName: "sum.golang.org"
+              # crates.io
+              - matchName: "crates.io"
+              - matchName: "static.crates.io"
+              # RubyGems
+              - matchName: "rubygems.org"
+              - matchName: "api.rubygems.org"
+
+    - toFQDNs:
+        - matchName: "pypi.org"
+        - matchPattern: "*.pypi.org"
+        - matchPattern: "*.pythonhosted.org"
+        - matchName: "registry.npmjs.org"
+        - matchName: "repo1.maven.org"
+        - matchName: "repo.maven.apache.org"
+        - matchName: "proxy.golang.org"
+        - matchName: "sum.golang.org"
+        - matchName: "crates.io"
+        - matchName: "static.crates.io"
+        - matchName: "rubygems.org"
+        - matchName: "api.rubygems.org"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

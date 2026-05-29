@@ -1,0 +1,19 @@
+{
+  "Version": "2012-10-17",
+  "Comment": "Bedrock permission template — substitute <ACCOUNT_ID> before applying. Widen the resource scope to match whichever Claude model family the reference agent invokes.",
+  "Statement": [
+    {
+      "Sid": "BedrockInvoke",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-*",
+        "arn:aws:bedrock:*:<ACCOUNT_ID>:inference-profile/us.anthropic.claude-sonnet-4*"
+      ]
+    }
+  ]
+}

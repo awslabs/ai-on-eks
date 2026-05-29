@@ -12,7 +12,7 @@ deploying to Kubernetes, and configuring access to AWS services.
 
 Before starting, you should have:
 
-- The [Agents on EKS infrastructure](https://awslabs.github.io/ai-on-eks/docs/infra/agents-on-eks) deployed
+- The [Agents on EKS infrastructure](https://awslabs.github.io/ai-on-eks/docs/infra/agents/agents-on-eks) deployed
 - An agent that runs locally (see [Best Practices for Agent Development](./best-practices.md) for guidance on
   structuring your agent code with the [Strands Agents SDK](https://strandsagents.com))
 - `kubectl` configured to access your EKS cluster

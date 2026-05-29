@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: agent-sandbox
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/kubernetes-sigs/agent-sandbox.git
+    targetRevision: ${agent_sandbox_version}
+    path: helm
+    helm:
+      valuesObject:
+        image:
+          tag: ${agent_sandbox_version}
+        controller:
+          # Extensions enable SandboxWarmPool / SandboxTemplate /
+          # SandboxClaim on top of the core Sandbox CRD. The reference
+          # agent in the agent-sandbox solution uses SandboxTemplates,
+          # so this is on by default.
+          extensions: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: agent-sandbox-system
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

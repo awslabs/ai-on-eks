@@ -1,0 +1,82 @@
+# SandboxTemplate — gVisor tier (basic).
+#
+# Same shape as sandbox-runc plus runtimeClassName: gvisor and the matching
+# NodePool toleration. gVisor's Sentry intercepts syscalls in userspace,
+# providing a significantly stronger isolation boundary than runc's
+# namespace+cgroup-only model at ~1.5s cold-start cost.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes — requires the gVisor RuntimeClass
+#     + a NodePool with the runsc containerd shim installed (see
+#     runtimeclass-gvisor.yaml + karpenter-nodepool-gvisor.yaml).
+#   - EKS Auto Mode: NO — Auto Mode workloads claim sandbox-runc instead.
+#
+# Pod spec mirrors sandbox-runc.yaml exactly so claims can switch freely
+# between tiers without re-plumbing the workload.
+#
+# Templates that build on this:
+#   - blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml adds
+#     python:3.12-slim + agent-script ConfigMap mount + Bedrock env
+#     for the reference agent.
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-gvisor
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: gvisor
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: gvisor
+    spec:
+      runtimeClassName: gvisor
+      # Tolerate the NoSchedule taint on gVisor nodes. Standard-runtime
+      # workloads don't tolerate this taint, so the gVisor-shim install
+      # cost is only paid for pods that actually use it.
+      tolerations:
+        - key: agent-sandbox/runtime
+          operator: Equal
+          value: gvisor
+          effect: NoSchedule
+      containers:
+        - name: workload
+          image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            # gVisor's Sentry handles syscall interception so seccomp isn't
+            # the primary boundary, but we keep the hardened PodSecurityContext
+            # aligned with the runc template so tier comparisons are
+            # apples-to-apples — only the runtime + toleration vary.
+            runAsNonRoot: true
+            runAsUser: 101
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: var-cache
+              mountPath: /var/cache/nginx
+            - name: var-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: var-cache
+          emptyDir: {}
+        - name: var-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

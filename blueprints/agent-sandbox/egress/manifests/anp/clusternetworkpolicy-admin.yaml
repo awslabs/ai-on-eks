@@ -1,0 +1,42 @@
+# Admin-tier ClusterNetworkPolicy — native EKS Auto Mode variant.
+#
+# Purpose: block EC2 Instance Metadata (169.254.169.254) and ECS
+# task metadata (169.254.170.2) for pods in the agent-sandboxes
+# namespace. Admin tier is evaluated before namespace-scoped
+# policies, so this denial cannot be overridden by an application
+# team's ANP.
+#
+# Note the narrow scoping — only the agent-sandboxes namespace.
+# Cluster-wide deny rules (empty namespace selector) would flip
+# every pod into default-deny, including CoreDNS and the
+# agent-sandbox controller.
+#
+# EKS Pod Identity uses 169.254.170.23 for its credential vending
+# endpoint. Block only the IMDS + ECS task endpoints, NOT the whole
+# 169.254.0.0/16 range. (Pod Identity doesn't work through gVisor
+# anyway — this blueprint assumes IRSA — but preserve the endpoint
+# for runc-tier workloads that might still use Pod Identity.)
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ClusterNetworkPolicy
+metadata:
+  name: admin-block-imds
+  labels:
+    agent-sandbox/tier: admin
+spec:
+  tier: Admin
+  priority: 10
+  subject:
+    namespaces:
+      matchLabels:
+        kubernetes.io/metadata.name: agent-sandboxes
+  egress:
+    - action: Deny
+      name: deny-ec2-imds
+      to:
+        - networks:
+            - 169.254.169.254/32
+    - action: Deny
+      name: deny-ecs-task-metadata
+      to:
+        - networks:
+            - 169.254.170.2/32

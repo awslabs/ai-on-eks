@@ -5,7 +5,7 @@ sidebar_label: Best Practices for Agent Development
 # Best Practices for Agent Development
 
 This guide covers patterns and best practices for developing agents that transition smoothly from local development to
-production on the [Agents on EKS environment](../../infra/agents-on-eks.md). We'll walk through a practical example using
+production on the [Agents on EKS environment](../../infra/agents/agents-on-eks.md). We'll walk through a practical example using
 the [Strands Agents SDK](https://strandsagents.com) to illustrate each pattern.
 
 ## Why AgentOps?

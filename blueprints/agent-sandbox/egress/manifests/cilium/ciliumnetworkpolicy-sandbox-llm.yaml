@@ -1,0 +1,96 @@
+# Per-sandbox FQDN egress allowlist — the app-tier policy.
+#
+# Scope: the `agent-sandboxes` namespace, pods labeled `egress-tier:
+# sandbox`. Both SandboxTemplates (standard + gVisor) apply this label
+# via podTemplate.metadata.labels so every claimed sandbox inherits
+# the allowlist automatically.
+#
+# Allowed destinations:
+#   - Bedrock runtime API                   — the reference agent's LLM call
+#   - STS                                   — IRSA auth for Bedrock
+#   - PyPI + pythonhosted                   — pip install inside the sandbox
+#
+# Everything else is denied by default (no egress section = default-deny
+# for pods matching this selector).
+#
+# Visibility in Hubble: allowed destinations render as forwarded flows
+# in the default Service Map. Blocked FQDNs are enforced at the DNS
+# proxy layer (empty-answer response) and won't produce a DROPPED
+# flow in the UI — see the reference agent's README for how to
+# observe FQDN verdicts directly. Raw-IP drops DO render as DROPPED
+# flows; the reference agent's Step 5 exercises this path.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sandbox-llm-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+spec:
+  description: "FQDN allowlist for sandbox workloads — LLM APIs + package registries."
+  endpointSelector:
+    matchLabels:
+      egress-tier: sandbox
+  egress:
+    # 1. DNS resolution for the allowed FQDNs. Redundant with admin
+    #    tier but explicit here so the policy is self-contained for
+    #    readers who haven't seen the cluster-wide policy yet.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.amazonaws.com"
+              - matchPattern: "*.pypi.org"
+              - matchPattern: "*.pythonhosted.org"
+              - matchName: "pypi.org"
+
+    # 2. EKS Pod Identity credential endpoint — 169.254.170.23 serves
+    #    the container-role credential document that boto3 consumes
+    #    when AWS_CONTAINER_CREDENTIALS_FULL_URI points at it. Without
+    #    this, any AWS SDK call inside the sandbox fails before the
+    #    first network byte leaves the pod because it can't even
+    #    resolve credentials.
+    - toCIDR:
+        - 169.254.170.23/32
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+
+    # 3. Bedrock runtime — the LLM the reference agent calls.
+    - toFQDNs:
+        - matchPattern: "bedrock-runtime.*.amazonaws.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+    # 3. STS — the IRSA / pod-identity auth surface the SDK uses
+    #    ahead of the Bedrock call. Without this, Bedrock calls fail
+    #    at the credential step rather than reaching the allowlist.
+    - toFQDNs:
+        - matchPattern: "sts.*.amazonaws.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+    # 4. PyPI — so the agent can install packages inside the sandbox
+    #    mid-session. Example pattern: the agent imports a package
+    #    like `requests`, pip-installs it from PyPI (permitted here),
+    #    then attempts egress to an unlisted domain (blocked at the
+    #    DNS proxy because the FQDN isn't in this allowlist).
+    - toFQDNs:
+        - matchName: "pypi.org"
+        - matchPattern: "*.pypi.org"
+        - matchPattern: "*.pythonhosted.org"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

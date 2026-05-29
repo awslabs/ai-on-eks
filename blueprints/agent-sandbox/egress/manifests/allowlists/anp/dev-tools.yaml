@@ -1,0 +1,55 @@
+# Developer tool allowlist — ApplicationNetworkPolicy (native egress variant).
+#
+# Allows outbound HTTPS to commonly-referenced developer services.
+# Scope matches pods labeled `allowlist: dev-tools` in the
+# agent-sandboxes namespace.
+#
+# Services included:
+#   - GitHub        — github.com, api.github.com, raw.githubusercontent.com, objects.githubusercontent.com
+#   - GitLab        — gitlab.com, registry.gitlab.com
+#   - Docker Hub    — hub.docker.com, registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com
+#   - Amazon ECR    — *.dkr.ecr across us-east-1 and us-west-2 + public.ecr.aws
+#   - Hugging Face  — huggingface.co, cdn-lfs.huggingface.co, cdn-lfs.hf.co
+#
+# Equivalent CiliumNetworkPolicy for Standard EKS:
+#   ../cilium/dev-tools.yaml
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: allowlist-dev-tools
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: dev-tools
+spec:
+  podSelector:
+    matchLabels:
+      allowlist: dev-tools
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - domainNames:
+            # GitHub
+            - "github.com"
+            - "api.github.com"
+            - "raw.githubusercontent.com"
+            - "objects.githubusercontent.com"
+            # GitLab
+            - "gitlab.com"
+            - "registry.gitlab.com"
+            # Docker Hub
+            - "hub.docker.com"
+            - "registry-1.docker.io"
+            - "auth.docker.io"
+            - "production.cloudflare.docker.com"
+            # Amazon ECR
+            - "public.ecr.aws"
+            - "*.dkr.ecr.us-east-1.amazonaws.com"
+            - "*.dkr.ecr.us-west-2.amazonaws.com"
+            # Hugging Face
+            - "huggingface.co"
+            - "cdn-lfs.huggingface.co"
+            - "cdn-lfs.hf.co"
+      ports:
+        - protocol: TCP
+          port: 443

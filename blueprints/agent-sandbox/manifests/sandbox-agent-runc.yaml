@@ -1,0 +1,100 @@
+# SandboxTemplate — agent (runc tier).
+#
+# Reference-agent-shaped variant of sandbox-runc. Same runtime, security
+# context, and egress labels, plus what the reference agent needs:
+#   - python:3.12-slim image
+#   - sandbox-agent-sa ServiceAccount (IRSA-bound at install time)
+#   - agent-script ConfigMap mount (sandbox-agent-script, populated by
+#     conformance.sh / install.sh)
+#   - Bedrock + HOME env vars
+#
+# Conformance claims this template on Auto Mode (gVisor unavailable)
+# and sandbox-agent-gvisor on Standard EKS.
+#
+# Adopters with a different agent runtime (Node, Go, custom image) copy
+# this template, swap the image + env, and point a SandboxClaim at the
+# new name. Platform primitives live in infra/agent-sandbox/manifests/.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes
+#   - EKS Auto Mode: yes
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-agent-runc
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: runc
+    agent-sandbox/role: reference-agent
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: runc
+        agent-sandbox/role: reference-agent
+    spec:
+      # IRSA-bound ServiceAccount provisioned alongside the SandboxClaim.
+      # See sandbox-agent.yaml for the SA + ConfigMap that pair with this template.
+      serviceAccountName: sandbox-agent-sa
+      # No runtimeClassName → runc (cluster default).
+      containers:
+        - name: agent-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          # cp the agent script from the mounted ConfigMap to a writable
+          # workspace, then sleep so operators drive the agent via
+          # `kubectl exec`. Matches the SIG-Apps singleton-stateful pattern.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/agent.py /workspace/agent.py
+              chmod +x /workspace/agent.py
+              echo "sandbox ready"
+              echo "run: kubectl exec -n agent-sandboxes <sandbox-name> -c agent-runtime -- python /workspace/agent.py"
+              sleep infinity
+          env:
+            - name: AWS_REGION
+              value: us-east-1
+            - name: BEDROCK_MODEL_ID
+              value: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+            # Override HOME so `pip install --user` has a writable target.
+            # readOnlyRootFilesystem means /.local under the default $HOME
+            # isn't writable; /workspace is an emptyDir.
+            - name: HOME
+              value: /workspace
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: agent-script
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: agent-script
+          configMap:
+            name: sandbox-agent-script
+            items:
+              - key: agent.py
+                path: agent.py

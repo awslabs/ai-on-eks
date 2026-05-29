@@ -1,0 +1,78 @@
+# Developer tool allowlist — CiliumNetworkPolicy (chained egress variant).
+#
+# Allows outbound HTTPS to commonly-referenced developer services.
+# Scope matches pods labeled `allowlist: dev-tools`.
+#
+# Services included:
+#   - GitHub        — github.com, api.github.com, raw.githubusercontent.com, objects.githubusercontent.com
+#   - GitLab        — gitlab.com, registry.gitlab.com
+#   - Docker Hub    — hub.docker.com, registry-1.docker.io, auth.docker.io, production.cloudflare.docker.com
+#   - Amazon ECR    — *.dkr.ecr.*.amazonaws.com (public.ecr.aws for ECR public)
+#   - Hugging Face  — huggingface.co, cdn-lfs.huggingface.co, cdn-lfs.hf.co
+#
+# Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
+#   ../anp/dev-tools.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allowlist-dev-tools
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: dev-tools
+spec:
+  description: "Allow egress to common developer services (VCS, container registries, model hubs)."
+  endpointSelector:
+    matchLabels:
+      allowlist: dev-tools
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              # GitHub
+              - matchName: "github.com"
+              - matchName: "api.github.com"
+              - matchName: "raw.githubusercontent.com"
+              - matchName: "objects.githubusercontent.com"
+              # GitLab
+              - matchName: "gitlab.com"
+              - matchName: "registry.gitlab.com"
+              # Docker Hub
+              - matchName: "hub.docker.com"
+              - matchName: "registry-1.docker.io"
+              - matchName: "auth.docker.io"
+              - matchName: "production.cloudflare.docker.com"
+              # Amazon ECR (public + private per-region)
+              - matchName: "public.ecr.aws"
+              - matchPattern: "*.dkr.ecr.*.amazonaws.com"
+              # Hugging Face
+              - matchName: "huggingface.co"
+              - matchName: "cdn-lfs.huggingface.co"
+              - matchName: "cdn-lfs.hf.co"
+
+    - toFQDNs:
+        - matchName: "github.com"
+        - matchName: "api.github.com"
+        - matchName: "raw.githubusercontent.com"
+        - matchName: "objects.githubusercontent.com"
+        - matchName: "gitlab.com"
+        - matchName: "registry.gitlab.com"
+        - matchName: "hub.docker.com"
+        - matchName: "registry-1.docker.io"
+        - matchName: "auth.docker.io"
+        - matchName: "production.cloudflare.docker.com"
+        - matchName: "public.ecr.aws"
+        - matchPattern: "*.dkr.ecr.*.amazonaws.com"
+        - matchName: "huggingface.co"
+        - matchName: "cdn-lfs.huggingface.co"
+        - matchName: "cdn-lfs.hf.co"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

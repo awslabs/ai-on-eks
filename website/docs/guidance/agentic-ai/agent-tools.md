@@ -10,7 +10,7 @@ This guide continues from [Building and Deploying Agents](./building-agents.md),
 
 Before starting, you should have:
 
-- The [Agents on EKS infrastructure](https://awslabs.github.io/ai-on-eks/docs/infra/agents-on-eks) deployed with `enable_selenium_grid` and `enable_jupyter_enterprise_gateway` set to `true`
+- The [Agents on EKS infrastructure](https://awslabs.github.io/ai-on-eks/docs/infra/agents/agents-on-eks) deployed with `enable_selenium_grid` and `enable_jupyter_enterprise_gateway` set to `true`
 - An agent deployed and running in the cluster (see [Building and Deploying Agents](./building-agents.md))
 - `kubectl` configured to access your EKS cluster
 

@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Comment": "IRSA trust policy template — substitute <ACCOUNT_ID> and <OIDC_PROVIDER_ID> with values from your cluster before applying. Resolve OIDC provider ID from: aws eks describe-cluster --name <cluster> --region <region> --query 'cluster.identity.oidc.issuer' --output text",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/oidc.eks.<REGION>.amazonaws.com/id/<OIDC_PROVIDER_ID>"
+      },
+      "Action": "sts:AssumeRoleWithWebIdentity",
+      "Condition": {
+        "StringEquals": {
+          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_PROVIDER_ID>:sub": [
+            "system:serviceaccount:agent-sandboxes:sandbox-agent-sa",
+            "system:serviceaccount:agent-sandboxes:composed-sandbox"
+          ],
+          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_PROVIDER_ID>:aud": "sts.amazonaws.com"
+        }
+      }
+    }
+  ]
+}

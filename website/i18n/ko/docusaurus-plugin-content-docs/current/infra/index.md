@@ -32,6 +32,13 @@ AI/ML 모델 추론 워크로드에 최적화된 인프라 솔루션:
 - **[Nvidia NIM on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-nim-llama3.md)** - Nvidia NIM 배포 샘플
 - **[Nvidia Dynamo on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-dynamo.md)** - Nvidia Dynamo 배포 샘플
 
+### 에이전트 인프라
+
+격리, 관측성, 도구 오케스트레이션을 갖춘 AI 에이전트 워크로드 실행을 위한 인프라 솔루션:
+
+- **[Agents on EKS](./agents/agents-on-eks.md)** - GitLab, Langfuse, Milvus, MCP Gateway Registry를 포함한 엔드 투 엔드 에이전트 플랫폼
+- **[Agent Sandbox on EKS](./agents/agent-sandbox.md)** - 보안이 필요한 에이전트 워크로드를 위한 커널 격리(gVisor / runc) 샌드박스와 FQDN 이그레스 적용
+
 ### 기타
 
 추가 인프라 솔루션 및 유틸리티:

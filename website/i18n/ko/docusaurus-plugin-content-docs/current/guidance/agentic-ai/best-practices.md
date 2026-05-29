@@ -4,7 +4,7 @@ sidebar_label: 에이전트 개발 모범 사례
 
 # 에이전트 개발 모범 사례
 
-이 가이드는 로컬 개발에서 [Agents on EKS 환경](../../infra/agents-on-eks.md)의 프로덕션으로 원활하게 전환할 수 있는 에이전트 개발 패턴과 모범 사례를 다룹니다. [Strands Agents SDK](https://strandsagents.com)를 사용한 실용적인 예제를 통해 각 패턴을 설명합니다.
+이 가이드는 로컬 개발에서 [Agents on EKS 환경](../../infra/agents/agents-on-eks.md)의 프로덕션으로 원활하게 전환할 수 있는 에이전트 개발 패턴과 모범 사례를 다룹니다. [Strands Agents SDK](https://strandsagents.com)를 사용한 실용적인 예제를 통해 각 패턴을 설명합니다.
 
 ## AgentOps가 필요한 이유
 

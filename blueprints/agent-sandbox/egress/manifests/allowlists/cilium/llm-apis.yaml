@@ -1,0 +1,63 @@
+# LLM API allowlist — CiliumNetworkPolicy (chained egress variant).
+#
+# Allows outbound HTTPS to the most common LLM API providers. Scope
+# matches pods labeled `allowlist: llm-apis` in any namespace that
+# this policy applies to (adjust namespace field + endpointSelector
+# for your environment).
+#
+# Providers included:
+#   - Amazon Bedrock (all regions)
+#   - Anthropic (api.anthropic.com)
+#   - OpenAI (api.openai.com)
+#
+# To extend with other providers, add entries under `toFQDNs` and
+# `rules.dns.matchPattern`. Both lists must include the FQDN for the
+# policy to work — `toFQDNs` gates the actual connection, `dns.rules`
+# gates the DNS lookup.
+#
+# Equivalent ApplicationNetworkPolicy for EKS Auto Mode:
+#   ../anp/llm-apis.yaml
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allowlist-llm-apis
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/allowlist: llm-apis
+spec:
+  description: "Allow egress to LLM APIs: Bedrock, Anthropic, OpenAI."
+  endpointSelector:
+    matchLabels:
+      allowlist: llm-apis
+  egress:
+    # DNS resolution for the allowed FQDNs.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              # Bedrock across regions.
+              - matchPattern: "bedrock-runtime.*.amazonaws.com"
+              - matchPattern: "bedrock.*.amazonaws.com"
+              # STS for IRSA auth path.
+              - matchPattern: "sts.*.amazonaws.com"
+              # Anthropic + OpenAI public endpoints.
+              - matchName: "api.anthropic.com"
+              - matchName: "api.openai.com"
+
+    # Outbound HTTPS to LLM API endpoints.
+    - toFQDNs:
+        - matchPattern: "bedrock-runtime.*.amazonaws.com"
+        - matchPattern: "bedrock.*.amazonaws.com"
+        - matchPattern: "sts.*.amazonaws.com"
+        - matchName: "api.anthropic.com"
+        - matchName: "api.openai.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

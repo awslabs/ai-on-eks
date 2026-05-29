@@ -1,0 +1,155 @@
+# gVisor NodePool — standalone from the cluster's default NodePool so
+# the gVisor containerd shim install doesn't affect general workloads.
+#
+# Two resources here:
+#   1. EC2NodeClass — AL2023 AMI with user-data that installs the
+#      gVisor `runsc` shim, writes the containerd plugin config, and
+#      restarts containerd. AL2023 over Bottlerocket because the shim
+#      install scripts upstream target AL2023 systemd + dnf today.
+#   2. NodePool — matches any pod requesting `runtimeClassName: gvisor`
+#      via the label selector, applies a matching taint so runc-only
+#      workloads don't accidentally land on gVisor nodes, and caps
+#      the node count to prevent runaway provisioning.
+#
+# Node label `agent-sandbox/runtime=gvisor` is referenced by the
+# RuntimeClass scheduling block in runtimeclass-gvisor.yaml.
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: agent-sandbox-gvisor
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: al2023@latest
+  # Resolved by install.sh sed — we look up the actual role name
+  # from a live EC2NodeClass at render time since the ai-on-eks base
+  # module appends a Terraform-generated suffix to the node role.
+  # Using sed (not envsubst) because the user-data below is shell
+  # script with its own $VAR references that envsubst would clobber.
+  role: __KARPENTER_NODE_ROLE__
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        encrypted: true
+  tags:
+    agent-sandbox/tier: gvisor
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+
+    # Install gVisor runsc binary + containerd shim from the official
+    # Google release channel. Using `release/latest/` alias keeps
+    # this blueprint self-updating. Production deployments should
+    # pin to a specific release tag and bump via CI.
+    ARCH=$(uname -m)
+    mkdir -p /tmp/gvisor && cd /tmp/gvisor
+
+    curl -fsSL -o runsc "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/runsc"
+    curl -fsSL -o containerd-shim-runsc-v1 "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/containerd-shim-runsc-v1"
+    chmod +x runsc containerd-shim-runsc-v1
+    mv runsc containerd-shim-runsc-v1 /usr/local/bin/
+
+    # Register runsc with containerd. AL2023 / EKS 1.34 ships with
+    # containerd v2 which uses the `io.containerd.cri.v1.runtime.*`
+    # plugin path — the older `io.containerd.grpc.v1.cri.*` path is
+    # legacy and silently ignored. Append (rather than clobber) so
+    # the base nodeadm runc registration stays intact.
+    cat <<'EOT' >> /etc/containerd/config.toml
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc]
+      runtime_type = "io.containerd.runsc.v1"
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc.options]
+      TypeUrl = "io.containerd.runsc.v1.options"
+      ConfigPath = "/etc/containerd/runsc.toml"
+    EOT
+
+    # Default gVisor runtime options — platform=kvm for hardware
+    # acceleration on nested-virt-capable instances, falling back to
+    # platform=ptrace on instances without nested virt. m5-class
+    # instances use ptrace; c5n.metal + m5.metal + other nested-virt
+    # instances would use kvm.
+    cat <<'EOT' > /etc/containerd/runsc.toml
+    [runsc_config]
+      platform = "ptrace"
+      network = "sandbox"
+    EOT
+
+    systemctl restart containerd
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      kubelet:
+        config:
+          maxPods: 30
+    --//
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: agent-sandbox-gvisor
+spec:
+  template:
+    metadata:
+      labels:
+        agent-sandbox/runtime: gvisor
+        agent-sandbox/tier: gvisor
+    spec:
+      # Tainted so standard-runtime workloads don't land here and
+      # waste the gVisor-shim install on pods that won't use it.
+      taints:
+        - key: agent-sandbox/runtime
+          value: gvisor
+          effect: NoSchedule
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: agent-sandbox-gvisor
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["m", "c"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        # Karpenter v1 scheduler needs label requirements to match pod
+        # nodeSelectors. Without this, the template.metadata.labels
+        # block above isn't visible to the requirement matcher — the
+        # node will be *created* with the label but Karpenter won't
+        # pick this pool when a pod requests `agent-sandbox/runtime=
+        # gvisor` unless the key is also in the requirements here.
+        - key: agent-sandbox/runtime
+          operator: In
+          values: ["gvisor"]
+      expireAfter: 24h
+  limits:
+    cpu: 16
+    memory: 32Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 10m

@@ -1,0 +1,8 @@
+{
+  "label": "에이전트",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Amazon EKS에서 AI 에이전트 워크로드를 실행하기 위한 인프라 솔루션"
+  }
+}

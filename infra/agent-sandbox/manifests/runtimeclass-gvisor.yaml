@@ -1,0 +1,23 @@
+# gVisor RuntimeClass — points at the containerd `runsc` handler that
+# the gVisor shim installs during node bootstrap. Sandboxes declaring
+# `runtimeClassName: gvisor` get scheduled onto nodes that have this
+# handler registered; runc pods land on the cluster's default pool.
+#
+# The node selector on the RuntimeClass itself ensures that any pod
+# requesting this class is constrained to gVisor-capable nodes,
+# matching the label Karpenter applies in karpenter-nodepool-gvisor.yaml.
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: gvisor
+  labels:
+    agent-sandbox/tier: gvisor
+handler: runsc
+scheduling:
+  nodeSelector:
+    agent-sandbox/runtime: gvisor
+  tolerations:
+    - key: agent-sandbox/runtime
+      operator: Equal
+      value: gvisor
+      effect: NoSchedule

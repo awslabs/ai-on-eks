@@ -41,6 +41,13 @@ Infrastructure solutions optimized for AI/ML model inference workloads:
 - **[Nvidia NIM on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-nim-llama3.md)** - Nvidia NIM deployment sample
 - **[Nvidia Dynamo on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-dynamo.md)** - Nvidia Dyanmo deployment sample
 
+### Agents Infrastructure
+
+Infrastructure solutions for running AI agent workloads with isolation, observability, and tool orchestration:
+
+- **[Agents on EKS](./agents/agents-on-eks.md)** - End-to-end agentic platform with GitLab, Langfuse, Milvus, and MCP Gateway Registry
+- **[Agent Sandbox on EKS](./agents/agent-sandbox.md)** - Kernel-isolated (gVisor / runc) sandboxes with FQDN egress enforcement for secure agent workloads
+
 ### Miscellaneous
 
 Additional infrastructure solutions and utilities:
