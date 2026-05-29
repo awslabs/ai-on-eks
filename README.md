@@ -20,7 +20,7 @@ In this repository, you'll find a variety of deployment blueprints for creating 
 
 ### 🧠 AI
 
-🚀 [Inference-Ready Cluster](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/inference-ready-cluster) 👈 This solution enables supporting multiple inference patters on EKS
+🚀 [Inference-Ready Cluster](https://awslabs.github.io/ai-on-eks/docs/infra/ai-ml/inference-ready-cluster) 👈 This solution enables supporting multiple inference patterns on EKS
 
 🚀 [Inference Charts](https://awslabs.github.io/ai-on-eks/docs/blueprints/inference/inference-charts) 👈 These charts support deploying various models on EKS
 
