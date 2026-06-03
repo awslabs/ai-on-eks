@@ -644,6 +644,135 @@ On the selected node, the DRA driver:
 - Allocates shared vs. exclusive access as per claim configuration
 - Isolates GPU slices securely between concurrent workloads
 
+### ResourceClaim scheduling: when the claim can be satisfied
+
+This section walks through the **happy path** using the [basic GPU example](https://github.com/awslabs/ai-on-eks/tree/main/infra/jark-stack/examples/k8s-dra/basic): a `ResourceClaimTemplate` plus a pod that references it.
+
+#### Objects and roles
+
+| Object | Role |
+|--------|------|
+| **ResourceClaimTemplate** (`single-gpu`) | Blueprint: each pod needs one device from `gpu.nvidia.com` |
+| **ResourceClaim** (`gpu-pod-gpu0-xxxxx`) | Per-pod reservation; created automatically from the template |
+| **DeviceClass** (`gpu.nvidia.com`) | Registered by the NVIDIA DRA driver — catalog of allocatable GPU devices |
+| **ResourceSlice** (per GPU node) | Inventory of physical GPUs the driver advertises on that node |
+| **Pod** (`gpu-pod`) | References the claim; must land on a node that satisfies both affinity and allocation |
+
+The pod wires the template to the container:
+
+```yaml
+spec:
+  resourceClaims:
+  - name: gpu0
+    resourceClaimTemplateName: single-gpu
+  containers:
+  - name: ctr0
+    resources:
+      claims:
+      - name: gpu0
+```
+
+#### End-to-end flow (claim satisfiable)
+
+```mermaid
+flowchart TB
+    subgraph create ["1. Create"]
+        A[User applies Pod + Template]
+        B[Controller creates ResourceClaim]
+        B2[Claim status: Pending]
+    end
+
+    subgraph schedule ["2. Schedule — claim satisfiable"]
+        C[kube-scheduler + DRA plugin]
+        E{Pod nodeSelector +<br/>taints satisfied?}
+        D{Node has free GPU in<br/>ResourceSlice for gpu.nvidia.com?}
+        F[Bind Pod to node]
+        G[Allocate claim on that node]
+        G2[Claim status: Allocated]
+    end
+
+    subgraph run ["3. Run on node"]
+        H[kubelet starts pod]
+        I[DRA driver prepares device]
+        J[Inject GPU into container]
+        K[Pod Running]
+    end
+
+    subgraph blocked ["Claim not satisfiable"]
+        P[Pod + Claim stay Pending]
+    end
+
+    A --> B --> B2 --> C
+    C --> E
+    E -->|no| P
+    E -->|yes| D
+    D -->|no| P
+    D -->|yes| F --> G --> G2 --> H --> I --> J --> K
+```
+
+#### Step-by-step (happy path)
+
+**1. Claim is created (unallocated)**
+
+When you apply the pod, Kubernetes creates a **ResourceClaim** from `single-gpu`. The claim starts in **`Pending`**: it needs one device from `gpu.nvidia.com` but is not assigned yet. The pod is also **Pending** (`PodScheduled: False`).
+
+**2. Scheduler checks whether the claim can be satisfied**
+
+The **DRA-aware scheduler** (in `kube-scheduler` on EKS 1.32+) performs two checks:
+
+1. **Ordinary pod scheduling** — `nodeSelector`, tolerations, affinity, etc. On JARK, the basic example requires `NodeGroupType: g6-mng` and tolerates the `nvidia.com/gpu` taint.
+2. **DRA allocation** — for each candidate node, read **ResourceSlices** and ask whether an unallocated device matches the claim (`deviceClassName: gpu.nvidia.com`, count, sharing mode).
+
+If at least one node passes both checks, the scheduler:
+
+- **Binds** the pod (`spec.nodeName` set).
+- **Allocates** the claim — records which physical GPU on that node is reserved.
+
+The claim moves to **Allocated**; the pod becomes **Scheduled**.
+
+**3. What “allocated” means**
+
+An allocated claim reserves a **specific** device on a **specific** node. Other exclusive claims cannot use that device until the claim is released. This is finer-grained than counting `nvidia.com/gpu` allocatable units alone.
+
+**4. Kubelet and DRA driver on the chosen node**
+
+After bind and allocate:
+
+1. The container’s `resources.claims` entry (`gpu0`) links to the same **ResourceClaim**.
+2. The kubelet asks the NVIDIA DRA driver to **prepare** the allocated device.
+3. For basic allocation, the driver grants **exclusive** access to one full GPU.
+4. The driver injects the device into the container (typically via CDI), so tools like `nvidia-smi` work inside the pod.
+
+The pod reaches **Running**.
+
+#### Timeline on a healthy JARK cluster
+
+| Order | What you see | Meaning |
+|-------|----------------|--------|
+| 1 | `DeviceClass` `gpu.nvidia.com` exists | DRA driver registered |
+| 2 | `ResourceSlice` on a g6 GPU node | GPUs advertised |
+| 3 | `ResourceClaim` **Pending** | Waiting for scheduler |
+| 4 | GPU node **Ready** | Candidate node available |
+| 5 | Claim **Allocated**, pod **Scheduled** | Claim satisfiable; GPU reserved |
+| 6 | Pod **Running** | Driver injected GPU into container |
+
+#### When the claim cannot be satisfied
+
+| Failure | Claim | Pod | Typical scheduler / event message |
+|---------|-------|-----|-----------------------------------|
+| DRA driver not installed | Pending | Pending | `device class gpu.nvidia.com does not exist` |
+| No GPU nodes (e.g. node group at zero) | Pending | Pending | `didn't match Pod's node affinity/selector` |
+| All GPUs already allocated | Pending | Pending | No node with a free device in ResourceSlice |
+| Karpenter-only scheduling | Pending | Pending | `DRA requirements ... not yet supported by Karpenter` |
+
+<Admonition type="info" title="JARK stack notes">
+
+- GPU managed node groups start at **desired size 0**; scale the `nvidia-gpu` node group before expecting claims to allocate.
+- **Karpenter does not schedule DRA pods** today; use managed node groups (or self-managed nodes) for DRA workloads.
+- Enable `enable_nvidia_dra_driver` and `enable_nvidia_gpu_operator` in `blueprint.tfvars` so `DeviceClass` and node labels exist before applying claim templates.
+
+</Admonition>
+
 
 ## Deploying the Solution
 
@@ -865,6 +994,8 @@ kubectl apply -f basic-gpu-pod.yaml
 kubectl get pods -n gpu-test1 -w
 ```
 
+See [ResourceClaim scheduling: when the claim can be satisfied](#resourceclaim-scheduling-when-the-claim-can-be-satisfied) for the full scheduling and allocation flow.
+
 **Best For:**
 - Large model training requiring full GPU resources
 - Workloads that fully utilize GPU compute and memory
@@ -892,11 +1023,25 @@ Time-slicing is a GPU sharing mechanism where multiple workloads take turns usin
 
 ### How to Deploy Time-Slicing with DRA
 
-<Tabs groupId="timeslicing-config">
-<TabItem value="template" label="ResourceClaimTemplate">
+#### Why a shared `ResourceClaim` (not per-pod template)
 
-<CodeBlock language="yaml" title="timeslicing-claim-template.yaml" showLineNumbers>
-{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-claim-template.yaml').default}
+This example runs **two pods on one physical GPU**. Use one `ResourceClaim` and reference it from every pod with `resourceClaimName`.
+
+| Approach | Scheduler behavior |
+|----------|-------------------|
+| `ResourceClaimTemplate` on each **pod** (no PodGroup) | **One claim per pod** → two pods need **two GPUs**. |
+| Single `ResourceClaim` + `resourceClaimName` | **One** allocation; both pods share the same device (**used in JARK / EKS 1.34**). |
+| **PodGroup** + `ResourceClaimTemplate` | Same sharing as a manual claim; claim is generated per group ([optional manifest](https://github.com/awslabs/ai-on-eks/blob/main/infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-podgroup.yaml)). Requires alpha APIs — **not on EKS 1.34** (`no matches for kind "PodGroup"`). |
+
+`sharing.strategy: TimeSlicing` in `GpuConfig` tells the **NVIDIA DRA driver** how to prepare the GPU after allocation. Multi-pod sharing still requires **one** Kubernetes claim object.
+
+Enable `TimeSlicingSettings` on the NVIDIA DRA driver (see `infra/base/terraform/helm-values/nvidia-dra-driver.yaml`) before applying workloads.
+
+<Tabs groupId="timeslicing-config">
+<TabItem value="claim" label="ResourceClaim">
+
+<CodeBlock language="yaml" title="timeslicing-claim.yaml" showLineNumbers>
+{require('!!raw-loader!@site/../infra/jark-stack/examples/k8s-dra/timeslicing/timeslicing-claim.yaml').default}
 </CodeBlock>
 
 </TabItem>
@@ -909,11 +1054,14 @@ Time-slicing is a GPU sharing mechanism where multiple workloads take turns usin
 </TabItem>
 </Tabs>
 
+Both pods set `resourceClaimName: shared-timeslicing-gpu`. The claim stays **pending** until pods are applied; allocation happens when the scheduler places the pods.
+
 **Deploy the Example:**
 ```bash title="Deploy Time-Slicing GPU Sharing"
-kubectl apply -f timeslicing-claim-template.yaml
+kubectl apply -f timeslicing-claim.yaml
 kubectl apply -f timeslicing-pod.yaml
 kubectl get pods -n timeslicing-gpu -w
+# In another terminal: kubectl get resourceclaim -n timeslicing-gpu -w
 ```
 
 **Best For:**
@@ -971,6 +1119,104 @@ kubectl apply -f mps-claim-template.yaml
 kubectl apply -f mps-pod.yaml
 kubectl get pods -n mps-gpu -w
 ```
+
+### Verify MPS deployment
+
+After the pod is **Running**, confirm the claim uses **MPS**, the MPS control daemon is up, both containers see the GPU, and `nvidia-smi` shows an **M+C** (MPS client) process.
+
+**1. Pod and ResourceClaim**
+
+```bash
+kubectl get pods,resourceclaim -n mps-gpu
+```
+
+Example output (JARK, `g6-mng` node):
+
+```text
+NAME                          READY   STATUS    RESTARTS   AGE
+pod/mps-multi-container-pod   2/2     Running   0          7m
+
+NAME                                                                           STATE                AGE
+resourceclaim.resource.k8s.io/mps-multi-container-pod-shared-gpu-claim-6sm2k   allocated,reserved   7m
+```
+
+**2. Device and sharing strategy**
+
+```bash
+kubectl get resourceclaim -n mps-gpu -o json | jq -r '
+  "device=\(.items[0].status.allocation.devices.results[0].device // "n/a")",
+  "sharing=\(.items[0].status.allocation.devices.config[0].opaque.parameters.sharing.strategy // "n/a")"
+'
+```
+
+Example output:
+
+```text
+device=gpu-0
+sharing=MPS
+```
+
+**3. MPS control daemon (requires `MPSSupport: true` on the DRA driver)**
+
+```bash
+kubectl get pods -n nvidia-dra-driver-gpu | grep mps
+```
+
+Example output:
+
+```text
+mps-control-daemon-445ccb5d-e0c0-471f-b88a-ff21c8cdf269-c3t854h   1/1     Running   0          7m
+```
+
+**4. CUDA in both containers**
+
+```bash
+kubectl exec -n mps-gpu mps-multi-container-pod -c inference-container -- \
+  python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+kubectl exec -n mps-gpu mps-multi-container-pod -c training-container -- \
+  python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+```
+
+Example output (both containers):
+
+```text
+True NVIDIA L4
+True NVIDIA L4
+```
+
+**5. Workload processes**
+
+```bash
+kubectl exec -n mps-gpu mps-multi-container-pod -c inference-container -- ps aux | grep python
+kubectl exec -n mps-gpu mps-multi-container-pod -c training-container -- ps aux | grep python
+```
+
+Example output:
+
+```text
+root  1  ... python /scripts/inference-script.py
+root  1  ... python /scripts/training-script.py
+```
+
+**6. GPU usage and MPS client (`M+C`) in `nvidia-smi`**
+
+```bash
+kubectl exec -n mps-gpu mps-multi-container-pod -c training-container -- nvidia-smi
+```
+
+Example output (note **Type `M+C`** = MPS client, non-zero memory, `python` under Processes):
+
+```text
+|   0  NVIDIA L4                      On  |   00000000:35:00.0 Off |                    0 |
+| N/A   49C    P0             34W /   72W |     603MiB /  23034MiB |      0%   E. Process |
+...
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|    0   N/A  N/A               1    M+C   python                                  316MiB |
+```
+
+:::note
+`nvidia-smi` from inside one container may list only that container’s process. Confirm both workloads with step 5. Example scripts buffer stdout, so `kubectl logs` can appear empty even when MPS is active.
+:::
 
 **Best For:**
 - Multiple small inference workloads
@@ -1075,7 +1321,7 @@ kubectl delete pod mig-workload -n mig-gpu --ignore-not-found
 kubectl delete pod basic-gpu-pod -n gpu-test1 --ignore-not-found
 
 # Delete ResourceClaimTemplates
-kubectl delete resourceclaimtemplate timeslicing-gpu-template -n timeslicing-gpu --ignore-not-found
+kubectl delete resourceclaim shared-timeslicing-gpu -n timeslicing-gpu --ignore-not-found
 kubectl delete resourceclaimtemplate mps-gpu-template -n mps-gpu --ignore-not-found
 kubectl delete resourceclaimtemplate mig-gpu-template -n mig-gpu --ignore-not-found
 kubectl delete resourceclaimtemplate basic-gpu-template -n gpu-test1 --ignore-not-found

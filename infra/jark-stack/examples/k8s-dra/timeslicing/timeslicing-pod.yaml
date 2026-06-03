@@ -71,7 +71,7 @@ spec:
       - name: shared-gpu-claim
   resourceClaims:
   - name: shared-gpu-claim
-    resourceClaimTemplateName: timeslicing-gpu-template
+    resourceClaimName: shared-timeslicing-gpu
   nodeSelector:
     NodeGroupType: g6-mng
     nvidia.com/gpu.present: "true"
@@ -105,10 +105,10 @@ spec:
       readOnly: true
     resources:
       claims:
-      - name: shared-gpu-claim-2
+      - name: shared-gpu-claim
   resourceClaims:
-  - name: shared-gpu-claim-2
-    resourceClaimTemplateName: timeslicing-gpu-template
+  - name: shared-gpu-claim
+    resourceClaimName: shared-timeslicing-gpu
   nodeSelector:
     NodeGroupType: g6-mng
     nvidia.com/gpu.present: "true"

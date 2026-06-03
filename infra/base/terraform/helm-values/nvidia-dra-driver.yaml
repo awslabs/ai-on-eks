@@ -41,3 +41,7 @@ kubeletPlugin:
     - key: "nvidia.com/gpu"
       operator: Exists
       effect: NoSchedule
+
+featureGates:
+  TimeSlicingSettings: true
+  MPSSupport: true   # only if you use MPS examples
