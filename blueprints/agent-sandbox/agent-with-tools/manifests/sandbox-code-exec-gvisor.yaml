@@ -1,0 +1,69 @@
+# SandboxTemplate — Code Execution (gVisor tier).
+#
+# Same shape as sandbox-code-exec-runc plus runtimeClassName: gvisor
+# and the gVisor NodePool toleration. Standard EKS only.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes
+#   - EKS Auto Mode: NO — Auto Mode uses sandbox-code-exec-runc
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-code-exec-gvisor
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: gvisor
+    agent-sandbox/role: code-exec
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: gvisor
+        agent-sandbox/role: code-exec
+        agent-sandbox/managed-by: agent-with-tools
+    spec:
+      runtimeClassName: gvisor
+      tolerations:
+        - key: agent-sandbox/runtime
+          operator: Equal
+          value: gvisor
+          effect: NoSchedule
+      containers:
+        - name: code-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "code-execution sandbox ready"
+              sleep infinity
+          env:
+            - name: HOME
+              value: /workspace
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

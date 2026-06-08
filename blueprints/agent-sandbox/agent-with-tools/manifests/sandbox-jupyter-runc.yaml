@@ -1,0 +1,73 @@
+# SandboxTemplate — Jupyter (runc tier).
+#
+# Session-scoped Jupyter kernel for stateful data analysis. The agent
+# process claims one instance per conversation session; state persists
+# across tool calls within that session.
+#
+# Image: python:3.12-slim with numpy/pandas/matplotlib pre-installed
+# at pod startup (written to /workspace/.local via pip install --user).
+# This avoids the jupyter/minimal-notebook image's root-requiring
+# conda setup and keeps the same security posture as the code-exec template.
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes
+#   - EKS Auto Mode: yes
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-jupyter-runc
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: runc
+    agent-sandbox/role: jupyter
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: runc
+        agent-sandbox/role: jupyter
+        agent-sandbox/managed-by: agent-with-tools
+    spec:
+      containers:
+        - name: jupyter-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              pip install --no-cache-dir --disable-pip-version-check --user \
+                numpy pandas matplotlib 2>/dev/null
+              echo "jupyter sandbox ready — data science libraries installed"
+              sleep infinity
+          env:
+            - name: HOME
+              value: /workspace
+            - name: MPLBACKEND
+              value: Agg
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
