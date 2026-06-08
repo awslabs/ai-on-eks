@@ -1,0 +1,43 @@
+# Egress allowlist for sandbox pods (code-exec + jupyter) — Cilium backend.
+#
+# Sandboxes only need package registries (PyPI for pip install).
+# They do NOT need Bedrock or STS — that's the agent's job.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: sandbox-tools-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+    agent-sandbox/role: agent-with-tools
+spec:
+  description: "FQDN allowlist for sandbox tool pods — package registries only."
+  endpointSelector:
+    matchLabels:
+      egress-tier: sandbox
+      agent-sandbox/managed-by: agent-with-tools
+  egress:
+    # DNS resolution
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchName: "pypi.org"
+              - matchPattern: "*.pypi.org"
+              - matchPattern: "*.pythonhosted.org"
+
+    # PyPI — so sandboxes can pip install
+    - toFQDNs:
+        - matchName: "pypi.org"
+        - matchPattern: "*.pypi.org"
+        - matchPattern: "*.pythonhosted.org"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
