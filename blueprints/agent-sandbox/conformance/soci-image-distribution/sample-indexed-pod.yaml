@@ -1,0 +1,38 @@
+# Conformance sample workload — a pre-SOCI-indexed image.
+#
+# public.ecr.aws/soci-workshop-examples/tensorflow_gpu:latest ships with a SOCI
+# index already attached in ECR (the upstream soci-snapshotter EKS guide uses
+# it as the canonical lazy-load demo). At ~3GB with a tiny startup working set,
+# it's the best-case lazy-load signal: if lazy-load is engaged, the container
+# reaches Ready having fetched a small fraction of the image, and SOCI FUSE
+# mounts appear on the node. No GPU needed — it just sleeps.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: soci-conformance
+  namespace: agent-sandboxes
+  labels:
+    app: soci-conformance
+spec:
+  restartPolicy: Never
+  # Pin to the dedicated SOCI lazy-load nodepool (AL2023 + FastImagePull +
+  # soci config overridden to default/lazy). Its taint keeps general
+  # workloads off, so we tolerate it here.
+  nodeSelector:
+    agent-sandbox/soci: lazy
+  tolerations:
+    - key: agent-sandbox/soci
+      operator: Equal
+      value: lazy
+      effect: NoSchedule
+  containers:
+    - name: workload
+      image: public.ecr.aws/soci-workshop-examples/tensorflow_gpu:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "1"
+          memory: "2Gi"

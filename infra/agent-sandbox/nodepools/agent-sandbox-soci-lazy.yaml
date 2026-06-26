@@ -1,0 +1,127 @@
+# Agent Sandbox — SOCI lazy-load NodePool (AL2023, opt-in).
+#
+# Dedicated pool for the image-distribution-at-scale / sandbox fan-out use
+# case. Isolated from the shared `general-purpose` pool on purpose:
+#   • Blast radius — routing the kubelet image service through soci affects
+#     image pulls on the node, so we keep it off the pool that runs
+#     cluster-critical workloads (this was a node-stability concern in
+#     earlier testing).
+#   • Churn — `general-purpose` consolidates empty nodes after 300s; this
+#     pool uses a long consolidateAfter so sandbox nodes don't get reaped
+#     mid-debug / between bursts.
+#
+# Mechanism (per AI-on-EKS team guidance): keep the EKS-managed
+# `FastImagePull` featuregate (which installs + wires soci-snapshotter via
+# nodeadm — the tested path), then override /etc/soci-snapshotter-grpc/
+# config.toml in userData so soci uses its DEFAULT pull mode (lazy-load when
+# a SOCI index is present, any index version) instead of the parallel-pull
+# config FastImagePull writes. nodeadm config generation runs before
+# cloud-init, so this shellscript's config wins.
+#
+# NOTE: candidate — validate end-to-end (FUSE mounts present + node stable)
+# on a live cluster. Open question this validates: whether FastImagePull's
+# AMI-bundled soci honors a config.toml override (untested upstream yet).
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: agent-sandbox-soci-lazy
+spec:
+  template:
+    metadata:
+      labels:
+        agent-sandbox/soci: lazy
+    spec:
+      expireAfter: 24h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: agent-sandbox-soci-lazy
+      # Tainted so only workloads that opt in (sandbox pods that tolerate
+      # this) land here — keeps the soci/image-service routing off general
+      # workloads.
+      taints:
+        - key: agent-sandbox/soci
+          value: lazy
+          effect: NoSchedule
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+      terminationGracePeriod: 24h
+  disruption:
+    budgets:
+      - nodes: 10%
+    # Long, deliberately: lazy-load sandbox nodes shouldn't be reaped
+    # between bursts (and it removes the empty-node churn we hit testing).
+    consolidateAfter: 86400s
+    consolidationPolicy: WhenEmpty
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: agent-sandbox-soci-lazy
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: ${node_iam_role}
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+        Name: "${cluster_name}-private-secondary*"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+  # soci cache on instance-store NVMe (RAID0), matching the base nodeclass.
+  instanceStorePolicy: RAID0
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 300Gi
+        volumeType: gp3
+        encrypted: true
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+    # Override the soci config FastImagePull/nodeadm wrote (parallel) with a
+    # minimal cri_keychain-only config → soci falls back to its DEFAULT pull
+    # mode, which lazy-loads any image that carries a SOCI index (no
+    # pull_modes filter, so v1- and v2-indexed images both lazy-load).
+    mkdir -p /etc/soci-snapshotter-grpc
+    cat > /etc/soci-snapshotter-grpc/config.toml <<'SOCI_CFG'
+    [cri_keychain]
+    enable_keychain = true
+    image_service_path = "/run/containerd/containerd.sock"
+    SOCI_CFG
+    # nodeadm may have already started soci with the parallel config; restart
+    # so the lazy default takes effect. Boot-time, before workloads pull.
+    systemctl restart soci-snapshotter 2>/dev/null || true
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      featureGates:
+        FastImagePull: true
+    --//
