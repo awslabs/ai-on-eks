@@ -127,6 +127,21 @@ high-churn fleets:
   to investigate the data plane (VPC CNI prefix delegation / NAU budget, runtime
   choice), not just to add nodes.
 
+### Measured: concurrent distinct cold pulls per node (validated)
+
+Real numbers from a controlled test — N pods each lazy-loading a **distinct** SOCI-indexed image (tiny shared base + a unique ~300 MB layer, read at startup) starting concurrently on **one cold c6a.xlarge (4 vCPU)**, baseline config:
+
+| Concurrent distinct cold pulls | per-pod time-to-Ready (min/avg/max) |
+|---|---|
+| 5 | 14 / 16 / 19 s |
+| 10 | 13 / 16 / 20 s |
+| 15 | 15 / 26 / 45 s |
+| 20 | 22 / 48 / 64 s |
+
+- **Single-image cold start ≈ 14 s** (vs ~3.5 min full pull, ~15× faster). For *same-image* horizontal scale-up (Deployment/HPA replicas), only the **first** replica on a node pays this; the rest are warm cache hits regardless of lazy-load.
+- **Per-pod startup stays flat to ~10 concurrent distinct cold pulls on a 4-vCPU node, knees at ~15, and roughly triples by 20** as the shared snapshotter + node network/NVMe saturate. All pods still succeed — the cost of over-concurrency is *latency, not failure*.
+- The knee is **node-capacity-relative** (more vCPU/bandwidth → higher knee) and **delta-size-relative**. Actionable rule of thumb: keep **≲10–12 concurrent distinct large-image cold pulls per 4-vCPU node**; spread fan-out across nodes and shrink the per-task delta (pre-warm shared bases) to raise the ceiling.
+
 These are directional starting points, not contractual limits — the right move
 is always to validate against your own workload (below). And image distribution
 is necessary but not sufficient at the top end: sandbox creation rate, pod
