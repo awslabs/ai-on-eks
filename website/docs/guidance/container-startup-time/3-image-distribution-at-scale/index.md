@@ -63,7 +63,7 @@ This distinction is worth being precise about:
 | Pull mode | What it does | AL2023 | Bottlerocket |
 |---|---|---|---|
 | **parallel-pull-unpack** (default) | Concurrent download + unpack of the full image. No SOCI index required; helps every image. | ✅ | ✅ |
-| **lazy-load** | On-demand streaming from a SOCI index — fast start when only part of the image is read at launch. Un-indexed images fall back to parallel-pull. | ✅ (`soci_pull_mode = "lazy-load"`) | ❌ — Bottlerocket's settings API exposes only `parallel-pull-unpack` |
+| **lazy-load** | On-demand streaming from a SOCI index — fast start when only part of the image is read at launch. Un-indexed images fall back to parallel-pull. | ✅ (see gates below) | ❌ — Bottlerocket's settings API exposes only `parallel-pull-unpack` |
 
 Lazy-load and parallel-pull are **not** combined per image — it's either/or.
 With the fallback enabled (our config sets `experimental_parallel_pull_as_fallback`),
@@ -76,7 +76,19 @@ Parallel-pull-unpack needs no index and helps every image; choose lazy-load
 (AL2023 only) when images are SOCI-indexed and the startup working set is sparse.
 On Bottlerocket, parallel is the only supported mode today.
 
-## It's orthogonal to the isolation tier
+## Enabling lazy-load on AL2023 — two gates that silently disable it
+
+Both must be satisfied, and each fails *silently* (soci looks installed/active, but no lazy-load happens). Validated on a live cluster, June 2026:
+
+1. **Instance size — xlarge+.** `nodeadm` only wires soci into containerd (proxy plugins + `snapshotter = soci` + kubelet image-service routing) when the node has **≥4 vCPU and ≥7 GiB** (the `UseSOCISnapshotter` gate). On a 2-vCPU node, soci is never in the pull path — no error, just a full pull. Require xlarge+ on the pool (`karpenter.k8s.aws/instance-cpu Gt "3"`).
+2. **Explicit pull-modes config — soci's default is NOT lazy.** A minimal `cri_keychain`-only config does **not** lazy-load. You must explicitly enable `[pull_modes.soci_v1]` and `[pull_modes.soci_v2]` (with `experimental_parallel_pull_as_fallback` for un-indexed images). This was verified empirically: same node, same soci version — `cri_keychain`-only gave **0** FUSE mounts; the explicit config gave **19**.
+
+Two ways to deliver the explicit config, both requiring xlarge+:
+
+- **Today, no custom AMI (bridge)**: keep the EKS-managed `FastImagePull` feature gate (it installs + wires soci) and override `/etc/soci-snapshotter-grpc/config.toml` in userData with the explicit lazy config. nodeadm config generation runs before cloud-init, so the override wins. This is what the [agent-sandbox SOCI lazy nodepool](https://github.com/awslabs/ai-on-eks/blob/main/infra/agent-sandbox/nodepools/agent-sandbox-soci-lazy.yaml) ships.
+- **Durable (cleaner)**: a `SociLazyLoading` nodeadm feature gate (proposed to `amazon-eks-ami`) that writes the explicit lazy config + wiring directly — no override hack. Same end state.
+
+
 
 Image distribution is a node-bootstrap concern, independent of the sandbox
 isolation runtime. The same SOCI path serves a `gvisor` sandbox and a `kata-fc`
