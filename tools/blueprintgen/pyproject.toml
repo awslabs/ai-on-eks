@@ -1,0 +1,19 @@
+[project]
+name = "aoe-blueprintgen"
+version = "0.1.0"
+description = "ai-on-eks blueprint generator: registry entry -> Kubernetes manifest"
+requires-python = ">=3.11"
+dependencies = ["Jinja2>=3.1", "PyYAML>=6.0", "jsonschema>=4.20"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0"]
+
+[project.scripts]
+aoe-blueprint = "tools.blueprintgen.cli:main"
+
+[tool.setuptools.package-data]
+"tools.blueprintgen" = ["templates/*.j2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

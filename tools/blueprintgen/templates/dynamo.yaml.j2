@@ -1,0 +1,45 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: nvidia.com/v1alpha1
+kind: DynamoGraphDeployment
+metadata:
+  name: {{ name }}
+spec:
+  services:
+    Frontend:
+      dynamoNamespace: {{ name }}
+      componentType: frontend
+      replicas: 1
+      extraPodSpec:
+        mainContainer:
+          image: {{ container_image }}
+    VllmWorker:
+      dynamoNamespace: {{ name }}
+      componentType: worker
+      replicas: 1
+      resources:
+        limits:
+          gpu: "{{ tensor_parallel }}"
+      extraPodSpec:
+        nodeSelector:
+          node.kubernetes.io/instance-type: {{ instance_type }}
+        mainContainer:
+          image: {{ container_image }}
+          args:
+            - "serve"
+            - "{{ served_repo }}"
+            - "--tensor-parallel-size"
+            - "{{ tensor_parallel }}"
+            - "--max-model-len"
+            - "{{ max_model_len }}"
+{% if tool_parser %}
+            - "--enable-auto-tool-choice"
+            - "--tool-call-parser"
+            - "{{ tool_parser }}"
+{% endif %}
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token

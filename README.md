@@ -76,3 +76,13 @@ instance types, benchmarks, status). Entries validate against
 [`registry/schema.json`](registry/schema.json). Run `python -m registry.validate`
 to check every entry. Per-model deployment guides generated from these entries live
 under [`website/docs/models/`](website/docs/models/).
+
+## Blueprint Generator
+
+[`tools/blueprintgen/`](tools/blueprintgen/) provides `aoe-blueprint`, which renders a
+validated registry entry into a deployable manifest — a plain vLLM `Deployment`+`Service`
+or an NVIDIA `DynamoGraphDeployment` CRD. Run
+`aoe-blueprint gen registry/models/qwen3-coder-30b.yaml --target vllm`. See
+[`tools/blueprintgen/README.md`](tools/blueprintgen/README.md).
+
+> > > > > > > 10fcbdd (feat(blueprintgen): add aoe-blueprint registry->manifest generator)
