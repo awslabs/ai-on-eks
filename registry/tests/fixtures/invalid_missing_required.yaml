@@ -1,0 +1,8 @@
+name: no-repo
+architecture: Qwen3ForCausalLM
+params_b: 1
+precision: [bf16]
+tensor_parallel: 1
+max_model_len: 32768
+container_image: pending
+status: draft
