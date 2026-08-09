@@ -1,0 +1,21 @@
+name: qwen3-coder-30b
+hf_repo: Qwen/Qwen3-Coder-30B-A3B-Instruct
+hf_repo_serve: null
+architecture: Qwen3MoeForCausalLM
+params_b: 30
+tool_parser: qwen3_coder
+precision: [bf16, fp8]
+tensor_parallel: 4
+max_model_len: 262144
+container_image: pending
+status: verified
+verified_date: "2026-07-27"
+instances:
+  - type: g6e.12xlarge
+    region_tested: us-east-2
+    tokens_per_sec: 842.0
+    ttft_ms: 260
+    itl_ms: 22.1
+    concurrency: 8
+    cost_per_1m_tok_usd: 1.94
+guide_url: /docs/models/qwen3-coder-30b
