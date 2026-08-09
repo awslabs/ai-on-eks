@@ -1,0 +1,31 @@
+# Egress allowlist for OpenWebUI — needs broad internet access at first boot
+# to download embedding models from HuggingFace. After initial setup, this
+# could be tightened to only cluster-internal (agent service).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: openwebui-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+    agent-sandbox/role: agent-with-tools
+spec:
+  description: "Broad egress for OpenWebUI — needs HuggingFace + CDN at first boot."
+  endpointSelector:
+    matchLabels:
+      app: openwebui
+  egress:
+    # Allow all egress for OpenWebUI (trusted UI component)
+    - toEntities:
+        - world
+        - cluster
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
