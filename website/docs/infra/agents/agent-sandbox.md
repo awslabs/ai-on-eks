@@ -34,7 +34,7 @@ flowchart TB
 
     A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
 
-    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxClaim lifecycle<br/><i>ArgoCD-managed addon (enable_agent_sandbox=true)</i>"]:::controller
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox · SandboxTemplate · SandboxWarmPool · SandboxClaim lifecycle<br/><i>ArgoCD-managed addon (enable_agent_sandbox=true)</i>"]:::controller
 
     subgraph C["RuntimeClass selection"]
         direction LR
@@ -62,7 +62,7 @@ flowchart TB
 The solution deploys in layers:
 
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
-- **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, and `SandboxClaim` lifecycle.
+- **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, `SandboxWarmPool`, and `SandboxClaim` lifecycle (`v1beta1` API, agent-sandbox v1.0+).
 - **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
 - **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
 - **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the infra with [agent-egress](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/egress) — it auto-detects compute mode and applies Cilium + Hubble chaining (Standard EKS, requires `enable_cilium = true` in the base infra) or native VPC CNI `ApplicationNetworkPolicy` (EKS Auto Mode).
@@ -79,10 +79,10 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 
 ### Two composition paths
 
-- **SandboxClaim** — a thin claim (`sandbox-agent.yaml`) that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
+- **SandboxWarmPool + SandboxClaim** — a pool that points at one of the SandboxTemplates and a thin claim (`sandbox-agent.yaml`) that checks out from the pool, plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the pool picks the tier. Native to the SIG-Apps Sandbox API.
 - **KRO AgentSandbox** — the same workload composed via a single `AgentSandbox` custom resource (`kro/instance.yaml` + `kro/rgd.yaml`). The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`) is a SandboxTemplate the claim or AgentSandbox can target — the claim's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on.
+Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
 
 ## Prerequisites
 
@@ -239,7 +239,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
 | `region` | AWS region | Base module default (`us-west-2`) |
 | `eks_cluster_version` | EKS version | `1.34` |
 | `enable_agent_sandbox` | Deploy the kubernetes-sigs agent-sandbox controller via ArgoCD | `true` |
-| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox git ref | `v0.4.5` |
+| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox git ref | `v1.0.1` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
 | `kro_version` | kro Helm chart version | `0.9.1` |
 | `enable_eks_auto_mode` | Use EKS Auto Mode instead of Karpenter-managed compute | `false` |

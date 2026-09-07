@@ -42,7 +42,7 @@ flowchart TB
 
     A["Agent workload<br/>(Python agent, background processor, LLM-driven task runner)<br/>Runs inside a <b>Sandbox</b> (agents.x-k8s.io CRD)"]:::workload
 
-    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox / SandboxTemplate / SandboxClaim lifecycle<br/><i>ArgoCD addon, enable_agent_sandbox=true</i>"]:::controller
+    B["SIG-Apps <b>agent-sandbox controller</b><br/>Manages Sandbox / SandboxTemplate / SandboxWarmPool / SandboxClaim lifecycle<br/><i>ArgoCD addon, enable_agent_sandbox=true</i>"]:::controller
 
     subgraph C["RuntimeClass selection"]
         direction LR
@@ -69,7 +69,7 @@ flowchart TB
 
 Two composition paths ship with the blueprint that layers on top of this infra:
 
-- **SandboxClaim** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml)) — a thin claim that points at one of the SandboxTemplates plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the claim picks the tier. Native to the SIG-Apps Sandbox API.
+- **SandboxWarmPool + SandboxClaim** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml)) — a pool that points at one of the SandboxTemplates, a thin claim that checks out from the pool, and the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the pool picks the tier. Native to the SIG-Apps Sandbox API (`v1beta1`).
 - **KRO AgentSandbox** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — the same workload composed via a single `AgentSandbox` custom resource. The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap`, and Bedrock region/model and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
 Both paths produce equivalent running pods. Each tier (`runc`, `gvisor`) is a SandboxTemplate the claim or AgentSandbox can target.
@@ -78,7 +78,7 @@ Both paths produce equivalent running pods. Each tier (`runc`, `gvisor`) is a Sa
 
 | Component | Version | Purpose |
 |-----------|---------|---------|
-| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v0.4.5 | Sandbox / SandboxTemplate / SandboxClaim controller (base infra ArgoCD addon, `enable_agent_sandbox`) |
+| [kubernetes-sigs/agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | v1.0.1 | Sandbox / SandboxTemplate / SandboxWarmPool / SandboxClaim controller, `v1beta1` API (base infra ArgoCD addon, `enable_agent_sandbox`) |
 | [kro](https://kro.run/) | 0.9.1 | ResourceGraphDefinition-based composition (base infra ArgoCD addon, `enable_kro`; optional) |
 | [gVisor](https://gvisor.dev/) | runsc (AL2023) | Userspace syscall interception for gvisor tier (installed via Karpenter NodePool user-data) |
 | [Karpenter](https://karpenter.sh/) | Bundled with base module | Node autoscaling with a dedicated gVisor NodePool (Standard EKS) |
@@ -236,7 +236,7 @@ With the platform manifests applied, the cluster can host any SandboxClaim that 
 
 **Reference agent blueprint** ([`blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/)) — complete agent workload with FQDN egress enforcement and end-to-end conformance:
 
-- **SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue. Claims the agent-shaped templates ([`sandbox-agent-runc.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-runc.yaml) / [`sandbox-agent-gvisor.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml)) which add the Python image + Bedrock env + ConfigMap mount on top of the basic templates' shape.
+- **SandboxWarmPool + SandboxClaim + reference agent** ([`blueprints/agent-sandbox/manifests/sandbox-agent.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent.yaml), [`agent.py`](../../blueprints/agent-sandbox/agent.py)) — the workload spec, agent script, and ServiceAccount glue. The pool references the agent-shaped templates ([`sandbox-agent-runc.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-runc.yaml) / [`sandbox-agent-gvisor.yaml`](../../blueprints/agent-sandbox/manifests/sandbox-agent-gvisor.yaml)) which add the Python image + Bedrock env + ConfigMap mount on top of the basic templates' shape; the claim checks out from the pool.
 - **KRO composition path** ([`blueprints/agent-sandbox/manifests/kro/`](../../blueprints/agent-sandbox/manifests/kro/)) — same workload via a single `AgentSandbox` CR backed by a `ResourceGraphDefinition`.
 - **Egress enforcement example** ([`blueprints/agent-sandbox/egress/`](../../blueprints/agent-sandbox/egress/)) — auto-detects compute mode and applies Cilium CNPs (Standard EKS) or native ANPs (Auto Mode) plus the Bedrock IRSA role.
 - **Conformance test** ([`blueprints/agent-sandbox/conformance.sh`](../../blueprints/agent-sandbox/conformance.sh)) — claims the right agent template for the cluster's compute mode and exercises the full chain end-to-end.
@@ -274,7 +274,7 @@ See the [basic blueprint README](../../blueprints/agent-sandbox/basic/README.md)
 | `region` | AWS region | Base module default (`us-west-2`); uncomment to override |
 | `eks_cluster_version` | EKS version | `1.34` |
 | `enable_agent_sandbox` | Deploy the SIG-Apps agent-sandbox controller via ArgoCD | `true` |
-| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v0.4.5` |
+| `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v1.0.1` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
 | `kro_version` | kro Helm chart version | `0.9.1` |
 | `enable_cilium` | Deploy Cilium in aws-cni chaining mode (Standard EKS only — leave `false` for Auto Mode) | `true` |
