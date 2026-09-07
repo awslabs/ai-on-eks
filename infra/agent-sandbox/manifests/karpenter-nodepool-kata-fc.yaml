@@ -46,6 +46,15 @@ spec:
   securityGroupSelectorTerms:
     - tags:
         karpenter.sh/discovery: __CLUSTER_NAME__
+  # Nested virtualization is a LAUNCH PARAMETER, not an instance-family
+  # property: /dev/kvm only appears when the instance is launched with
+  # NestedVirtualization enabled (EC2 API, Feb 2026). Karpenter supports
+  # this via cpuOptions.nestedVirtualization from v1.14 (aws/karpenter-
+  # provider-aws#9043). Found live: a c8i.xlarge launched without this
+  # flag has no /dev/kvm and the user-data fail-fast fires — a capable
+  # family alone is not the gate.
+  cpuOptions:
+    nestedVirtualization: enabled
   blockDeviceMappings:
     # Root volume for the OS + containerd overlay store.
     - deviceName: /dev/xvda
@@ -144,6 +153,14 @@ spec:
         ConfigPath = "/opt/kata/share/defaults/kata-containers/configuration-fc.toml"
     EOT
 
+    # Keep compressed layer blobs in the content store. The nodeadm base
+    # config sets discard_unpacked_layers=true; with two snapshotters on
+    # one node (overlayfs for runc pulls, devmapper for kata-fc) the
+    # first unpack discards the blobs and the devmapper re-unpack then
+    # fails with "content digest ... not found". Flip in place —
+    # appending a duplicate TOML table would be rejected by containerd.
+    sed -i 's/discard_unpacked_layers = true/discard_unpacked_layers = false/' /etc/containerd/config.toml
+
     systemctl restart containerd
 
     # --- 6. Non-fatal verification (surfaces issues in node logs) ----
@@ -186,15 +203,20 @@ spec:
         - key: kubernetes.io/arch
           operator: In
           values: ["amd64"]
-        # Nested-virt-capable families only (EC2 nested virt GA on
-        # C8i / M8i / R8i — Intel/AMD gen 8). Kata+FC can't run without
-        # /dev/kvm, so we never provision a non-nested-virt node here.
-        - key: karpenter.k8s.aws/instance-category
+        # Nested-virt-capable families (EC2 nested virt on virtual
+        # instances, Feb 2026: C8i/M8i/R8i + flex variants, C7i/M7i/R7i,
+        # X8i, I7i). NOTE: /dev/kvm requires the NestedVirtualization
+        # LAUNCH PARAMETER (cpuOptions.nestedVirtualization on the
+        # EC2NodeClass above) — a capable family alone does not expose
+        # KVM. Pin non-flex families for consistent (non-burst) CPU
+        # under microVM load, and require ≥4 vCPU so the node carries
+        # the microVM + devmapper thin-pool overhead comfortably.
+        - key: karpenter.k8s.aws/instance-family
           operator: In
-          values: ["m", "c", "r"]
-        - key: karpenter.k8s.aws/instance-generation
-          operator: In
-          values: ["8"]
+          values: ["c8i", "m8i", "r8i"]
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: Gt
+          values: ["3"]
         - key: karpenter.sh/capacity-type
           operator: In
           values: ["on-demand"]
