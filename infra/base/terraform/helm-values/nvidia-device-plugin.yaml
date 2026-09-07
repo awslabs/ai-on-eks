@@ -3,7 +3,7 @@ mofedEnabled: false
 
 # Target only nodes running AL2023 AMIs
 nodeSelector:
-  ai.eks.amazonaws.com/amiFamily: al2023
+  ai-on-eks.io/amiFamily: al2023
 
 # Enable GPU Feature Discovery (default: false)
 gfd:
@@ -14,7 +14,7 @@ nfd:
   master:
     config:
       extraLabelNs:
-      - "ai.eks.amazonaws.com"
+      - "ai-on-eks.io"
       - "vpc.amazonaws.com"
       - "nvidia.com"
   worker:
@@ -27,7 +27,7 @@ nfd:
         custom:
           - name: "label amiFamily for al2023"
             labels:
-              "ai.eks.amazonaws.com/amiFamily": "al2023"
+              "ai-on-eks.io/amiFamily": "al2023"
             matchFeatures:
               - feature: system.osRelease
                 matchExpressions:
@@ -35,7 +35,7 @@ nfd:
                   VERSION_ID: {op: In, value: ["2023"]}
           - name: "label amiFamily for bottlerocket"
             labels:
-              "ai.eks.amazonaws.com/amiFamily": "bottlerocket"
+              "ai-on-eks.io/amiFamily": "bottlerocket"
             matchFeatures:
               - feature: system.osRelease
                 matchExpressions:
