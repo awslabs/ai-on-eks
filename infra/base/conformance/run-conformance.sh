@@ -126,10 +126,22 @@ instance_for_node() {
 }
 
 ssm_run() { # $1=instance-id $2=command -> stdout
-    local cid
-    cid="$(aws ssm send-command --region "$REGION" --instance-ids "$1" \
-        --document-name "AWS-RunShellScript" --parameters commands="[\"$2\"]" \
-        --query "Command.CommandId" --output text)"
+    # Fresh Karpenter nodes lag SSM registration by several minutes (the
+    # same failure mode node-debug.sh documents). send-command throws
+    # InvalidInstanceId until the agent registers — retry through that
+    # window instead of failing the assertion with empty output.
+    local cid="" attempt
+    for attempt in $(seq 1 20); do
+        cid="$(aws ssm send-command --region "$REGION" --instance-ids "$1" \
+            --document-name "AWS-RunShellScript" --parameters commands="[\"$2\"]" \
+            --query "Command.CommandId" --output text 2>/dev/null || echo "")"
+        [ -n "$cid" ] && [ "$cid" != "None" ] && break
+        sleep 15
+    done
+    if [ -z "$cid" ] || [ "$cid" = "None" ]; then
+        echo "SSM-UNREACHABLE: instance $1 never registered with SSM (5 min)"
+        return 0
+    fi
     aws ssm wait command-executed --region "$REGION" --command-id "$cid" --instance-id "$1" 2>/dev/null || true
     aws ssm list-command-invocations --region "$REGION" --command-id "$cid" --instance-id "$1" \
         --details --query "CommandInvocations[0].CommandPlugins[0].Output" --output text
