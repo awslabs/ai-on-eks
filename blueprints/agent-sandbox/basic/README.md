@@ -4,7 +4,7 @@ The smallest viable Sandbox deployment, demonstrating sandboxing alone — no IR
 
 ## What ships
 
-- `sandbox-claim-basic.yaml` — a SandboxClaim that targets one of the basic SandboxTemplates installed by the platform infra.
+- `sandbox-claim-basic.yaml` — a SandboxWarmPool (replicas: 0, cold-start) that targets one of the basic SandboxTemplates installed by the platform infra, plus a SandboxClaim that checks out from the pool (v1beta1 API).
 - `install.sh` — auto-detects the cluster's compute mode (Standard EKS vs Auto Mode), substitutes the right SandboxTemplate name, applies the claim, waits for Ready, and (with `smoke`) runs a smoke test.
 - `README.md` — this file.
 
@@ -72,13 +72,13 @@ The basic templates (`sandbox-runc` for runc on both modes, `sandbox-gvisor` for
 - Pod labels `egress-tier: sandbox` + `agent-sandbox/tier: <runc|gvisor>` — these are matched by the egress example's network policies if you layer it on later
 - `runtimeClassName: gvisor` + matching `tolerations` (gvisor template only) — schedules onto the gVisor Karpenter NodePool
 
-The default workload image is `nginx:alpine` so the templates produce a Pod that runs out of the box. Swap it out by writing your own SandboxTemplate (copy the basic template, change the image, change the volumeMounts to fit your workload, give it a unique `metadata.name`) and pointing a SandboxClaim at it.
+The default workload image is `nginx:alpine` so the templates produce a Pod that runs out of the box. Swap it out by writing your own SandboxTemplate (copy the basic template, change the image, change the volumeMounts to fit your workload, give it a unique `metadata.name`), pointing a SandboxWarmPool at it, and pointing a SandboxClaim at the pool.
 
 ## Customizing the workload
 
 Two patterns:
 
-**(1) Write your own SandboxTemplate.** Copy [`sandbox-runc.yaml`](../../../infra/agent-sandbox/manifests/sandbox-runc.yaml) (or the gvisor variant) into your workload manifests, change `metadata.name`, change the container image + ports + volumeMounts, and apply it. Then point a SandboxClaim at the new template name. This is the canonical pattern — the basic templates demonstrate the shape.
+**(1) Write your own SandboxTemplate.** Copy [`sandbox-runc.yaml`](../../../infra/agent-sandbox/manifests/sandbox-runc.yaml) (or the gvisor variant) into your workload manifests, change `metadata.name`, change the container image + ports + volumeMounts, and apply it. Then point a SandboxWarmPool's `sandboxTemplateRef` at the new template name and a SandboxClaim's `warmPoolRef` at the pool. This is the canonical pattern — the basic templates demonstrate the shape.
 
 **(2) Use one of the agent-shaped templates.** If your workload happens to be a Python agent that wants the Bedrock + ConfigMap + IRSA scaffolding, the [reference agent's templates](../manifests/sandbox-agent-runc.yaml) are ready-made variants. They live in the blueprint, not the platform infra, because they bake in workload-specific assumptions.
 
