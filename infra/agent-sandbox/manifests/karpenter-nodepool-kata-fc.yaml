@@ -1,0 +1,235 @@
+# Kata + Firecracker NodePool — standalone pool that supplies
+# nested-virt-capable nodes with the Kata + Firecracker shim installed.
+#
+# Why Karpenter (not a managed node group): Kata+FC needs CPU Options +
+# user-data that MNG lifecycle operations don't persist across node
+# replacements (spec §6.6). Karpenter owns the node lifecycle via the
+# EC2NodeClass below, so the nested-virt config survives — which is why
+# the EKS-native Kata+FC path is practical on Karpenter today while the
+# MNG path waits on the persistence gap.
+#
+# Two resources:
+#   1. EC2NodeClass — AL2023 on nested-virt-capable instances (C8i/M8i/
+#      R8i — Intel/AMD gen-8, where EC2 nested virt is GA). User-data
+#      installs the Kata static build + Firecracker and registers the
+#      `kata-fc` containerd runtime.
+#   2. NodePool — matches pods requesting `runtimeClassName: kata-fc`,
+#      taints so other workloads don't land on these (more expensive)
+#      nodes, and constrains to nested-virt instance families.
+#
+# ⚠️ Validate on a live cluster before production use.
+# The install below provisions the full Kata+FC path: an LVM devmapper
+# thin-pool on the secondary EBS volume (Firecracker needs a block-device
+# rootfs — overlayfs won't work), a pinned kata-static install, and the
+# kata-fc containerd-v2 runtime registration. E2E cycle-01 surfaced that
+# the prior scaffolding left the thin-pool unconfigured, so containerd
+# dropped the runtime ("no runtime for kata-fc is configured") — that is
+# the gap this closes. Still to confirm on-cluster: thin-pool sizing for
+# the resident image set, and that configuration-fc.toml's shipped
+# defaults boot on the chosen nested-virt instances.
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: agent-sandbox-kata-fc
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: al2023@latest
+  # Resolved by install.sh sed at render time (same pattern as the
+  # gVisor NodeClass) — the base module appends a generated suffix to
+  # the node role.
+  role: __KARPENTER_NODE_ROLE__
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: __CLUSTER_NAME__
+  # Nested virtualization is a LAUNCH PARAMETER, not an instance-family
+  # property: /dev/kvm only appears when the instance is launched with
+  # NestedVirtualization enabled (EC2 API, Feb 2026). Karpenter supports
+  # this via cpuOptions.nestedVirtualization from v1.14 (aws/karpenter-
+  # provider-aws#9043). Found live: a c8i.xlarge launched without this
+  # flag has no /dev/kvm and the user-data fail-fast fires — a capable
+  # family alone is not the gate.
+  cpuOptions:
+    nestedVirtualization: enabled
+  blockDeviceMappings:
+    # Root volume for the OS + containerd overlay store.
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        encrypted: true
+    # Separate volume backing the devmapper thin-pool that Firecracker
+    # rootfs blocks live on. Sized for the resident image set; tune.
+    - deviceName: /dev/xvdb
+      ebs:
+        volumeSize: 200Gi
+        volumeType: gp3
+        encrypted: true
+  tags:
+    agent-sandbox/tier: kata-fc
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+
+    # --- 1. Prerequisites --------------------------------------------
+    # lvm2 + device-mapper-persistent-data: create/activate the thin-pool
+    # (thin_check). zstd: kata-static ships as .tar.zst since 3.21.0.
+    dnf install -y lvm2 device-mapper-persistent-data zstd
+
+    # --- 2. Verify nested virt ---------------------------------------
+    # Firecracker needs /dev/kvm; absent on non-nested-virt instances —
+    # fail fast and loud rather than register a runtime that can't start.
+    if [[ ! -e /dev/kvm ]]; then
+      echo "FATAL: /dev/kvm not present — instance lacks nested virt" >&2
+      exit 1
+    fi
+
+    # --- 3. devmapper thin-pool on the secondary EBS volume ----------
+    # Firecracker uses a block-device rootfs, so the kata-fc runtime
+    # needs containerd's devmapper snapshotter backed by a real thin
+    # pool (overlayfs won't work). Nitro presents the /dev/xvdb EBS
+    # mapping as an NVMe device; AL2023 udev usually creates the xvdb
+    # symlink, but resolve robustly with an NVMe-disk fallback.
+    DATA_DEV=""
+    for _ in $(seq 1 30); do
+      if [[ -e /dev/xvdb ]]; then DATA_DEV=$(readlink -f /dev/xvdb); break; fi
+      sleep 2
+    done
+    if [[ -z "$DATA_DEV" ]]; then
+      ROOT_DISK=$(lsblk -ndo PKNAME "$(findmnt -no SOURCE /)")
+      DATA_DEV=$(lsblk -dpno NAME,TYPE | awk '$2=="disk"{print $1}' \
+        | grep -v "/dev/${ROOT_DISK}" | head -1)
+    fi
+    echo "devmapper data device: ${DATA_DEV}"
+
+    pvcreate -y "${DATA_DEV}"
+    vgcreate containerd "${DATA_DEV}"
+    # Thin-pool LV (LVM auto-sizes metadata); dm name = containerd-thinpool.
+    lvcreate -y --type thin-pool --name thinpool -l 95%FREE containerd
+
+    # --- 4. Install Kata Containers (static) + Firecracker -----------
+    # kata-static bundles the Kata shim, guest kernel/image, and the
+    # Firecracker VMM under /opt/kata. Pinned; bump via CI.
+    KATA_VERSION="3.21.0"
+    cd /tmp
+    curl -fsSL --retry 3 -o kata-static.tar.zst \
+      "https://github.com/kata-containers/kata-containers/releases/download/${KATA_VERSION}/kata-static-${KATA_VERSION}-amd64.tar.zst"
+    tar --use-compress-program=unzstd -xf kata-static.tar.zst -C /
+    ln -sf /opt/kata/bin/containerd-shim-kata-v2 /usr/local/bin/containerd-shim-kata-v2
+
+    # --- 5. containerd: devmapper snapshotter + kata-fc runtime ------
+    # AL2023 / EKS 1.34 ships containerd v2: CRI runtimes live under
+    # io.containerd.cri.v1.runtime (the legacy grpc.v1.cri path is
+    # silently ignored). The snapshotter plugin id is unchanged
+    # (io.containerd.snapshotter.v1.devmapper). Wait for nodeadm to
+    # generate the base config, then append (don't clobber) so the runc
+    # registration stays intact, and restart — same mechanism as gVisor.
+    for _ in $(seq 1 30); do
+      [[ -f /etc/containerd/config.toml ]] && break
+      sleep 2
+    done
+    cat <<'EOT' >> /etc/containerd/config.toml
+
+    [plugins.'io.containerd.snapshotter.v1.devmapper']
+      pool_name = "containerd-thinpool"
+      root_path = "/var/lib/containerd/devmapper"
+      base_image_size = "10GB"
+      discard_blocks = true
+
+    [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-fc]
+      runtime_type = "io.containerd.kata.v2"
+      snapshotter = "devmapper"
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.kata-fc.options]
+        ConfigPath = "/opt/kata/share/defaults/kata-containers/configuration-fc.toml"
+    EOT
+
+    # Keep compressed layer blobs in the content store. The nodeadm base
+    # config sets discard_unpacked_layers=true; with two snapshotters on
+    # one node (overlayfs for runc pulls, devmapper for kata-fc) the
+    # first unpack discards the blobs and the devmapper re-unpack then
+    # fails with "content digest ... not found". Flip in place —
+    # appending a duplicate TOML table would be rejected by containerd.
+    sed -i 's/discard_unpacked_layers = true/discard_unpacked_layers = false/' /etc/containerd/config.toml
+
+    systemctl restart containerd
+
+    # --- 6. Non-fatal verification (surfaces issues in node logs) ----
+    sleep 5
+    crictl info 2>/dev/null | grep -i kata-fc \
+      && echo "kata-fc runtime registered" \
+      || echo "WARN: kata-fc not yet visible in crictl info"
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      kubelet:
+        config:
+          maxPods: 30
+    --//
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: agent-sandbox-kata-fc
+spec:
+  template:
+    metadata:
+      labels:
+        agent-sandbox/runtime: kata-fc
+        agent-sandbox/tier: kata-fc
+    spec:
+      taints:
+        - key: agent-sandbox/runtime
+          value: kata-fc
+          effect: NoSchedule
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: agent-sandbox-kata-fc
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        # Nested-virt-capable families (EC2 nested virt on virtual
+        # instances, Feb 2026: C8i/M8i/R8i + flex variants, C7i/M7i/R7i,
+        # X8i, I7i). NOTE: /dev/kvm requires the NestedVirtualization
+        # LAUNCH PARAMETER (cpuOptions.nestedVirtualization on the
+        # EC2NodeClass above) — a capable family alone does not expose
+        # KVM. Pin non-flex families for consistent (non-burst) CPU
+        # under microVM load, and require ≥4 vCPU so the node carries
+        # the microVM + devmapper thin-pool overhead comfortably.
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["c8i", "m8i", "r8i"]
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: Gt
+          values: ["3"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        # Mirror the gVisor pool: the runtime label must be in
+        # requirements (not just template labels) for the Karpenter v1
+        # scheduler to select this pool on a matching pod nodeSelector.
+        - key: agent-sandbox/runtime
+          operator: In
+          values: ["kata-fc"]
+      expireAfter: 24h
+  limits:
+    cpu: 16
+    memory: 32Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 10m

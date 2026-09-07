@@ -1,0 +1,37 @@
+# Conformance sample workload — Kata + Firecracker tier.
+#
+# A minimal pod pinned to the kata-fc RuntimeClass + matching toleration, to
+# exercise the tier infra (RuntimeClass + nested-virt NodePool + shim install)
+# end to end. nginx:alpine just needs to reach Ready inside the microVM.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kata-conformance
+  namespace: agent-sandboxes
+  labels:
+    app: kata-conformance
+spec:
+  runtimeClassName: kata-fc
+  restartPolicy: Never
+  tolerations:
+    - key: agent-sandbox/runtime
+      operator: Equal
+      value: kata-fc
+      effect: NoSchedule
+  containers:
+    - name: workload
+      image: nginx:alpine
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "256Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]

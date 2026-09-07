@@ -20,7 +20,7 @@
 #   cd blueprints/agent-sandbox/basic
 #   ./install.sh                # Mode detection + apply + wait for Ready
 #   ./install.sh smoke          # Apply + smoke test (kubectl exec into the pod)
-#   ./install.sh uninstall      # Remove the SandboxClaim
+#   ./install.sh uninstall      # Remove the SandboxWarmPool + SandboxClaim
 
 set -euo pipefail
 
@@ -91,13 +91,25 @@ apply_claim() {
         exit 1
     }
 
-    echo "=== Applying basic SandboxClaim ==="
+    echo "=== Applying basic SandboxWarmPool + SandboxClaim ==="
     sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
         "$SCRIPT_DIR/sandbox-claim-basic.yaml" \
         | kubectl apply -f -
 
     echo "=== Waiting for Sandbox pod Ready (up to 3 min) ==="
-    # The pod's `metadata.name` is the same as the SandboxClaim's name.
+    # v1beta1 claims resolve through the warm pool (replicas: 0 →
+    # cold start), so the pod appears after pool + claim + sandbox
+    # reconciles. A cold-started sandbox takes the claim's name, and
+    # the pod's `metadata.name` always equals the sandbox's name —
+    # so pod/$CLAIM_NAME still holds. Poll for pod existence first;
+    # `kubectl wait` errors out immediately on a missing resource.
+    local attempt
+    for attempt in $(seq 1 12); do
+        if kubectl -n "$NS" get pod "$CLAIM_NAME" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 5
+    done
     kubectl -n "$NS" wait --for=condition=Ready pod/"$CLAIM_NAME" --timeout=180s
 
     echo ""
@@ -134,7 +146,7 @@ smoke_test() {
 
 uninstall() {
     detect_compute_mode || true
-    echo "=== Removing basic SandboxClaim ==="
+    echo "=== Removing basic SandboxWarmPool + SandboxClaim ==="
     if [ -n "${SANDBOX_TEMPLATE:-}" ]; then
         sed "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
             "$SCRIPT_DIR/sandbox-claim-basic.yaml" \
@@ -143,8 +155,9 @@ uninstall() {
         # Fall back to deleting by name+namespace if mode detection
         # failed (e.g., cluster already gone).
         kubectl -n "$NS" delete sandboxclaim "$CLAIM_NAME" --ignore-not-found
+        kubectl -n "$NS" delete sandboxwarmpool "${CLAIM_NAME}-pool" --ignore-not-found
     fi
-    echo "=== Basic SandboxClaim removed ==="
+    echo "=== Basic SandboxWarmPool + SandboxClaim removed ==="
 }
 
 case "$PHASE" in
