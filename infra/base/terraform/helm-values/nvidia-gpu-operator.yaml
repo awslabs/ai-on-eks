@@ -6,7 +6,7 @@ node-feature-discovery:
   master:
     config:
       extraLabelNs:
-      - "ai.eks.amazonaws.com"
+      - "ai-on-eks.io"
       - "vpc.amazonaws.com"
       - "nvidia.com"
   worker:
@@ -19,7 +19,7 @@ node-feature-discovery:
         custom:
           - name: "label amiFamily for al2023"
             labels:
-              "ai.eks.amazonaws.com/amiFamily": "al2023"
+              "ai-on-eks.io/amiFamily": "al2023"
             matchFeatures:
               - feature: system.osRelease
                 matchExpressions:
@@ -27,7 +27,7 @@ node-feature-discovery:
                   VERSION_ID: {op: In, value: ["2023"]}
           - name: "label amiFamily bottlerocket"
             labels:
-              "ai.eks.amazonaws.com/amiFamily": "bottlerocket"
+              "ai-on-eks.io/amiFamily": "bottlerocket"
             matchFeatures:
               - feature: system.osRelease
                 matchExpressions:
