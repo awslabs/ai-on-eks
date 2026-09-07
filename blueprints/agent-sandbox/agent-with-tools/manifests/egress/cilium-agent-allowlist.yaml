@@ -1,0 +1,94 @@
+# Egress allowlist for the agent-orchestrator pod (Cilium backend).
+#
+# The agent needs Bedrock + STS (for model calls) and the Pod Identity
+# credential endpoint. It does NOT need PyPI — only the sandboxes do.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: agent-orchestrator-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+    agent-sandbox/role: agent-with-tools
+spec:
+  description: "FQDN allowlist for the agent-orchestrator — Bedrock + STS."
+  endpointSelector:
+    matchLabels:
+      egress-tier: agent
+  egress:
+    # DNS resolution
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+          rules:
+            dns:
+              - matchPattern: "*.amazonaws.com"
+              - matchName: "pypi.org"
+              - matchPattern: "*.pypi.org"
+              - matchPattern: "*.pythonhosted.org"
+              - matchPattern: "*.dl.k8s.io"
+              - matchName: "dl.k8s.io"
+              - matchPattern: "*.debian.org"
+              - matchPattern: "*.ubuntu.com"
+
+    # Pod Identity credential endpoint
+    - toCIDR:
+        - 169.254.170.23/32
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+
+    # Bedrock runtime
+    - toFQDNs:
+        - matchPattern: "bedrock-runtime.*.amazonaws.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+    # STS (IRSA auth)
+    - toFQDNs:
+        - matchPattern: "sts.*.amazonaws.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+    # PyPI + kubectl download + apt repos
+    - toFQDNs:
+        - matchName: "pypi.org"
+        - matchPattern: "*.pypi.org"
+        - matchPattern: "*.pythonhosted.org"
+        - matchName: "dl.k8s.io"
+        - matchPattern: "*.dl.k8s.io"
+        - matchPattern: "*.debian.org"
+        - matchPattern: "*.ubuntu.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+
+    # Kubernetes API server (for kubectl to manage sandbox pods)
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP
+
+    # Cluster-internal (OpenWebUI + sandbox pods)
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: agent-sandboxes
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP

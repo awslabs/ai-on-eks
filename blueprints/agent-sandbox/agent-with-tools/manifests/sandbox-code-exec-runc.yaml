@@ -1,0 +1,68 @@
+# SandboxTemplate — Code Execution (runc tier).
+#
+# Ephemeral Python/shell execution environment for the agent-with-tools
+# blueprint. The agent process claims instances of this template per
+# tool call, executes code via kubectl exec, and captures output.
+#
+# Shape: python:3.12-slim with pip available, writable /workspace and
+# /tmp, readOnlyRootFilesystem, runAsNonRoot. No IRSA (sandboxes don't
+# need AWS credentials — only the agent process talks to Bedrock).
+#
+# Mode compatibility:
+#   - Standard EKS (Karpenter): yes
+#   - EKS Auto Mode: yes
+apiVersion: extensions.agents.x-k8s.io/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: sandbox-code-exec-runc
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: runc
+    agent-sandbox/role: code-exec
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: runc
+        agent-sandbox/role: code-exec
+        agent-sandbox/managed-by: agent-with-tools
+    spec:
+      containers:
+        - name: code-runtime
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "code-execution sandbox ready"
+              sleep infinity
+          env:
+            - name: HOME
+              value: /workspace
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

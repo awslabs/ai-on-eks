@@ -1,0 +1,124 @@
+# OpenWebUI — Deployment + Service + PVC.
+#
+# User-facing chat interface. Configured to use the agent-orchestrator
+# service as its OpenAI-compatible backend. No external egress needed —
+# OpenWebUI only talks to the agent service (cluster-internal).
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-data
+  namespace: agent-sandboxes
+  labels:
+    app: openwebui
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: agent-sandboxes
+  labels:
+    app: openwebui
+    agent-sandbox/role: agent-with-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openwebui
+  template:
+    metadata:
+      labels:
+        app: openwebui
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
+    spec:
+      containers:
+        - name: openwebui
+          image: ghcr.io/open-webui/open-webui:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            # Point OpenWebUI at the agent-orchestrator service
+            - name: OPENAI_API_BASE_URL
+              value: "http://agent-orchestrator.agent-sandboxes.svc.cluster.local:8000/v1"
+            - name: OPENAI_API_KEY
+              value: "not-needed"
+            # Disable Ollama backend (we only use OpenAI-compatible)
+            - name: OLLAMA_BASE_URL
+              value: ""
+            - name: ENABLE_OLLAMA_API
+              value: "false"
+            # Disable features that need external connectivity
+            - name: ENABLE_RAG_WEB_SEARCH
+              value: "false"
+            - name: ENABLE_IMAGE_GENERATION
+              value: "false"
+            - name: RAG_EMBEDDING_ENGINE
+              value: ""
+            - name: ENABLE_RAG_HYBRID_SEARCH
+              value: "false"
+            - name: ENABLE_COMMUNITY_SHARING
+              value: "false"
+            - name: ENABLE_MODEL_FILTER
+              value: "false"
+            - name: SAFE_MODE
+              value: "true"
+            - name: WEBUI_AUTH
+              value: "false"
+            # Data persistence
+            - name: DATA_DIR
+              value: /app/backend/data
+          ports:
+            - containerPort: 8080
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: data
+              mountPath: /app/backend/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: openwebui-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openwebui
+  namespace: agent-sandboxes
+  labels:
+    app: openwebui
+spec:
+  selector:
+    app: openwebui
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  type: LoadBalancer
