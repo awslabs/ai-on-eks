@@ -13,7 +13,7 @@ spec:
   template:
     metadata:
       labels:
-        ai.eks.amazonaws.com/amiFamily: al2023
+        ai-on-eks.io/amiFamily: al2023
         accelerator: nvidia
     spec:
       expireAfter: Never
