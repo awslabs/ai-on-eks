@@ -33,7 +33,7 @@ This blueprint exists for two reasons:
 | Subdirectory / file | Purpose |
 |---|---|
 | `agent.py` | The reference agent (Python) — five steps exercising FQDN + L3/L4 enforcement and gVisor's syscall boundary. |
-| `manifests/sandbox-agent.yaml` | The reference SandboxClaim + ServiceAccount + agent-script ConfigMap. The claim's `sandboxTemplateRef.name` is patched at apply time (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-runc` on Auto Mode). |
+| `manifests/sandbox-agent.yaml` | The reference SandboxWarmPool + SandboxClaim + ServiceAccount + agent-script ConfigMap. The pool's `sandboxTemplateRef.name` is patched at apply time (`sandbox-agent-gvisor` on Standard EKS, `sandbox-agent-runc` on Auto Mode); the claim checks out from the pool (v1beta1 API). |
 | `manifests/sandbox-agent-runc.yaml` | Agent-shaped SandboxTemplate for the runc tier — adds `python:3.12-slim`, agent-script ConfigMap mount, Bedrock env vars, and `sandbox-agent-sa` IRSA-bound ServiceAccount on top of the `sandbox-runc` shape. |
 | `manifests/sandbox-agent-gvisor.yaml` | Same as `sandbox-agent-runc` with `runtimeClassName: gvisor` and the gVisor NodePool toleration. Standard EKS only. |
 | `manifests/kro/rgd.yaml` | KRO `ResourceGraphDefinition` exposing a single `AgentSandbox` CRD wrapping the same workload shape. Optional. |
@@ -69,7 +69,7 @@ The recommended path is `conformance.sh` — it auto-detects the cluster's compu
 
 ### Apply the SandboxClaim and reference agent
 
-The reference SandboxClaim (`manifests/sandbox-agent.yaml`) targets one of the agent-shaped SandboxTemplates that ship with this blueprint. Apply both templates first (one of them gets claimed depending on compute mode):
+The reference SandboxWarmPool + SandboxClaim (`manifests/sandbox-agent.yaml`) target one of the agent-shaped SandboxTemplates that ship with this blueprint — the pool references the template, the claim checks out from the pool. Apply both templates first (one of them gets claimed depending on compute mode):
 
 ```bash
 kubectl apply -f manifests/sandbox-agent-runc.yaml
@@ -77,7 +77,7 @@ kubectl apply -f manifests/sandbox-agent-runc.yaml
 kubectl apply -f manifests/sandbox-agent-gvisor.yaml
 ```
 
-The SandboxClaim carries a `__SANDBOX_TEMPLATE__` placeholder substituted at apply time. To apply by hand:
+The SandboxWarmPool carries a `__SANDBOX_TEMPLATE__` placeholder substituted at apply time. To apply by hand:
 
 ```bash
 SANDBOX_TEMPLATE=sandbox-agent-gvisor   # or sandbox-agent-runc for Auto Mode
@@ -189,7 +189,7 @@ For larger agents where a ConfigMap mount is impractical, bake `agent.py` into a
 |------|---------|
 | `agent.py` | The reference agent — 5 steps demonstrating FQDN + L3/L4 enforcement |
 | `conformance.sh` | Automated end-to-end test — applies the SandboxClaim, runs the agent, asserts PASS/BLOCKED markers |
-| `manifests/sandbox-agent.yaml` | SandboxClaim + ServiceAccount + agent-script ConfigMap |
+| `manifests/sandbox-agent.yaml` | SandboxWarmPool + SandboxClaim + ServiceAccount + agent-script ConfigMap |
 | `manifests/sandbox-agent-runc.yaml` | Agent-shaped SandboxTemplate for the runc tier |
 | `manifests/sandbox-agent-gvisor.yaml` | Agent-shaped SandboxTemplate for the gVisor tier |
 | `manifests/kro/{rgd,instance}.yaml` | KRO composition path — optional |

@@ -22,7 +22,7 @@ Each tier adds three files, parallel to the gVisor set:
 - `karpenter-nodepool-<tier>.yaml` — NodePool + EC2NodeClass with the tier's runtime shim install in user-data
 - `sandbox-<tier>.yaml` — SandboxTemplate using `runtimeClassName: <tier>` and the matching toleration
 
-A `SandboxClaim` (in any blueprint or your own workload) targets the new tier by setting `sandboxTemplateRef.name` accordingly. No changes elsewhere in this directory.
+A `SandboxWarmPool` (in any blueprint or your own workload) targets the new tier by setting `sandboxTemplateRef.name` accordingly; `SandboxClaim`s check out from the pool via `warmPoolRef.name` (v1beta1 API — claims no longer reference templates directly). No changes elsewhere in this directory.
 
 ## Layering on top
 
