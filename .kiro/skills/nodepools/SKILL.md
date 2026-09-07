@@ -474,7 +474,7 @@ spec:
   template:
     metadata:
       labels:
-        ai.eks.amazonaws.com/amiFamily: ${ami_family}
+        ai-on-eks.io/amiFamily: ${ami_family}
         workload-type: training
     spec:
       expireAfter: 720h
@@ -527,7 +527,7 @@ spec:
   template:
     metadata:
       labels:
-        ai.eks.amazonaws.com/amiFamily: ${ami_family}
+        ai-on-eks.io/amiFamily: ${ami_family}
         workload-type: training
     spec:
       expireAfter: 720h
