@@ -1,0 +1,44 @@
+apiVersion: conformance.ai-on-eks/v1
+kind: ConformanceSpec
+metadata:
+  name: kata-fc-isolation
+# Validates the Kata + Firecracker isolation tier end to end: the kata-fc
+# RuntimeClass resolves, the nested-virt NodePool provisions a node with the
+# Kata+FC shim, and a pod pinned to the tier reaches Ready inside a microVM.
+spec:
+  namespace: agent-sandboxes
+
+  manifests:
+    - kata-pod.yaml
+
+  readiness:
+    - kind: Pod
+      name: kata-conformance
+      timeout: 420s   # microVM cold start + first-node shim bootstrap is longer
+
+  assertions:
+    - name: kata-pod-ready
+      description: Pod pinned to the kata-fc tier reaches Ready (microVM started).
+      type: podReady
+      target: kata-conformance
+
+    - name: runtime-class-is-kata-fc
+      description: The pod actually landed on the kata-fc RuntimeClass.
+      type: jsonpath
+      resource: pod/kata-conformance
+      path: "{.spec.runtimeClassName}"
+      expected: kata-fc
+
+    - name: microvm-present-on-node
+      description: >-
+        A Firecracker/Kata process backs the sandbox on the node — confirms
+        hardware-VM isolation is actually in effect, not a silent fallback to a
+        shared-kernel runtime.
+      type: nodeExec
+      podRef: kata-conformance
+      command: "ps -ef | grep -E 'firecracker|containerd-shim-kata' | grep -v grep || true"
+      match: regex
+      expected: "firecracker|kata"
+
+  cleanup:
+    deleteManifests: true

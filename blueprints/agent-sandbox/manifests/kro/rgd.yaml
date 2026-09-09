@@ -81,7 +81,7 @@ spec:
       readyWhen:
         - ${sandbox.status.conditions.exists(x, x.type == "Ready" && x.status == "True")}
       template:
-        apiVersion: agents.x-k8s.io/v1alpha1
+        apiVersion: agents.x-k8s.io/v1beta1
         kind: Sandbox
         metadata:
           name: ${schema.metadata.name}

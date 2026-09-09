@@ -1,11 +1,19 @@
-# Reference SandboxClaim — per-instance binding that points at one
-# of the agent SandboxTemplates plus the per-deployment glue
-# (ServiceAccount + agent-script ConfigMap).
+# Reference SandboxWarmPool + SandboxClaim — per-instance binding that
+# points at one of the agent SandboxTemplates plus the per-deployment
+# glue (ServiceAccount + agent-script ConfigMap).
 #
 # The runtime spec (image, env, securityContext, volumes) lives in the
 # SandboxTemplate; the claim adds only deployment-specific bits — IRSA
-# wiring on the SA, the script ConfigMap the agent reads, and a pointer
-# to the chosen template.
+# wiring on the SA and the script ConfigMap the agent reads.
+#
+# v1beta1 API shape (agent-sandbox v1.0+): a SandboxClaim no longer
+# references a SandboxTemplate directly. Claims check out from a
+# SandboxWarmPool, and the pool is what references the template. With
+# replicas: 0 the pool holds no pre-warmed sandboxes — the claim
+# cold-starts from the pool's template, matching the pre-v1.0 behavior
+# of this blueprint (a cold-started sandbox also takes the claim's
+# name, so the pod is still `sandbox-agent`). Bump replicas to
+# pre-warm sandboxes for near-instant claim binding.
 #
 # Template selection is deferred to apply time:
 #   - Standard EKS → sandboxTemplateRef.name = sandbox-agent-gvisor
@@ -40,7 +48,24 @@ data:
   # This placeholder keeps the manifest self-contained for review.
   agent.py: "# populated by install.sh from blueprints/agent-sandbox/agent.py"
 ---
-apiVersion: extensions.agents.x-k8s.io/v1alpha1
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxWarmPool
+metadata:
+  name: sandbox-agent-pool
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: runtime
+spec:
+  # No pre-warmed capacity — the claim cold-starts from the template,
+  # so the sandbox pod mounts the agent-script ConfigMap in its
+  # install-time state (conformance.sh replaces the placeholder content
+  # and recreates the pod, same flow as pre-v1.0).
+  replicas: 0
+  # Patched at apply time. See header comment for tier-selection rules.
+  sandboxTemplateRef:
+    name: __SANDBOX_TEMPLATE__
+---
+apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxClaim
 metadata:
   name: sandbox-agent
@@ -48,6 +73,5 @@ metadata:
   labels:
     agent-sandbox/role: runtime
 spec:
-  # Patched at apply time. See header comment for tier-selection rules.
-  sandboxTemplateRef:
-    name: __SANDBOX_TEMPLATE__
+  warmPoolRef:
+    name: sandbox-agent-pool

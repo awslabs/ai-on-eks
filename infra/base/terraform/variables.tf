@@ -398,7 +398,7 @@ variable "enable_agent_sandbox" {
 variable "agent_sandbox_version" {
   description = "kubernetes-sigs/agent-sandbox git ref (tag or branch) for the ArgoCD sync"
   type        = string
-  default     = "v0.4.5"
+  default     = "v1.0.1"
 }
 
 # Kube Resource Orchestrator (kro)

@@ -167,14 +167,18 @@ require_cluster() {
 }
 
 setup_configmap_with_real_agent() {
-    # sandbox-agent.yaml ships as a SandboxClaim with a templateRef
-    # placeholder and a placeholder ConfigMap. We:
+    # sandbox-agent.yaml ships as a SandboxWarmPool (replicas: 0, so
+    # claims cold-start from the template) + SandboxClaim, with a
+    # templateRef placeholder and a placeholder ConfigMap. We:
     #   1. Render the manifest with the resolved SandboxTemplate name
-    #      and apply it (creates SA + placeholder ConfigMap + Claim).
+    #      and apply it (creates SA + placeholder ConfigMap + Pool + Claim).
     #   2. Overwrite the ConfigMap with the real agent.py contents.
     #   3. Delete the controller-owned pod so it's recreated and the
     #      container's startup `cp /config/agent.py /workspace/agent.py`
     #      picks up the real content.
+    # A cold-started sandbox takes the claim's name, and the pod name
+    # always equals the sandbox name (v1.0 guarantee) — so the static
+    # POD=sandbox-agent reference below remains valid.
     RENDERED_SANDBOX_MANIFEST=$(mktemp -t agent-sandbox-claim.XXXXXX.yaml)
     sed -e "s|__SANDBOX_TEMPLATE__|$SANDBOX_TEMPLATE|g" \
         "$BLUEPRINT_MANIFEST_DIR/sandbox-agent.yaml" \
@@ -213,9 +217,18 @@ setup_irsa_annotation() {
 
 wait_for_pod() {
     log "Waiting for Sandbox pod Ready (up to 5 min)..."
-    # The controller recreates the pod after our delete; give it a
-    # moment to spawn a fresh one before waiting on Ready.
-    sleep 5
+    # The controller recreates the pod after our delete; the claim's
+    # cold-start path (pool → template → sandbox) may take a few
+    # reconciles before the pod object exists, and `kubectl wait`
+    # errors out immediately on a missing resource. Poll for existence
+    # first, then wait on Ready.
+    local attempt
+    for attempt in $(seq 1 12); do
+        if kubectl -n "$NS" get pod "$POD" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 5
+    done
     if ! kubectl -n "$NS" wait --for=condition=Ready "pod/$POD" --timeout=300s >/dev/null; then
         kubectl -n "$NS" describe "pod/$POD" >&2
         fail "Sandbox pod did not become Ready within 5 min"
