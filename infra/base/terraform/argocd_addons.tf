@@ -82,7 +82,7 @@ resource "kubectl_manifest" "envoy_gateway_yaml" {
 
 resource "kubectl_manifest" "lws_yaml" {
   count     = var.enable_leader_worker_set ? 1 : 0
-  yaml_body = file("${path.module}/argocd-addons/leader-worker-set.yaml")
+  yaml_body = templatefile("${path.module}/argocd-addons/leader-worker-set.yaml", { version = var.leader_worker_set_version })
 
   depends_on = [
     helm_release.argocd

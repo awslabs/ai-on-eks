@@ -24,6 +24,8 @@ spec:
         - key: karpenter.sh/capacity-type
           operator: In
           values:
+            - reserved
+            - spot
             - on-demand
         - key: eks.amazonaws.com/instance-category
           operator: In
@@ -69,6 +71,7 @@ spec:
         - key: karpenter.sh/capacity-type
           operator: In
           values:
+            - reserved
             - on-demand
         - key: eks.amazonaws.com/instance-category
           operator: In
@@ -99,17 +102,4 @@ kind: NodeClass
 metadata:
   name: general
 spec:
-  ephemeralStorage:
-    iops: 3000
-    size: 80Gi
-    throughput: 125
-  networkPolicy: DefaultAllow
-  networkPolicyEventLogs: Disabled
-  role: ${node_iam_role}
-  securityGroupSelectorTerms:
-    - id: ${cluster_security_group_id}
-  snatPolicy: Random
-  subnetSelectorTerms:
-    - tags:
-        karpenter.sh/discovery: "${cluster_name}"
-        Name: "${cluster_name}-private-secondary*" # Only secondary cidr subnets
+  ${indent(2, ec2nodeclass)}

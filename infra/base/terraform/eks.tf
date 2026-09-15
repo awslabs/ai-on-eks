@@ -188,7 +188,7 @@ module "eks" {
       max_size     = 8
       desired_size = 2
 
-      instance_types = ["m6i.xlarge"]
+      instance_types = ["m6i.xlarge", "m7i.xlarge"]
 
       labels = {
         WorkerType    = "ON_DEMAND"

@@ -32,6 +32,7 @@ resource "aws_s3_bucket" "models_bucket" {
 
   bucket        = var.s3_models_bucket_name != "" ? var.s3_models_bucket_name : null
   bucket_prefix = var.s3_models_bucket_name == "" ? "${local.name}-models-${local.region}-" : null
+  force_destroy = true
 
   tags = merge(local.tags, {
     Purpose = "ML Model Storage"

@@ -76,6 +76,8 @@ devicePlugin:
   env:
     - name: MOFED_ENABLED
       value: "false"
+    - name: GDRCOPY_ENABLED
+      value: "true"
 
 # DCGM service (nv-hostengine)
 dcgm:

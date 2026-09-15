@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/kubernetes-sigs/lws.git
-    targetRevision: v0.7.0
+    targetRevision: ${version}
     path: config/default
   destination:
     server: https://kubernetes.default.svc

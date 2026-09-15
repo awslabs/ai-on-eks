@@ -8,6 +8,11 @@ subnetSelectorTerms:
 securityGroupSelectorTerms:
   - tags:
       karpenter.sh/discovery: "${cluster_name}"
+capacityReservationSelectorTerms:
+  - tags:
+%{ for tag_key, tag_value in jsondecode(capacity_reservation_tags) ~}
+      ${tag_key}: "${tag_value}"
+%{ endfor ~}
 instanceStorePolicy: RAID0
 blockDeviceMappings:
   - deviceName: /dev/xvda

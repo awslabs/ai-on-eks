@@ -8,14 +8,18 @@ locals {
   nodepools     = merge(local.default_nodepools, var.nodepools)
   node_iam_role = var.enable_eks_auto_mode ? module.eks.node_iam_role_name : module.karpenter[0].node_iam_role_name
 
-  ec2nodeclass = templatefile("${path.module}/karpenter-resources/templates/${var.ami_family}_ec2nodeclass.tpl",
+  nodeclass_template = var.enable_eks_auto_mode ? "automode_nodeclass.tpl" : "${var.ami_family}_ec2nodeclass.tpl"
+
+  ec2nodeclass = templatefile("${path.module}/karpenter-resources/templates/${local.nodeclass_template}",
     {
       node_iam_role                       = local.node_iam_role
       cluster_name                        = module.eks.cluster_name
+      cluster_security_group_id           = module.eks.cluster_primary_security_group_id
       enable_soci_snapshotter             = var.enable_soci_snapshotter
       soci_snapshotter_use_instance_store = var.soci_snapshotter_use_instance_store
       data_disk_snapshot_id               = var.bottlerocket_data_disk_snapshot_id
       max_user_namespaces                 = var.max_user_namespaces
+      capacity_reservation_tags           = jsonencode(var.capacity_reservation_tags)
     }
   )
 }
@@ -31,6 +35,7 @@ data "kubectl_path_documents" "nodepools_manifests" {
     cluster_security_group_id = module.eks.cluster_primary_security_group_id
     ami_family                = var.ami_family
     ec2nodeclass              = local.ec2nodeclass
+    capacity_reservation_tags = jsonencode(var.capacity_reservation_tags)
     efa_network_interfaces    = jsonencode({ for k, v in module.efa_network_interfaces : k => v.karpenter_network_interfaces_yaml })
   }
   depends_on = [
@@ -48,6 +53,7 @@ data "kubectl_path_documents" "nodepools_manifests_dummy" {
     cluster_security_group_id = ""
     ami_family                = ""
     ec2nodeclass              = ""
+    capacity_reservation_tags = jsonencode(var.capacity_reservation_tags)
     efa_network_interfaces    = jsonencode({ for inst in local.efa_instance_types : inst => "" })
   }
 }

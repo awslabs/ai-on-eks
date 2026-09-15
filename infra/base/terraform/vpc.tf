@@ -132,30 +132,49 @@ module "vpc" {
 # VPC Endpoints
 ################################################################################
 
+# Regions where S3 Express One Zone (and its Gateway VPC endpoint) is available.
+# Reference: https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-express-Regions-and-Zones.html
+locals {
+  s3express_supported_regions = [
+    "us-east-1",
+    "us-east-2",
+    "us-west-2",
+    "ap-south-1",
+    "ap-northeast-1",
+    "eu-west-1",
+    "eu-north-1",
+  ]
+  s3express_available = contains(local.s3express_supported_regions, local.region)
+}
+
 module "vpc_endpoints" {
   source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
   version = "~> 6.4"
 
   vpc_id = module.vpc.vpc_id
 
-  endpoints = {
-    s3 = {
-      service         = "s3"
-      service_type    = "Gateway"
-      route_table_ids = module.vpc.private_route_table_ids
-      tags = {
-        Name = "${var.name}-s3-vpc-endpoint"
+  endpoints = merge(
+    {
+      s3 = {
+        service         = "s3"
+        service_type    = "Gateway"
+        route_table_ids = module.vpc.private_route_table_ids
+        tags = {
+          Name = "${var.name}-s3-vpc-endpoint"
+        }
       }
-    }
-    s3express = {
-      service         = "s3express"
-      service_type    = "Gateway"
-      route_table_ids = module.vpc.private_route_table_ids
-      tags = {
-        Name = "${var.name}-s3express-vpc-endpoint"
+    },
+    local.s3express_available ? {
+      s3express = {
+        service         = "s3express"
+        service_type    = "Gateway"
+        route_table_ids = module.vpc.private_route_table_ids
+        tags = {
+          Name = "${var.name}-s3express-vpc-endpoint"
+        }
       }
-    }
-  }
+    } : {}
+  )
 
   tags = local.tags
 }

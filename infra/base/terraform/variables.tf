@@ -137,7 +137,7 @@ DESC
 
 variable "vpc_cni_configuration" {
   description = "Configuration values for the VPC CNI addon (e.g., ENABLE_PREFIX_DELEGATION, WARM_PREFIX_TARGET). Passed as-is to the addon's configuration_values via jsonencode."
-  type        = map(any)
+  type        = any
   default     = {}
 }
 
@@ -380,6 +380,12 @@ variable "enable_leader_worker_set" {
   description = "Flag to enable the LeaderWorkerSet"
   type        = bool
   default     = false
+}
+
+variable "leader_worker_set_version" {
+  description = "LeaderWorkerSet version"
+  type        = string
+  default     = "v0.9.0"
 }
 
 # kubernetes-sigs/agent-sandbox controller
@@ -708,7 +714,7 @@ variable "ami_family" {
 variable "karpenter_version" {
   description = "Karpenter version"
   type        = string
-  default     = "1.13.0"
+  default     = "1.14.0"
 }
 
 # S3 Model Storage Variables
@@ -821,6 +827,14 @@ variable "aws_dranet_version" {
   description = "AWS DRANET driver version"
   type        = string
   default     = "1.0.0"
+}
+
+variable "capacity_reservation_tags" {
+  description = "Tags used by Karpenter EC2NodeClass capacityReservationSelectorTerms to discover EC2 Capacity Reservations (e.g. ODCRs / Capacity Blocks)"
+  type        = map(string)
+  default = {
+    "ai-on-eks" = "true"
+  }
 }
 
 variable "nodepools" {

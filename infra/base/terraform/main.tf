@@ -30,6 +30,7 @@ provider "kubectl" {
   cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
   token                  = ephemeral.aws_eks_cluster_auth.this.token
   load_config_file       = false
+  lazy_load              = true
 }
 
 ephemeral "aws_eks_cluster_auth" "this" {
