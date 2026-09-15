@@ -1,0 +1,10 @@
+name: deepseek-r1-distill-llama-70b
+hf_repo: deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+hf_repo_serve: null
+architecture: LlamaForCausalLM
+params_b: 70
+precision: [bf16]
+tensor_parallel: 4
+max_model_len: 131072
+container_image: pending
+status: unverified

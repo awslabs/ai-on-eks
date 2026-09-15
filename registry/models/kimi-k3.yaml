@@ -1,0 +1,11 @@
+name: kimi-k3
+hf_repo: moonshotai/Kimi-K3
+hf_repo_serve: null
+architecture: DeepseekV3ForCausalLM
+params_b: 671
+tool_parser: deepseek_v3
+precision: [fp8, bf16]
+tensor_parallel: 8
+max_model_len: 131072
+container_image: pending
+status: draft
