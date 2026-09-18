@@ -25,7 +25,7 @@ This solution deploys a secure, FQDN-filtered Kubernetes environment for running
 
 Agents that execute model-generated code need two guarantees the default Kubernetes pod doesn't provide:
 
-- **Kernel boundary isolation**: untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; Kata+Firecracker (documented as a future tier) adds hardware-virtualization boundaries.
+- **Kernel boundary isolation**: untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; the Kata+Firecracker tier adds hardware-virtualization boundaries (Standard EKS only).
 - **Egress policy enforcement**: agents call LLM APIs, package registries, and developer tools. Without an allowlist, a compromised agent can exfiltrate data or probe internal services. FQDN filtering limits egress to a pre-approved set of destinations.
 
 This solution delivers both. The reference agent (under [`../../blueprints/agent-sandbox/`](../../blueprints/agent-sandbox/)) exercises the full chain: provisions inside a gVisor-isolated Sandbox, fetches credentials via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
@@ -93,16 +93,16 @@ Each tier is a weaker boundary than the one below it — tier choice maps to a t
 |------|----------|------------------|--------------------------|
 | `runc` (basic) | Linux namespaces + seccomp | Other pods in the cluster (network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
 | `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for ~99% of common syscalls (Sentry serves restricted subset). Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); some specialized syscalls fall back to host (ptrace, certain perf paths); Sentry itself is a trusted computing base |
-| Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization support which EKS Managed Node Groups do not yet provide. See [tracking issue](https://github.com/awslabs/ai-on-eks/issues) for status. |
+| `kata-fc` (Kata + Firecracker) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Standard EKS only (no Auto Mode node hooks). Nodes need the EC2 `NestedVirtualization` launch parameter — a capable instance family alone does not expose `/dev/kvm`; the shipped Karpenter NodePool sets it via `cpuOptions.nestedVirtualization` (Karpenter v1.14+). ~5s microVM start on a warm node; stateless (no snapshot/suspend — microVM checkpoint/restore is a tracked follow-on). |
 
 ### Tier selection
 
 1. Does your agent execute untrusted code (prompts that generate + run code, user-uploaded scripts, model-generated shell)?
-   - **Yes** → `gvisor` or Kata+Firecracker (once available). Syscall isolation is the differentiator.
+   - **Yes** → `gvisor` or `kata-fc`. Syscall isolation is the differentiator.
    - **No** → `runc` may be sufficient; network policy + RBAC still apply.
 
 2. Does your threat model include malicious first-party code (a compromised agent image, an insider-threat scenario)?
-   - **Yes** → Kata+Firecracker (hardware boundary) when available.
+   - **Yes** → `kata-fc` (hardware boundary), Standard EKS only.
    - **No** → `gvisor` is still a reasonable default for code-executing agents even in single-tenant deployments.
 
 ## Plan Your Deployment
