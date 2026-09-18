@@ -55,6 +55,34 @@ def _wait_for_pod(pod_name: str, timeout: int = 180) -> bool:
     return result.returncode == 0
 
 
+def _resolve_sandbox_pod(claim_name: str, timeout: int = 60) -> str | None:
+    """Resolve the sandbox pod backing a SandboxClaim.
+
+    agent-sandbox v1beta1: the pod's name always equals the sandbox's
+    name, but the sandbox's name only equals the claim's name on the
+    cold-start path. Warm-pool checkouts adopt a pool-created sandbox
+    with a pool-derived name — so never assume; read it from the
+    claim's status.sandbox.name (populated once the claim binds).
+
+    Returns the pod name, or None if the claim doesn't exist or didn't
+    bind within the timeout.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        result = _kubectl(
+            "-n", NS, "get", f"sandboxclaim/{claim_name}",
+            "-o", "jsonpath={.status.sandbox.name}",
+        )
+        if result.returncode != 0:
+            return None  # claim doesn't exist
+        name = result.stdout.strip()
+        if name:
+            return name
+        if time.monotonic() >= deadline:
+            return None
+        time.sleep(2)
+
+
 def _pod_exists(pod_name: str) -> bool:
     """Check if a pod exists and is Running."""
     result = _kubectl("-n", NS, "get", f"pod/{pod_name}", "-o", "jsonpath={.status.phase}")
@@ -104,27 +132,27 @@ def execute_code(args: dict[str, Any], session_id: str) -> str:
     """
     code = args.get("code", "")
     language = args.get("language", "python")
-    pod_name = f"code-exec-{session_id[:8]}"
+    claim_name = f"code-exec-{session_id[:8]}"
 
-    # Ensure the sandbox pod exists
-    if not _pod_exists(pod_name):
-        logger.info("Creating code-execution sandbox: %s", pod_name)
-        # Apply the SandboxClaim
-        claim_manifest = _render_code_exec_claim(pod_name)
-        result = _kubectl("apply", "-f", "-", timeout=10)
+    # Resolve the sandbox pod from the claim; create the claim if needed.
+    pod_name = _resolve_sandbox_pod(claim_name, timeout=5)
+    if pod_name is None or not _pod_exists(pod_name):
+        logger.info("Creating code-execution sandbox claim: %s", claim_name)
+        claim_manifest = _render_code_exec_claim(claim_name)
+        result = subprocess.run(
+            ["kubectl", "apply", "-f", "-"],
+            input=claim_manifest,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
         if result.returncode != 0:
-            # Try applying via stdin
-            result = subprocess.run(
-                ["kubectl", "apply", "-f", "-"],
-                input=claim_manifest,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
-            if result.returncode != 0:
-                return f"ERROR: Failed to create sandbox: {result.stderr}"
+            return f"ERROR: Failed to create sandbox: {result.stderr}"
 
+        pod_name = _resolve_sandbox_pod(claim_name)
+        if pod_name is None:
+            return "ERROR: SandboxClaim did not bind a sandbox within 60s"
         if not _wait_for_pod(pod_name):
             return "ERROR: Sandbox pod did not become Ready within 3 minutes"
 
@@ -162,19 +190,24 @@ def execute_code(args: dict[str, Any], session_id: str) -> str:
     return "\n".join(output_parts) if output_parts else "(no output)"
 
 
-def _render_code_exec_claim(pod_name: str) -> str:
-    """Render a SandboxClaim manifest for a code-execution sandbox."""
-    return f"""apiVersion: extensions.agents.x-k8s.io/v1alpha1
+def _render_code_exec_claim(claim_name: str) -> str:
+    """Render a SandboxClaim manifest for a code-execution sandbox.
+
+    v1beta1: claims check out from a SandboxWarmPool (the pool ships
+    alongside the SandboxTemplate in manifests/ as <template>-pool).
+    """
+    template = SANDBOX_TEMPLATE_CODE.replace('__TIER__', os.environ.get('SANDBOX_TIER', 'runc'))
+    return f"""apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxClaim
 metadata:
-  name: {pod_name}
+  name: {claim_name}
   namespace: {NS}
   labels:
     agent-sandbox/role: code-exec
     agent-sandbox/managed-by: agent-with-tools
 spec:
-  sandboxTemplateRef:
-    name: {SANDBOX_TEMPLATE_CODE.replace('__TIER__', os.environ.get('SANDBOX_TIER', 'runc'))}
+  warmPoolRef:
+    name: {template}-pool
 """
 
 
@@ -218,10 +251,10 @@ def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
     pod_name = _jupyter_sessions.get(session_id)
 
     if pod_name is None or not _pod_exists(pod_name):
-        pod_name = f"jupyter-{session_id[:8]}"
-        logger.info("Creating Jupyter sandbox: %s", pod_name)
+        claim_name = f"jupyter-{session_id[:8]}"
+        logger.info("Creating Jupyter sandbox claim: %s", claim_name)
 
-        claim_manifest = _render_jupyter_claim(pod_name)
+        claim_manifest = _render_jupyter_claim(claim_name)
         result = subprocess.run(
             ["kubectl", "apply", "-f", "-"],
             input=claim_manifest,
@@ -233,6 +266,9 @@ def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
         if result.returncode != 0:
             return f"ERROR: Failed to create Jupyter sandbox: {result.stderr}"
 
+        pod_name = _resolve_sandbox_pod(claim_name)
+        if pod_name is None:
+            return "ERROR: Jupyter SandboxClaim did not bind a sandbox within 60s"
         if not _wait_for_pod(pod_name, timeout=240):
             return "ERROR: Jupyter sandbox pod did not become Ready within 4 minutes"
 
@@ -280,19 +316,24 @@ def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
     return "\n".join(output_parts) if output_parts else "(no output)"
 
 
-def _render_jupyter_claim(pod_name: str) -> str:
-    """Render a SandboxClaim manifest for a Jupyter sandbox."""
-    return f"""apiVersion: extensions.agents.x-k8s.io/v1alpha1
+def _render_jupyter_claim(claim_name: str) -> str:
+    """Render a SandboxClaim manifest for a Jupyter sandbox.
+
+    v1beta1: claims check out from a SandboxWarmPool (the pool ships
+    alongside the SandboxTemplate in manifests/ as <template>-pool).
+    """
+    template = SANDBOX_TEMPLATE_JUPYTER.replace('__TIER__', os.environ.get('SANDBOX_TIER', 'runc'))
+    return f"""apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxClaim
 metadata:
-  name: {pod_name}
+  name: {claim_name}
   namespace: {NS}
   labels:
     agent-sandbox/role: jupyter
     agent-sandbox/managed-by: agent-with-tools
 spec:
-  sandboxTemplateRef:
-    name: {SANDBOX_TEMPLATE_JUPYTER.replace('__TIER__', os.environ.get('SANDBOX_TIER', 'runc'))}
+  warmPoolRef:
+    name: {template}-pool
 """
 
 

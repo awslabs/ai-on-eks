@@ -157,7 +157,7 @@ if [ -z "$SANDBOX_POD" ]; then
     }
     TIER=$(detect_compute_mode)
     cat <<EOF | kubectl apply -f -
-apiVersion: extensions.agents.x-k8s.io/v1alpha1
+apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxClaim
 metadata:
   name: conformance-egress-test
@@ -166,11 +166,23 @@ metadata:
     agent-sandbox/role: code-exec
     agent-sandbox/managed-by: agent-with-tools
 spec:
-  sandboxTemplateRef:
-    name: sandbox-code-exec-${TIER}
+  warmPoolRef:
+    name: sandbox-code-exec-${TIER}-pool
 EOF
-    kubectl -n "$NS" wait --for=condition=Ready pod/conformance-egress-test --timeout=180s
-    SANDBOX_POD="conformance-egress-test"
+    # v1beta1: resolve the backing pod from the claim's status — warm-pool
+    # checkouts adopt pool-named sandboxes, so the pod name is not the
+    # claim name. Pod name == sandbox name is a v1.0 guarantee.
+    SANDBOX_POD=""
+    for _ in $(seq 1 30); do
+        SANDBOX_POD=$(kubectl -n "$NS" get sandboxclaim conformance-egress-test \
+            -o jsonpath='{.status.sandbox.name}' 2>/dev/null || echo "")
+        [ -n "$SANDBOX_POD" ] && break
+        sleep 2
+    done
+    if [ -z "$SANDBOX_POD" ]; then
+        fail "conformance-egress-test claim did not bind a sandbox within 60s"
+    fi
+    kubectl -n "$NS" wait --for=condition=Ready "pod/$SANDBOX_POD" --timeout=180s
     CLEANUP_SANDBOX=1
 fi
 

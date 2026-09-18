@@ -11,7 +11,7 @@
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes
 #   - EKS Auto Mode: yes
-apiVersion: extensions.agents.x-k8s.io/v1alpha1
+apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxTemplate
 metadata:
   name: sandbox-code-exec-runc
@@ -66,3 +66,22 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+---
+# Companion warm pool (agent-sandbox v1.0 / v1beta1: SandboxClaims check
+# out from a SandboxWarmPool via warmPoolRef; claims no longer reference
+# templates directly). replicas: 1 keeps one sandbox pre-warmed so a
+# tool call binds in seconds instead of paying pod cold-start — the
+# latency profile this per-tool-call pattern wants. Set replicas: 0 to
+# trade that latency back for zero idle cost (claims then cold-start
+# from the template on demand).
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxWarmPool
+metadata:
+  name: sandbox-code-exec-runc-pool
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/managed-by: agent-with-tools
+spec:
+  replicas: 1
+  sandboxTemplateRef:
+    name: sandbox-code-exec-runc
