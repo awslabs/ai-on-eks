@@ -53,16 +53,29 @@ spec:
     set -euxo pipefail
 
     # Install gVisor runsc binary + containerd shim from the official
-    # Google release channel. Using `release/latest/` alias keeps
-    # this blueprint self-updating. Production deployments should
-    # pin to a specific release tag and bump via CI.
+    # GitHub release tarball. gVisor moved binary distribution from the
+    # storage.googleapis.com/gvisor GCS bucket (per-file downloads,
+    # `release/latest/` alias) to GitHub release assets — the GCS paths
+    # 404 as of release-20260914.0, which silently broke fresh node
+    # provisioning here. Pinned; bump via CI.
+    GVISOR_RELEASE="release-20260914.0"
     ARCH=$(uname -m)
+    dnf install -y zstd
     mkdir -p /tmp/gvisor && cd /tmp/gvisor
 
-    curl -fsSL -o runsc "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/runsc"
-    curl -fsSL -o containerd-shim-runsc-v1 "https://storage.googleapis.com/gvisor/releases/release/latest/${ARCH}/containerd-shim-runsc-v1"
+    curl -fsSL --retry 3 -o gvisor.tar.zstd \
+      "https://github.com/google/gvisor/releases/download/${GVISOR_RELEASE}/gvisor-${ARCH}.tar.zstd"
+    # Extract the FULL tarball: since release-20260914.0 the Sentry is
+    # split into sidecar binaries under gvisor-bin/ (gvisor_sentry,
+    # prewarmer, fd-parking, ...) and runsc's default
+    # --sidecar-usage-policy=STRICT refuses to start sandboxes if
+    # /usr/local/bin/gvisor-bin/ is missing. runsc alone is no longer a
+    # complete install.
+    tar --use-compress-program=unzstd -xf gvisor.tar.zstd
     chmod +x runsc containerd-shim-runsc-v1
     mv runsc containerd-shim-runsc-v1 /usr/local/bin/
+    mv gvisor-bin /usr/local/bin/gvisor-bin
+    chmod +x /usr/local/bin/gvisor-bin/*
 
     # Register runsc with containerd. AL2023 / EKS 1.34 ships with
     # containerd v2 which uses the `io.containerd.cri.v1.runtime.*`
