@@ -131,3 +131,42 @@ the earlier agent-with-tools blueprint is not dispatchable.
 No public implementation found that dispatches across both axes
 (in-cluster RuntimeClass tiers + managed-service CRs) behind one label
 registry; #1267 is the community-demand receipt for the in-cluster half.
+
+## Discovery vs. policy (why not a ConfigMap registry like #1267?)
+
+The ConfigMap registry #1267 proposed has real merits worth naming: it
+creates a **governance boundary** (workload teams ship pools, the
+platform team curates the dispatchable menu, RBAC on each is
+independent), it holds **structured policy** that flat labels can't
+(overflow semantics, fallback chains, tier aliases, per-tier defaults),
+and it makes the routing table a **single reviewable GitOps artifact**
+rather than an emergent property of a label query.
+
+This design still chooses labels for discovery, because discovery and
+policy are different questions:
+
+- **Discovery — "what capacity exists" — is cluster state**, and
+  labels make registration and capacity the same object. A ConfigMap
+  registry re-introduces the registry/capacity split and its whole
+  failure class: entries pointing at deleted pools, pools awaiting
+  entries, two-phase applies, reload/watch semantics (the v1alpha1→
+  v1beta1 shadow-pool migration was precisely this class of pain).
+  Label selection is also the native idiom — Services→Pods, Karpenter
+  pools, RuntimeClass scheduling.
+- **Policy — "what's allowed and preferred" — is declared intent**,
+  and it deserves a document. When overflow/fallback/alias/quota rules
+  are needed, they attach at the `pre_bind` hook as an optional policy
+  layer *on top of* label discovery — not as a replacement for it. The
+  near-term governance concern is already bounded by namespace RBAC
+  (pools live in the dispatcher's namespace); the policy layer is for
+  when pool-creators and menu-curators are different teams.
+- **If the policy layer grows real structure, the endpoint is a small
+  CRD** (typed, schema-validated at apply time, with status), not a
+  ConfigMap. ConfigMap-as-API is the middle step that trades apply-time
+  validation for bind-time surprises — #1267 chose it to avoid a
+  premature CRD, which was reasonable for a webhook's mapping table but
+  isn't a reason to route *discovery* through it.
+
+Net: labels answer existence drift-free; policy, when someone needs it,
+arrives as declared intent through the hook seam without touching the
+discovery mechanism.
