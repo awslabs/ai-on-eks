@@ -88,11 +88,34 @@ see DESIGN.md.
 ## Off-cluster tier (Lambda MicroVM)
 
 Label a `MicrovmImage` with `agent-sandbox/tier: microvm` and construct
-the dispatcher with `microvm_execution_role_arn=...`. Binds create a
-per-session `Microvm` CR (idle-suspend + auto-resume) and return
-`status.endpoint`. Constraints worth knowing: ARM64-only, connector-based
-egress (no FQDN allowlists — the in-cluster tiers keep the finer egress
-story), 8h session ceiling. See [../microvm/](../microvm/README.md).
+the dispatcher with `microvm_execution_role_arn=...` plus the
+Lambda-managed network connectors (without an ingress connector the
+bind succeeds but endpoint traffic never reaches the worker):
+
+```python
+d = Dispatcher(dyn, namespace="agent-sandboxes",
+               microvm_execution_role_arn=EXEC_ROLE_ARN,
+               microvm_ingress_connector_arns=[f"{CONNECTOR}:ALL_INGRESS"],
+               microvm_egress_connector_arns=[f"{CONNECTOR}:INTERNET_EGRESS"])
+```
+
+Binds create a per-session `Microvm` CR (idle-suspend + auto-resume)
+and return `status.endpoint`; requests to the endpoint carry a
+port-scoped auth token (`X-aws-proxy-auth`) and `X-aws-proxy-port`
+(the proxy defaults to 8080). Constraints worth knowing: ARM64-only,
+connector-based egress (no FQDN allowlists — the in-cluster tiers keep
+the finer egress story), 8h session ceiling.
+See [../microvm/](../microvm/README.md).
+
+## Testing
+
+| Suite | Scope | Needs |
+|---|---|---|
+| `tests/test_unit.py`, `tests/test_cma.py` | registry, providers, hooks, CMA loop semantics (stubbed) | nothing |
+| `tests/e2e_smoke.py` | in-cluster axis live: warm/cold bind, naming, veto, release | live rig |
+| `tests/microvm_smoke.py` | off-cluster axis live: bind → proxy round-trip → release | live rig + ACK addon + built worker image |
+| `tests/cma_smoke.py` | CMA loop live: poll→bind→`/execute` in the sandbox, failure semantics | live rig |
+| `../conformance/dispatch/` | capacity path via the conformance framework | live rig |
 
 ## Measured (fresh Standard EKS rig)
 
@@ -101,6 +124,7 @@ story), 8h session ceiling. See [../microvm/](../microvm/README.md).
 | Warm bind, gvisor | 0.82s (+2.7s pod-ready) |
 | Warm bind, runc | 0.80s (+2.2s pod-ready) |
 | Cold bind, gvisor (pool exhausted) | 3.01s (+2.2s pod-ready) |
+| MicroVM bind (create → RUNNING + endpoint) | 31.7s |
 
 Warm binding is runtime-independent — consistent with the benchmarks in
 [kubernetes-sigs/agent-sandbox#1267](https://github.com/kubernetes-sigs/agent-sandbox/issues/1267):

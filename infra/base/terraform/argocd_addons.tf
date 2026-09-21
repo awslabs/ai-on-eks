@@ -306,8 +306,11 @@ resource "kubectl_manifest" "cilium_yaml" {
 
 # ACK service controller for AWS Lambda MicroVMs (Microvm / MicrovmImage
 # CRDs + reconciler). IRSA role carries the controller's recommended
-# inline policy: Lambda MicroVM APIs + iam:PassRole scoped to
-# lambda.amazonaws.com (the MicroVM execution role hand-off).
+# inline policy (Lambda MicroVM APIs + iam:PassRole for the build /
+# execution role hand-off) plus lambda:PassNetworkConnector, which
+# CreateMicrovmImage and RunMicrovm require to attach the Lambda-managed
+# network connectors (builds default to INTERNET_EGRESS to pull the
+# Dockerfile base image).
 data "aws_iam_policy_document" "ack_lambdamicrovms_trust" {
   count = var.enable_ack_lambdamicrovms ? 1 : 0
   statement {
@@ -364,14 +367,22 @@ resource "aws_iam_role_policy" "ack_lambdamicrovms" {
         Resource = "*"
       },
       {
+        # No iam:PassedToService condition: CreateMicrovmImage was
+        # denied live with the condition set to lambda.amazonaws.com
+        # (and microvms.lambda.amazonaws.com) — the lambda-microvms
+        # APIs do not populate the key with either value (verified
+        # us-west-2, Sep 2026). Re-tighten once the service documents
+        # its PassedToService value.
         Effect   = "Allow"
         Action   = "iam:PassRole"
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "iam:PassedToService" = "lambda.amazonaws.com"
-          }
-        }
+      },
+      {
+        # Managed + account-owned network connectors (ALL_INGRESS /
+        # INTERNET_EGRESS / SHELL_INGRESS live under account "aws").
+        Effect   = "Allow"
+        Action   = "lambda:PassNetworkConnector"
+        Resource = "arn:aws:lambda:*:*:network-connector:*"
       }
     ]
   })

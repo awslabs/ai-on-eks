@@ -29,6 +29,8 @@ class Dispatcher:
         dyn_client,
         namespace: str = "agent-sandboxes",
         microvm_execution_role_arn: str | None = None,
+        microvm_ingress_connector_arns: list[str] | None = None,
+        microvm_egress_connector_arns: list[str] | None = None,
     ):
         self.registry = TierRegistry(dyn_client, namespace)
         self.namespace = namespace
@@ -37,7 +39,10 @@ class Dispatcher:
         }
         if microvm_execution_role_arn:
             self._providers["MicrovmImage"] = MicrovmProvider(
-                dyn_client, microvm_execution_role_arn
+                dyn_client,
+                microvm_execution_role_arn,
+                ingress_connector_arns=microvm_ingress_connector_arns,
+                egress_connector_arns=microvm_egress_connector_arns,
             )
         self._hooks: dict[str, list[Hook]] = {
             "pre_bind": [], "post_bind": [], "pre_release": [], "post_release": [],

@@ -11,8 +11,11 @@
 #
 # Placeholders (rendered by install tooling or by hand):
 #   __BASE_IMAGE_ARN__   Lambda-managed base image — discover with
-#                        `aws lambda list-managed-microvm-images`
-#   __CODE_ARTIFACT_URI__ S3 URI of the zipped worker code
+#                        `aws lambda-microvms list-managed-microvm-images`
+#   __CODE_ARTIFACT_URI__ S3 URI of the zipped worker code — the zip
+#                        contains app code + a Dockerfile; Lambda runs
+#                        the Dockerfile, starts CMD, and snapshots the
+#                        running state (S3 zip only; no ECR image path)
 #   __BUILD_ROLE_ARN__   IAM role Lambda assumes for the build (S3 read
 #                        on the artifact bucket at minimum)
 #
@@ -28,6 +31,9 @@ metadata:
   namespace: agent-sandboxes
   labels:
     agent-sandbox/role: microvm-worker
+    # Registers this image as a dispatchable tier — the dispatcher's
+    # label registry discovers MicrovmImage resources by this label.
+    agent-sandbox/tier: microvm
 spec:
   # Must be unique within the AWS account; immutable once set.
   name: agent-sandbox-worker

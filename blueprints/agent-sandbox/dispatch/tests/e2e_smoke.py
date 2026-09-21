@@ -66,12 +66,22 @@ def main() -> None:
     print(f"[2] WARM gvisor bind={warm_bind:.2f}s ready+={warm_ready:.2f}s pod={b1.pod}")
     results["warm_gvisor"] = (round(warm_bind, 2), round(warm_ready, 2))
 
+    # Scale the pool to 0 first — otherwise the pool replenishes the
+    # checked-out replica between binds and the "cold" bind silently
+    # adopts a fresh warm pod (pool-named, ~0.8s), voiding the cold-path
+    # assertions. replicas=0 guarantees the claim-created (cold) path.
+    kubectl_out("-n", NS, "patch", "sandboxwarmpool",
+                "dispatch-worker-gvisor-pool", "--type=merge",
+                "-p", '{"spec":{"replicas":0}}')
     t0 = time.monotonic()
     b2 = d.bind("smoke-cold-002", "gvisor", timeout=300)
     cold_bind = time.monotonic() - t0
     cold_ready = wait_pod_ready(b2.pod)
     print(f"[3] COLD gvisor bind={cold_bind:.2f}s ready+={cold_ready:.2f}s pod={b2.pod}")
     results["cold_gvisor"] = (round(cold_bind, 2), round(cold_ready, 2))
+    kubectl_out("-n", NS, "patch", "sandboxwarmpool",
+                "dispatch-worker-gvisor-pool", "--type=merge",
+                "-p", '{"spec":{"replicas":1}}')
     assert b2.pod.startswith("dispatch-smoke-cold"), "cold pod should be claim-named"
     assert not b1.pod.startswith("dispatch-smoke-warm"), "warm pod should be pool-named"
 

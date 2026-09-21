@@ -26,6 +26,12 @@ spec:
     from:
       name: agent-sandbox-worker
   executionRoleARN: __EXECUTION_ROLE_ARN__
+  # Lambda-managed network connectors (swap the region). Without an
+  # ingress connector, endpoint traffic never reaches the worker.
+  ingressNetworkConnectors:
+    - arn:aws:lambda:us-west-2:aws:network-connector:aws-network-connector:ALL_INGRESS
+  egressNetworkConnectors:
+    - arn:aws:lambda:us-west-2:aws:network-connector:aws-network-connector:INTERNET_EGRESS
   # Hard session ceiling (managed-tier limit is 8h = 28800).
   maximumDurationInSeconds: 3600
   # Suspend after 5 idle minutes rather than billing active compute;
