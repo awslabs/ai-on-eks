@@ -1,0 +1,46 @@
+# MicrovmImage — declarative build of the sandbox worker image for the
+# Lambda MicroVM (off-cluster) execution tier.
+#
+# The ACK lambdamicrovms controller (base infra addon,
+# enable_ack_lambdamicrovms=true) reconciles this CR into a Lambda
+# MicroVM image build: Lambda pulls the code artifact from S3, layers
+# it onto the managed base image, runs the image hooks, and publishes
+# a versioned image. The resulting ARN surfaces on status.ackResourceMetadata.arn
+# and is consumed by Microvm CRs via imageIdentifierRef (see
+# microvm-worker.yaml).
+#
+# Placeholders (rendered by install tooling or by hand):
+#   __BASE_IMAGE_ARN__   Lambda-managed base image — discover with
+#                        `aws lambda list-managed-microvm-images`
+#   __CODE_ARTIFACT_URI__ S3 URI of the zipped worker code
+#   __BUILD_ROLE_ARN__   IAM role Lambda assumes for the build (S3 read
+#                        on the artifact bucket at minimum)
+#
+# Constraints worth knowing before building: Lambda MicroVMs are
+# ARM64/Graviton only (build the worker artifact for arm64), max
+# 16 vCPU / 32 GiB / 32 GiB disk per VM, 9 launch regions as of
+# Aug 2026. Egress is connector-based (no FQDN allowlists) — the
+# in-cluster tiers keep the finer-grained egress story.
+apiVersion: lambdamicrovms.services.k8s.aws/v1alpha1
+kind: MicrovmImage
+metadata:
+  name: agent-sandbox-worker
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: microvm-worker
+spec:
+  # Must be unique within the AWS account; immutable once set.
+  name: agent-sandbox-worker
+  description: >-
+    Sandbox worker for agent tool-call execution — off-cluster tier of
+    the agent-sandbox dispatch pattern.
+  baseImageARN: __BASE_IMAGE_ARN__
+  codeArtifact:
+    uri: __CODE_ARTIFACT_URI__
+  buildRoleARN: __BUILD_ROLE_ARN__
+  environmentVariables:
+    SANDBOX_TIER: "microvm"
+  # Uncomment to stream build + runtime logs to a dedicated group:
+  # logging:
+  #   cloudWatch:
+  #     logGroup: /agent-sandbox/microvm-worker

@@ -1,0 +1,38 @@
+# Microvm — one off-cluster sandbox worker instance, launched from the
+# agent-sandbox-worker MicrovmImage.
+#
+# In the dispatch pattern the dispatcher creates these per session
+# (analogous to a SandboxClaim on the in-cluster axis), waits for
+# status.state == Running, and calls status.endpoint. Teardown is CR
+# deletion; idlePolicy handles park-between-turns economics without
+# tearing down (suspend/resume is the managed-tier capability the
+# in-cluster tiers don't have).
+#
+# Placeholder: __EXECUTION_ROLE_ARN__ — the runtime role for the
+# worker (scoped to what tool execution needs; iam:PassRole for it is
+# already conditioned to lambda.amazonaws.com on the controller role).
+apiVersion: lambdamicrovms.services.k8s.aws/v1alpha1
+kind: Microvm
+metadata:
+  name: sandbox-microvm-example
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: microvm-worker
+    agent-sandbox/managed-by: dispatch
+spec:
+  # Reference the MicrovmImage CR by its Kubernetes name — ACK resolves
+  # the built image ARN once the image reconciles to Available.
+  imageIdentifierRef:
+    from:
+      name: agent-sandbox-worker
+  executionRoleARN: __EXECUTION_ROLE_ARN__
+  # Hard session ceiling (managed-tier limit is 8h = 28800).
+  maximumDurationInSeconds: 3600
+  # Suspend after 5 idle minutes rather than billing active compute;
+  # auto-resume on the next request (resume is sub-second from
+  # snapshot). suspendedDurationSeconds bounds how long a suspended VM
+  # is retained before termination.
+  idlePolicy:
+    maxIdleDurationSeconds: 300
+    autoResumeEnabled: true
+    suspendedDurationSeconds: 86400
