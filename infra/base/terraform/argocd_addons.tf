@@ -303,3 +303,88 @@ resource "kubectl_manifest" "cilium_yaml" {
     helm_release.argocd
   ]
 }
+
+# ACK service controller for AWS Lambda MicroVMs (Microvm / MicrovmImage
+# CRDs + reconciler). IRSA role carries the controller's recommended
+# inline policy: Lambda MicroVM APIs + iam:PassRole scoped to
+# lambda.amazonaws.com (the MicroVM execution role hand-off).
+data "aws_iam_policy_document" "ack_lambdamicrovms_trust" {
+  count = var.enable_ack_lambdamicrovms ? 1 : 0
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [module.eks.oidc_provider_arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${module.eks.oidc_provider}:sub"
+      values   = ["system:serviceaccount:ack-system:ack-lambdamicrovms-controller"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "${module.eks.oidc_provider}:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "ack_lambdamicrovms" {
+  count              = var.enable_ack_lambdamicrovms ? 1 : 0
+  name               = "${local.name}-ack-lambdamicrovms"
+  assume_role_policy = data.aws_iam_policy_document.ack_lambdamicrovms_trust[0].json
+}
+
+resource "aws_iam_role_policy" "ack_lambdamicrovms" {
+  count = var.enable_ack_lambdamicrovms ? 1 : 0
+  name  = "ack-lambdamicrovms-recommended"
+  role  = aws_iam_role.ack_lambdamicrovms[0].id
+  # Mirrors config/iam/recommended-inline-policy at the pinned chart
+  # version in aws-controllers-k8s/lambdamicrovms-controller.
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "lambda:CreateMicrovmImage",
+          "lambda:UpdateMicrovmImage",
+          "lambda:DeleteMicrovmImage",
+          "lambda:GetMicrovmImage",
+          "lambda:GetMicrovmImageVersion",
+          "lambda:ListMicrovmImages",
+          "lambda:RunMicrovm",
+          "lambda:GetMicrovm",
+          "lambda:TerminateMicrovm",
+          "lambda:ListMicrovms",
+          "lambda:TagResource",
+          "lambda:UntagResource",
+          "lambda:ListTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = "iam:PassRole"
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "iam:PassedToService" = "lambda.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "kubectl_manifest" "ack_lambdamicrovms_yaml" {
+  count = var.enable_ack_lambdamicrovms ? 1 : 0
+  yaml_body = templatefile("${path.module}/argocd-addons/ack-lambdamicrovms.yaml", {
+    version  = var.ack_lambdamicrovms_version
+    region   = var.region
+    role_arn = aws_iam_role.ack_lambdamicrovms[0].arn
+  })
+  depends_on = [
+    helm_release.argocd
+  ]
+}
