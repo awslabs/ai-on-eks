@@ -1,0 +1,74 @@
+# Dispatchable worker — runc tier.
+#
+# SandboxTemplate runs the upstream python-runtime-sandbox (HTTP on
+# :8888) so the agent-sandbox SDK / MCP server can execute inside it
+# — the dispatch pattern's worker-runtime requirement (DESIGN.md).
+# The SandboxWarmPool carries the agent-sandbox/tier label, which
+# registers it with the dispatcher's label-based tier registry.
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: dispatch-worker-runc
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/managed-by: dispatch
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        egress-tier: sandbox
+        agent-sandbox/tier: runc
+    spec:
+      containers:
+        - name: runtime
+          image: registry.k8s.io/agent-sandbox/python-runtime-sandbox:v1.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8888
+          env:
+            # v1.0 runtime feature: relocate the working base dir onto
+            # the writable mount so readOnlyRootFilesystem holds.
+            - name: SANDBOX_BASE_DIR
+              value: /workspace
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+# The dispatchable capacity: tier label on the POOL is what the
+# registry discovers. replicas: 1 pre-warms one worker (warm claim
+# latency is runtime-independent ~0.32s; cold varies by tier — see
+# DESIGN.md prior art). Bump for burst, 0 for zero idle cost.
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxWarmPool
+metadata:
+  name: dispatch-worker-runc-pool
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: runc
+    agent-sandbox/managed-by: dispatch
+spec:
+  replicas: 1
+  sandboxTemplateRef:
+    name: dispatch-worker-runc
