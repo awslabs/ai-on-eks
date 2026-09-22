@@ -44,8 +44,8 @@ In production agent platforms (Modal, E2B, Daytona, Anthropic Code Execution, Op
 │           ▼                  ▼                     ▼           │
 │    ┌──────────────┐   ┌──────────────┐    ┌──────────────┐    │
 │    │ Sandbox      │   │ Sandbox      │    │ Sandbox      │    │
-│    │ (code exec)  │   │ (jupyter)    │    │ (future)     │    │
-│    │ runtime:     │   │ runtime:     │    │              │    │
+│    │ (code exec)  │   │ (data        │    │ (future)     │    │
+│    │ runtime:     │   │  analysis)   │    │              │    │
 │    │ gvisor/runc  │   │ gvisor/runc  │    │              │    │
 │    │ ephemeral    │   │ session-     │    │              │    │
 │    │              │   │ scoped       │    │              │    │
@@ -62,7 +62,7 @@ The agent process and OpenWebUI run as normal unsandboxed pods. The sandboxes ar
 | OpenWebUI | User-facing chat interface | `ghcr.io/open-webui/open-webui:latest` |
 | Agent process | Tool orchestrator — receives chat, calls Bedrock, invokes sandboxes | `python:3.12-slim` (with agent code via ConfigMap) |
 | Code-execution sandbox | Ephemeral Python/shell execution environment | `python:3.12-slim` (via SandboxTemplate) |
-| Jupyter sandbox | Session-scoped Jupyter kernel for stateful data analysis | `jupyter/minimal-notebook:latest` (via SandboxTemplate) |
+| Data-analysis sandbox | Sandbox with pandas/numpy/matplotlib for data analysis | `python:3.12-slim` (via SandboxTemplate) |
 
 ## Prerequisites
 
@@ -80,19 +80,26 @@ cd blueprints/agent-sandbox/agent-with-tools
 
 The installer:
 1. Auto-detects compute mode (Standard EKS vs. Auto Mode)
-2. Applies sandbox templates for both tools (code-exec + jupyter)
+2. Applies sandbox templates for both tools (code-exec + data-analysis)
 3. Deploys the agent process with IRSA credentials
 4. Deploys OpenWebUI with the agent as its backend
 5. Applies egress policies scoped to each component's needs
 
-After install completes:
+After install completes, reach the chat UI over a local port-forward. The
+OpenWebUI service is `ClusterIP` by design — it is not exposed publicly,
+because it proxies Bedrock and can drive code execution in the sandboxes.
 
 ```bash
-# Get the OpenWebUI endpoint
-kubectl -n agent-sandboxes get svc openwebui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+# Forward the UI to your machine
+kubectl -n agent-sandboxes port-forward svc/openwebui 8080:8080
 
-# Open the URL in your browser, create an account, and chat
+# Open http://localhost:8080, create the admin account (auth is on), and chat
 ```
+
+> Exposing the UI publicly is opt-in. If you need a shared endpoint, keep
+> `WEBUI_AUTH=true` and front it with an internal/source-ranged LoadBalancer or
+> an authenticated Ingress — don't switch the Service back to a public
+> `LoadBalancer`.
 
 ## How it works
 
@@ -103,13 +110,13 @@ kubectl -n agent-sandboxes get svc openwebui -o jsonpath='{.status.loadBalancer.
 3. Agent calls Bedrock Claude with the message + tool definitions
 4. If Claude requests a tool call:
    - **code_execute**: Agent creates/reuses a code-execution sandbox, runs the code via `kubectl exec`, returns stdout/stderr
-   - **jupyter_execute**: Agent creates/reuses a Jupyter sandbox, sends code to the kernel via the Jupyter REST API, returns cell output
+   - **data_analysis_execute**: Agent creates/reuses a data-analysis sandbox (pandas/numpy/matplotlib preinstalled), runs the snippet via `kubectl exec`, returns stdout/stderr
 5. Agent returns the final response to OpenWebUI
 
 ### Sandbox lifecycle
 
 - **Code-execution sandboxes** are ephemeral — one per tool call. The agent claims a SandboxClaim, executes the code, captures output, and the sandbox can be cleaned up (or reused within a session).
-- **Jupyter sandboxes** are session-scoped — they persist across multiple tool calls within a conversation so state (variables, imports, dataframes) carries over.
+- **Data-analysis sandboxes** reuse the same sandbox pod across tool calls within a session (avoiding repeated cold starts), but each call runs a fresh Python interpreter — variables and imports do **not** persist between calls, so each snippet must be self-contained. (A kernel-backed sandbox that preserves interpreter state across calls is a possible future enhancement.)
 
 Both sandbox types use the same security posture as the reference agent: `readOnlyRootFilesystem`, `runAsNonRoot`, `capabilities.drop: [ALL]`, writable workspace via emptyDir, FQDN egress allowlist.
 
@@ -131,7 +138,7 @@ This blueprint uses three egress tiers:
 |-----------|-----------|---------------------|
 | Agent process | `egress-tier: agent` | Bedrock, STS, OpenWebUI (cluster-internal) |
 | Code-exec sandbox | `egress-tier: sandbox` | PyPI, pythonhosted (pip install) |
-| Jupyter sandbox | `egress-tier: sandbox` | PyPI, pythonhosted, conda channels |
+| Data-analysis sandbox | `egress-tier: sandbox` | PyPI, pythonhosted (pip install) |
 | OpenWebUI | `egress-tier: ui` | Agent (cluster-internal only) |
 
 The agent's egress is broader than the sandboxes' — it needs to reach Bedrock. The sandboxes only need package registries for dependency installation. OpenWebUI only talks to the agent (no external egress).
@@ -144,7 +151,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/<role> ./conformance.sh
 
 The conformance test validates:
 1. User message → agent reasons → code-execution tool invoked → sandbox runs → output returned
-2. User message → agent invokes Jupyter tool → notebook cell executes → output returned
+2. User message → agent invokes data-analysis tool → sandbox runs snippet → output returned
 3. Sandbox egress is restricted (non-allowlisted FQDN blocked)
 
 ## Cleanup
@@ -166,9 +173,11 @@ Removes all blueprint-specific resources (agent deployment, OpenWebUI, sandbox t
 | `agent/requirements.txt` | Python dependencies for the agent process |
 | `manifests/agent-deployment.yaml` | Agent Deployment + Service |
 | `manifests/openwebui-deployment.yaml` | OpenWebUI Deployment + Service + PVC |
-| `manifests/sandbox-code-exec.yaml` | SandboxTemplate for ephemeral code execution |
-| `manifests/sandbox-jupyter.yaml` | SandboxTemplate for session-scoped Jupyter |
-| `manifests/sandbox-claim-code-exec.yaml` | SandboxClaim template for code-execution tool |
-| `manifests/sandbox-claim-jupyter.yaml` | SandboxClaim template for Jupyter tool |
+| `manifests/sandbox-code-exec-runc.yaml` | Code-exec SandboxTemplate + warm pool (Auto Mode / runc) |
+| `manifests/sandbox-code-exec-gvisor.yaml` | Code-exec SandboxTemplate + warm pool (Standard EKS / gVisor) |
+| `manifests/sandbox-jupyter-runc.yaml` | Data-analysis SandboxTemplate + warm pool (Auto Mode / runc) |
+| `manifests/sandbox-jupyter-gvisor.yaml` | Data-analysis SandboxTemplate + warm pool (Standard EKS / gVisor) |
 | `manifests/egress/` | Egress policies for agent + sandbox tiers |
+
+> SandboxClaims are rendered dynamically by `agent/tools.py` at tool-call time (they check out from the warm pools defined in the template files above), so there are no standalone claim manifests.
 | `README.md` | This file |

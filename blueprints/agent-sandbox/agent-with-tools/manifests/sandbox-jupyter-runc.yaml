@@ -1,13 +1,14 @@
-# SandboxTemplate — Jupyter (runc tier).
+# SandboxTemplate — data-analysis (runc tier).
 #
-# Session-scoped Jupyter kernel for stateful data analysis. The agent
-# process claims one instance per conversation session; state persists
-# across tool calls within that session.
+# Data-analysis sandbox: Python with numpy/pandas/matplotlib for the
+# data_analysis_execute tool. The agent reuses one sandbox pod per
+# conversation session to avoid repeated cold starts, but each tool call
+# runs a fresh `python` process — interpreter state (variables, imports,
+# dataframes) does NOT persist across calls.
 #
 # Image: python:3.12-slim with numpy/pandas/matplotlib pre-installed
 # at pod startup (written to /workspace/.local via pip install --user).
-# This avoids the jupyter/minimal-notebook image's root-requiring
-# conda setup and keeps the same security posture as the code-exec template.
+# This keeps the same non-root security posture as the code-exec template.
 #
 # Mode compatibility:
 #   - Standard EKS (Karpenter): yes
@@ -31,7 +32,7 @@ spec:
         agent-sandbox/managed-by: agent-with-tools
     spec:
       containers:
-        - name: jupyter-runtime
+        - name: data-analysis-runtime
           image: python:3.12-slim
           imagePullPolicy: IfNotPresent
           command:
@@ -39,8 +40,8 @@ spec:
             - -c
             - |
               pip install --no-cache-dir --disable-pip-version-check --user \
-                numpy pandas matplotlib 2>/dev/null
-              echo "jupyter sandbox ready — data science libraries installed"
+                numpy pandas matplotlib
+              echo "data-analysis sandbox ready — data science libraries installed"
               sleep infinity
           env:
             - name: HOME

@@ -3,7 +3,7 @@
 Exposes an OpenAI-compatible chat/completions API that OpenWebUI
 connects to. Receives user messages, calls Amazon Bedrock Claude
 with tool definitions, and dispatches tool calls to sandbox-backed
-executors (code execution, Jupyter).
+executors (code execution, data analysis).
 
 The server is a standard Flask app running on port 8000. OpenWebUI
 is configured to use it as a custom OpenAI-compatible backend.
@@ -264,9 +264,11 @@ def chat_completions():
                 "You are a helpful AI assistant with access to code execution tools. "
                 "When the user asks you to run code, perform calculations, analyze data, "
                 "or do anything that requires computation, use the available tools. "
-                "For simple data analysis tasks that build on previous results, prefer "
-                "the jupyter_execute tool. For one-off computations or scripts, use "
-                "code_execute. Always show the user the results of tool execution."
+                "For data analysis with pandas/numpy/matplotlib, prefer the "
+                "data_analysis_execute tool. For general one-off computations or shell "
+                "scripts, use code_execute. Each tool call runs independently, so include "
+                "all needed imports and setup in the same snippet. Always show the user "
+                "the results of tool execution."
             ),
         })
 

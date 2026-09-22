@@ -71,8 +71,12 @@ spec:
               value: "false"
             - name: SAFE_MODE
               value: "true"
+            # Authentication is ON. This UI proxies Bedrock and can drive code
+            # execution in the sandboxes, so it must not be left open. On first
+            # visit OpenWebUI prompts you to create an admin account; that
+            # account then gates all access.
             - name: WEBUI_AUTH
-              value: "false"
+              value: "true"
             # Data persistence
             - name: DATA_DIR
               value: /app/backend/data
@@ -106,6 +110,17 @@ spec:
           persistentVolumeClaim:
             claimName: openwebui-data
 ---
+# Service is ClusterIP (cluster-internal only). This blueprint deliberately
+# does NOT expose the chat UI on a public LoadBalancer: it proxies Bedrock and
+# can drive code execution in the sandboxes, so a public endpoint is a
+# cost-abuse and security risk. Reach the UI over a local port-forward:
+#
+#   kubectl -n agent-sandboxes port-forward svc/openwebui 8080:8080
+#   # then open http://localhost:8080
+#
+# If you must expose it (e.g. a shared demo), do so explicitly and safely:
+# keep WEBUI_AUTH=true, and front it with an internal/source-ranged LB or an
+# authenticated Ingress rather than flipping this back to a public LoadBalancer.
 apiVersion: v1
 kind: Service
 metadata:
@@ -121,4 +136,4 @@ spec:
       targetPort: 8080
       protocol: TCP
       name: http
-  type: LoadBalancer
+  type: ClusterIP

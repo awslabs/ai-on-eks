@@ -4,8 +4,8 @@
 # Validates the full tool-calling chain:
 #   1. Agent receives a message → reasons → invokes code_execute tool
 #      → sandbox runs Python → output returned
-#   2. Agent receives a message → invokes jupyter_execute tool
-#      → Jupyter sandbox runs code → output returned
+#   2. Agent receives a message → invokes data_analysis_execute tool
+#      → data-analysis sandbox runs code → output returned
 #   3. Sandbox egress is restricted (non-allowlisted FQDN blocked)
 #
 # Run after install.sh has completed.
@@ -107,28 +107,28 @@ else
     fi
 fi
 
-# --- Test 2: Jupyter Execution Tool ----------------------------------------
+# --- Test 2: Data Analysis Execution Tool ----------------------------------
 
 log ""
-log "=== Test 2: Jupyter Execution Tool ==="
-log "Sending: 'Create a list of squares from 1 to 5 using data analysis'"
+log "=== Test 2: Data Analysis Execution Tool ==="
+log "Sending: 'Create a pandas DataFrame of x (1-5) and y (squares) and print it'"
 
-PAYLOAD_2='{"messages":[{"role":"user","content":"Use the Jupyter/data analysis tool to create a pandas DataFrame with columns x (1 through 5) and y (squares of x), then print it. Show me the output."}],"session_id":"conformance-jupyter-test"}'
+PAYLOAD_2='{"messages":[{"role":"user","content":"Use the data analysis tool to create a pandas DataFrame with columns x (1 through 5) and y (squares of x), then print it. Show me the output."}],"session_id":"conformance-data-analysis-test"}'
 
 RESPONSE_2=$(call_agent "$PAYLOAD_2")
 log "Response received (${#RESPONSE_2} chars)"
 
 # Validate response shows data analysis output
-if echo "$RESPONSE_2" | grep -qE "25|jupyter_execute|DataFrame"; then
-    log "PASS: Jupyter execution produced expected output"
+if echo "$RESPONSE_2" | grep -qE "25|data_analysis_execute|DataFrame"; then
+    log "PASS: Data analysis execution produced expected output"
 else
     if echo "$RESPONSE_2" | grep -qi "error"; then
         fail "Test 2: Agent returned an error"
     fi
     if echo "$RESPONSE_2" | grep -q "tool_calls"; then
-        log "PASS: Agent invoked jupyter_execute tool (tool call detected)"
+        log "PASS: Agent invoked data_analysis_execute tool (tool call detected)"
     else
-        log "WARNING: Could not confirm jupyter tool execution — response may have used code_execute instead"
+        log "WARNING: Could not confirm data analysis tool execution — response may have used code_execute instead"
         log "Response snippet: $(echo "$RESPONSE_2" | head -c 500)"
     fi
 fi
@@ -225,5 +225,5 @@ log "======================================="
 log ""
 log "Validated:"
 log "  1. User message → agent → code_execute tool → sandbox → result"
-log "  2. User message → agent → jupyter_execute tool → sandbox → result"
+log "  2. User message → agent → data_analysis_execute tool → sandbox → result"
 log "  3. Sandbox egress restricted (non-allowlisted FQDN blocked)"

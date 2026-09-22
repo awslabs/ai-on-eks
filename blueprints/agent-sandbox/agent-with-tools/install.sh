@@ -261,15 +261,10 @@ print_success() {
     echo "Bedrock region:  $REGION"
     echo "IRSA role:       $BEDROCK_ROLE_ARN"
     echo ""
-    echo "Access OpenWebUI:"
-    local endpoint
-    endpoint=$(kubectl -n "$NS" get svc openwebui -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
-    if [ -n "$endpoint" ]; then
-        echo "  http://$endpoint:8080"
-    else
-        echo "  kubectl -n $NS port-forward svc/openwebui 8080:8080"
-        echo "  Then open http://localhost:8080"
-    fi
+    echo "Access OpenWebUI (ClusterIP — reach it via a local port-forward):"
+    echo "  kubectl -n $NS port-forward svc/openwebui 8080:8080"
+    echo "  Then open http://localhost:8080"
+    echo "  On first visit, create the admin account (WEBUI_AUTH is on)."
     echo ""
     echo "Verify agent health:"
     echo "  kubectl -n $NS exec deploy/agent-orchestrator -c agent -- python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8000/health').read().decode())\""

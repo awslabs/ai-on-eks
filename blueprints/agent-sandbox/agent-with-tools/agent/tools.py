@@ -26,8 +26,10 @@ NS = os.environ.get("SANDBOX_NAMESPACE", "agent-sandboxes")
 SANDBOX_TEMPLATE_CODE = os.environ.get("SANDBOX_TEMPLATE_CODE", "sandbox-code-exec-__TIER__")
 SANDBOX_TEMPLATE_JUPYTER = os.environ.get("SANDBOX_TEMPLATE_JUPYTER", "sandbox-jupyter-__TIER__")
 
-# Track active Jupyter sandboxes by session to enable stateful conversations.
-_jupyter_sessions: dict[str, str] = {}  # session_id -> pod_name
+# Reuse a data-analysis sandbox pod per session to avoid repeated cold starts.
+# Note: this reuses the pod, not interpreter state — each call runs a fresh
+# `python` process, so variables/imports do not carry over between calls.
+_data_analysis_sessions: dict[str, str] = {}  # session_id -> pod_name
 
 
 def _kubectl(*args: str, timeout: int = 60) -> subprocess.CompletedProcess:
@@ -212,27 +214,27 @@ spec:
 
 
 # ---------------------------------------------------------------------------
-# Jupyter Execution Tool
+# Data Analysis Execution Tool
 # ---------------------------------------------------------------------------
 
-JUPYTER_EXEC_SCHEMA = {
+DATA_ANALYSIS_SCHEMA = {
     "type": "function",
     "function": {
-        "name": "jupyter_execute",
+        "name": "data_analysis_execute",
         "description": (
-            "Execute code in a persistent Jupyter kernel. State (variables, "
-            "imports, dataframes) persists across calls within the same "
-            "conversation. Use this for data analysis, iterative exploration, "
-            "plotting, and any workflow where you need to build on previous "
-            "results. The kernel has Python 3 with common data science "
-            "libraries available (numpy, pandas, matplotlib)."
+            "Execute Python code in a data-analysis sandbox with common data "
+            "science libraries available (numpy, pandas, matplotlib). Use this "
+            "for data analysis, computation, and plotting. Each call runs "
+            "independently — variables and imports do NOT carry over between "
+            "calls, so include everything a snippet needs (imports, data setup) "
+            "in the same call."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "code": {
                     "type": "string",
-                    "description": "The Python code to execute in the Jupyter kernel.",
+                    "description": "The Python code to execute.",
                 },
             },
             "required": ["code"],
@@ -241,20 +243,23 @@ JUPYTER_EXEC_SCHEMA = {
 }
 
 
-def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
-    """Execute code in a session-scoped Jupyter sandbox.
+def execute_data_analysis(args: dict[str, Any], session_id: str) -> str:
+    """Execute Python code in a data-analysis sandbox.
 
-    The Jupyter sandbox persists across tool calls within the same
-    session_id, so variables and imports carry over between calls.
+    The sandbox pod is reused across calls within the same session_id
+    (avoiding repeated cold starts), but each call runs a *fresh* Python
+    interpreter — the code is written to a file and run with `python`, so
+    interpreter state (variables, imports, dataframes) does NOT persist
+    between calls. Each snippet must be self-contained.
     """
     code = args.get("code", "")
-    pod_name = _jupyter_sessions.get(session_id)
+    pod_name = _data_analysis_sessions.get(session_id)
 
     if pod_name is None or not _pod_exists(pod_name):
-        claim_name = f"jupyter-{session_id[:8]}"
-        logger.info("Creating Jupyter sandbox claim: %s", claim_name)
+        claim_name = f"data-analysis-{session_id[:8]}"
+        logger.info("Creating data-analysis sandbox claim: %s", claim_name)
 
-        claim_manifest = _render_jupyter_claim(claim_name)
+        claim_manifest = _render_data_analysis_claim(claim_name)
         result = subprocess.run(
             ["kubectl", "apply", "-f", "-"],
             input=claim_manifest,
@@ -264,44 +269,29 @@ def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
             check=False,
         )
         if result.returncode != 0:
-            return f"ERROR: Failed to create Jupyter sandbox: {result.stderr}"
+            return f"ERROR: Failed to create data-analysis sandbox: {result.stderr}"
 
         pod_name = _resolve_sandbox_pod(claim_name)
         if pod_name is None:
-            return "ERROR: Jupyter SandboxClaim did not bind a sandbox within 60s"
+            return "ERROR: data-analysis SandboxClaim did not bind a sandbox within 60s"
         if not _wait_for_pod(pod_name, timeout=240):
-            return "ERROR: Jupyter sandbox pod did not become Ready within 4 minutes"
+            return "ERROR: data-analysis sandbox pod did not become Ready within 4 minutes"
 
-        # Wait for Jupyter to be responsive
-        time.sleep(5)
-        _jupyter_sessions[session_id] = pod_name
+        _data_analysis_sessions[session_id] = pod_name
 
-    # Execute code via the Jupyter kernel using papermill-style exec
-    # We use ipython directly since it's simpler and avoids HTTP API complexity
-    escaped_code = code.replace("'", "'\\''")
-    exec_cmd = [
-        "-n", NS, "exec", pod_name, "-c", "jupyter-runtime", "--",
-        "python", "-c",
-        f"import subprocess, sys; "
-        f"r = subprocess.run([sys.executable, '-c', '''{code}'''], "
-        f"capture_output=True, text=True, timeout=60); "
-        f"print(r.stdout); "
-        f"print(r.stderr, file=sys.stderr) if r.stderr else None",
-    ]
-
-    # Simpler approach: write code and execute via python directly
+    # Write the snippet to a file and run it with a fresh interpreter.
     write_result = _kubectl(
-        "-n", NS, "exec", pod_name, "-c", "jupyter-runtime", "--",
+        "-n", NS, "exec", pod_name, "-c", "data-analysis-runtime", "--",
         "/bin/sh", "-c",
-        f"cat > /tmp/jupyter_cell.py << 'AGENT_JUPYTER_EOF'\n{code}\nAGENT_JUPYTER_EOF",
+        f"cat > /tmp/analysis_cell.py << 'AGENT_ANALYSIS_EOF'\n{code}\nAGENT_ANALYSIS_EOF",
         timeout=10,
     )
     if write_result.returncode != 0:
-        return f"ERROR: Failed to write code to Jupyter sandbox: {write_result.stderr}"
+        return f"ERROR: Failed to write code to data-analysis sandbox: {write_result.stderr}"
 
     result = _kubectl(
-        "-n", NS, "exec", pod_name, "-c", "jupyter-runtime", "--",
-        "python", "/tmp/jupyter_cell.py",
+        "-n", NS, "exec", pod_name, "-c", "data-analysis-runtime", "--",
+        "python", "/tmp/analysis_cell.py",
         timeout=60,
     )
 
@@ -316,8 +306,8 @@ def execute_jupyter(args: dict[str, Any], session_id: str) -> str:
     return "\n".join(output_parts) if output_parts else "(no output)"
 
 
-def _render_jupyter_claim(claim_name: str) -> str:
-    """Render a SandboxClaim manifest for a Jupyter sandbox.
+def _render_data_analysis_claim(claim_name: str) -> str:
+    """Render a SandboxClaim manifest for a data-analysis sandbox.
 
     v1beta1: claims check out from a SandboxWarmPool (the pool ships
     alongside the SandboxTemplate in manifests/ as <template>-pool).
@@ -329,7 +319,7 @@ metadata:
   name: {claim_name}
   namespace: {NS}
   labels:
-    agent-sandbox/role: jupyter
+    agent-sandbox/role: data-analysis
     agent-sandbox/managed-by: agent-with-tools
 spec:
   warmPoolRef:
@@ -346,9 +336,9 @@ TOOLS = {
         "schema": CODE_EXEC_SCHEMA,
         "execute": execute_code,
     },
-    "jupyter_execute": {
-        "schema": JUPYTER_EXEC_SCHEMA,
-        "execute": execute_jupyter,
+    "data_analysis_execute": {
+        "schema": DATA_ANALYSIS_SCHEMA,
+        "execute": execute_data_analysis,
     },
 }
 
