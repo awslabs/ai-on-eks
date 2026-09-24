@@ -1,0 +1,27 @@
+# Egress allowlist for sandbox pods (code-exec + jupyter) — ANP backend (Auto Mode).
+#
+# Native ApplicationNetworkPolicy equivalent of cilium-sandbox-allowlist.yaml.
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: sandbox-tools-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+    agent-sandbox/role: agent-with-tools
+spec:
+  podSelector:
+    matchLabels:
+      egress-tier: sandbox
+      agent-sandbox/managed-by: agent-with-tools
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - domainNames:
+            - "pypi.org"
+            - "*.pypi.org"
+            - "*.pythonhosted.org"
+  policyTypes:
+    - Egress
