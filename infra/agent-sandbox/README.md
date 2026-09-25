@@ -190,7 +190,9 @@ kubectl get pods -n kro-system
 
 ### Apply the Platform Manifests
 
-The platform-layer Kubernetes resources live under `manifests/` and are applied after the cluster is up. These are the runtime primitives the agent-sandbox controller needs (RuntimeClass, SandboxTemplates, namespace, gVisor-capable Karpenter NodePool). See [`manifests/README.md`](manifests/README.md) for a per-file reference.
+The platform-layer Kubernetes resources live under `manifests/` and are applied after the cluster is up. These are the runtime primitives the agent-sandbox controller needs (RuntimeClass, SandboxTemplates, namespace). See [`manifests/README.md`](manifests/README.md) for a per-file reference.
+
+The runtime nodepools (gVisor, Kata+FC) live under `nodepools/` and are Terraform-managed: `install.sh` copies them into the standard nodepool mechanism (`karpenter-resources/karpenter/`), so they deploy with the cluster and are removed by `terraform destroy`. No manual apply step.
 
 Choose the apply set that matches your cluster's compute mode:
 
@@ -199,22 +201,11 @@ Choose the apply set that matches your cluster's compute mode:
 ```bash
 cd manifests/
 
-# Resolve cluster name + Karpenter node role from terraform state (region-agnostic).
-export CLUSTER_NAME=$(terraform -chdir=../terraform/_LOCAL output -raw deployment_name)
-export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spec.role}')
-
 # Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
 kubectl apply -f runtimeclass-gvisor.yaml
 kubectl apply -f sandbox-runc.yaml
 kubectl apply -f sandbox-gvisor.yaml
-
-# gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
-sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
-    -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
-    karpenter-nodepool-gvisor.yaml \
-    > /tmp/karpenter-nodepool-gvisor.rendered.yaml
-kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 ```
 
 #### EKS Auto Mode
@@ -319,12 +310,9 @@ cd infra/agent-sandbox
 ./cleanup.sh
 ```
 
-The wrapper handles teardown in five phases to avoid common Karpenter + EKS race conditions that cause cluster destroy to stall:
+Cleanup runs in two steps:
 
-1. **Egress example uninstall** — removes any installed CNPs/ANPs and the Bedrock IRSA role provisioned by the egress example's `irsa` phase.
-2. **Karpenter scale-down** — scales the Karpenter controller deployment to zero so it stops launching replacement nodes during teardown.
-3. **Finalizer drop** — patches `EC2NodeClass` and `NodePool` finalizers to empty so the controller-less cluster doesn't deadlock on them.
-4. **Base destroy** — runs `terraform destroy` with up to three retries, verifying after each attempt that the VPC and EKS cluster are actually gone (state-driven checks against AWS, not just script exit codes).
-5. **Auxiliary sweep** — cleans up resources Terraform sometimes leaves behind on partial-destroy: orphan EKS-managed cluster security groups (which can block VPC delete), placement groups, KMS aliases, CloudWatch log groups.
+1. **Blueprint-created resources** — the egress example uninstall (CNPs/ANPs plus its IRSA role), then the in-cluster resources applied outside Terraform: Microvm and MicrovmImage CRs first (waiting for the ACK controller to reap the service-side Lambda resources through its finalizers), then sandbox claims, pools, templates, the `agent-sandboxes` namespace, and the RuntimeClasses.
+2. **Terraform cleanup** — the standard `terraform destroy` flow from the base copy. The runtime nodepools are Terraform-managed, so they are removed here with everything else.
 
-If Phase 4 fails after three retries, the wrapper reports "Cleanup partially complete" with manual recovery instructions and exits non-zero. IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.
+IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.

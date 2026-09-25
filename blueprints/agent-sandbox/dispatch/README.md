@@ -4,8 +4,7 @@ Session→execution-target binding across two axes behind one interface:
 **in-cluster** isolation tiers (runc / gvisor / kata-fc via
 SandboxWarmPools) and **off-cluster** AWS Lambda MicroVMs (via the ACK
 `lambdamicrovms` controller). The Kubernetes control plane is the
-registry and the state store — the dispatcher never reconciles anything.
-Architecture and rationale: [DESIGN.md](DESIGN.md).
+registry and the state store; the dispatcher never reconciles anything.
 
 ```
             ┌─ in-cluster:  SandboxClaim ⇦ SandboxWarmPool (tier label)
@@ -24,7 +23,7 @@ bind(session, tier) ──┤
 ## 1. Register tiers (apply labeled capacity)
 
 ```bash
-kubectl apply -f manifests/worker-runc.yaml -f manifests/worker-gvisor.yaml
+kubectl apply -f manifests/worker.yaml -f manifests/worker-gvisor.yaml
 # Standard EKS with the kata-fc RuntimeClass installed:
 kubectl apply -f manifests/worker-kata-fc.yaml
 ```
@@ -82,8 +81,7 @@ d.on("post_bind", stamp_attribution_labels)   # fail-open
 
 `pre_bind` runs before any CR is created and may veto; the other hooks
 (`post_bind`, `pre_release`, `post_release`) fail open. This is the
-seam for CMA work-queue integration, per-user attribution, and quota —
-see DESIGN.md.
+seam for CMA work-queue integration, per-user attribution, and quota.
 
 ## Off-cluster tier (Lambda MicroVM)
 

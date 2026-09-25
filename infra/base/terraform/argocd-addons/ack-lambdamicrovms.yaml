@@ -8,27 +8,12 @@ metadata:
 spec:
   project: default
   source:
-    # ACK service controller for AWS Lambda MicroVMs. Provides the
-    # Microvm / MicrovmImage CRDs + reconciler so MicroVM fleets are
-    # managed as Kubernetes resources (declarative create/terminate,
-    # status.endpoint / state surfaced on the CR). Consumed by
-    # agent-sandbox dispatch patterns as the off-cluster execution
-    # tier alongside the in-cluster SandboxClaim tiers.
     repoURL: public.ecr.aws/aws-controllers-k8s
     chart: lambdamicrovms-chart
     targetRevision: ${version}
     helm:
-      valuesObject:
-        aws:
-          region: ${region}
-        serviceAccount:
-          create: true
-          name: ack-lambdamicrovms-controller
-          annotations:
-            # IRSA role created in argocd_addons.tf with the
-            # controller's recommended inline policy (Lambda MicroVM
-            # APIs + scoped iam:PassRole to lambda.amazonaws.com).
-            eks.amazonaws.com/role-arn: ${role_arn}
+      values: |
+        ${user_values_yaml}
   destination:
     server: https://kubernetes.default.svc
     namespace: ack-system

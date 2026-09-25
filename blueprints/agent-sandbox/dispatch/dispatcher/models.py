@@ -2,7 +2,7 @@
 
 The dispatcher holds no state of its own — these types describe what
 the cluster already knows (labeled capacity resources, per-session CRs).
-See DESIGN.md.
+See ../README.md.
 """
 
 from __future__ import annotations

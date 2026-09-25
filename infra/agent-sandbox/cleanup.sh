@@ -1,48 +1,42 @@
 #!/bin/bash
-# Agent Sandbox — teardown wrapper.
-#
-# Thin wrapper over the shared cleanup driver (infra/base/cleanup/run-cleanup.sh).
-# Resolves cluster + region from the live tfvars and passes the agent-sandbox
-# egress-example uninstall as the component phase-0 hook. The phased teardown
-# logic (Karpenter scale-down/finalizer/instance sweep, retry-and-verify base
-# destroy, auxiliary resource sweep) lives in the shared driver so every
-# blueprint reuses it — see issue #334.
+# Agent Sandbox teardown. Two steps:
+#   1. Remove resources this blueprint created outside Terraform
+#      (in-cluster CRs, namespace, RuntimeClasses, egress example).
+#   2. Run the standard Terraform cleanup from the base copy.
 #
 # Usage:
 #   cd infra/agent-sandbox
 #   ./cleanup.sh
 
-set -euo pipefail
+set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOCAL_DIR="$SCRIPT_DIR/terraform/_LOCAL"
-DRIVER="$(cd "$SCRIPT_DIR/../base/cleanup" && pwd)/run-cleanup.sh"
 
-# Resolve cluster + region from tfvars (region precedence:
-# tfvars > AWS_REGION > AWS_DEFAULT_REGION > kubectl context > us-west-2).
-if [ -f "$SCRIPT_DIR/terraform/blueprint.tfvars" ]; then
-    CLUSTER_NAME=$(grep -E '^name\s*=' "$SCRIPT_DIR/terraform/blueprint.tfvars" | head -1 | awk -F'"' '{print $2}')
-    TFVARS_REGION=$(grep -E '^region\s*=' "$SCRIPT_DIR/terraform/blueprint.tfvars" | head -1 | awk -F'"' '{print $2}' || echo "")
-fi
-CLUSTER_NAME="${CLUSTER_NAME:-agent-sandbox}"
-if [ -n "${TFVARS_REGION:-}" ]; then
-    REGION="$TFVARS_REGION"
-elif [ -n "${AWS_REGION:-}" ]; then
-    REGION="$AWS_REGION"
-elif [ -n "${AWS_DEFAULT_REGION:-}" ]; then
-    REGION="$AWS_DEFAULT_REGION"
-else
-    REGION=$(kubectl config current-context 2>/dev/null | awk -F':' '{print $4}' || echo "")
-    REGION="${REGION:-us-west-2}"
-fi
+echo "=== Step 1: blueprint-created resources ==="
 
-# Phase-0 hook: the agent-egress example's idempotent, mode-aware uninstall
-# (releases CNPs/ANPs + the Bedrock IRSA role it provisioned).
+# Egress example uninstall (idempotent, releases CNPs/ANPs + its IRSA role).
 EGRESS_DIR="$SCRIPT_DIR/../../blueprints/agent-sandbox/egress"
-PHASE0_HOOK=""
 if [ -x "$EGRESS_DIR/install.sh" ]; then
-    PHASE0_HOOK="cd '$EGRESS_DIR' && ./install.sh uninstall"
+    (cd "$EGRESS_DIR" && ./install.sh uninstall) || true
 fi
 
-CLUSTER_NAME="$CLUSTER_NAME" REGION="$REGION" LOCAL_DIR="$LOCAL_DIR" PHASE0_HOOK="$PHASE0_HOOK" \
-    bash "$DRIVER"
+if kubectl get namespace agent-sandboxes >/dev/null 2>&1; then
+    # Delete Microvm/MicrovmImage CRs first and wait: the ACK controller
+    # reaps the service-side VMs and images through its finalizers. If
+    # the controller is destroyed before these CRs are gone, the Lambda
+    # resources are orphaned in the account.
+    kubectl delete microvms,microvmimages -n agent-sandboxes --all --timeout=300s 2>/dev/null || true
+
+    # Session and capacity resources, then the namespace.
+    kubectl delete sandboxclaims,sandboxes,sandboxwarmpools,sandboxtemplates \
+        -n agent-sandboxes --all --timeout=120s 2>/dev/null || true
+    kubectl delete namespace agent-sandboxes --timeout=120s || true
+fi
+
+# Cluster-scoped RuntimeClasses applied from manifests/.
+kubectl delete runtimeclass gvisor kata-fc --ignore-not-found 2>/dev/null || true
+
+echo "=== Step 2: Terraform cleanup ==="
+cd "$LOCAL_DIR"
+source ./cleanup.sh

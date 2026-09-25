@@ -2,7 +2,7 @@
 
 Thin by design: discovery via the label registry, CR creation via the
 providers, teardown by label selector. No reconcile loop, no state that
-`kubectl get -l agent-sandbox/session-id=<id>` can't show. See DESIGN.md.
+`kubectl get -l agent-sandbox/session-id=<id>` can't show.
 """
 
 from __future__ import annotations

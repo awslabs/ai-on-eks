@@ -1,14 +1,9 @@
-# Dispatchable worker — runc tier.
-#
-# SandboxTemplate runs the upstream python-runtime-sandbox (HTTP on
-# :8888) so the agent-sandbox SDK / MCP server can execute inside it
-# — the dispatch pattern's worker-runtime requirement (DESIGN.md).
-# The SandboxWarmPool carries the agent-sandbox/tier label, which
-# registers it with the dispatcher's label-based tier registry.
+# Dispatchable worker, default runtime (runc tier).
+# The tier label on the SandboxWarmPool below is the registry entry.
 apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxTemplate
 metadata:
-  name: dispatch-worker-runc
+  name: dispatch-worker
   namespace: agent-sandboxes
   labels:
     agent-sandbox/managed-by: dispatch
@@ -56,14 +51,11 @@ spec:
         - name: tmp
           emptyDir: {}
 ---
-# The dispatchable capacity: tier label on the POOL is what the
-# registry discovers. replicas: 1 pre-warms one worker (warm claim
-# latency is runtime-independent ~0.32s; cold varies by tier — see
-# DESIGN.md prior art). Bump for burst, 0 for zero idle cost.
+# replicas: 1 pre-warms one worker. Bump for burst, 0 for zero idle cost.
 apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxWarmPool
 metadata:
-  name: dispatch-worker-runc-pool
+  name: dispatch-worker-pool
   namespace: agent-sandboxes
   labels:
     agent-sandbox/tier: runc
@@ -71,4 +63,4 @@ metadata:
 spec:
   replicas: 1
   sandboxTemplateRef:
-    name: dispatch-worker-runc
+    name: dispatch-worker

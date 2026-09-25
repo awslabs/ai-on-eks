@@ -1,15 +1,11 @@
-# Conformance framework (driver + declarative spec)
+# Conformance harness (driver + declarative spec)
 
-A reusable end-to-end conformance harness for AI on EKS components. A single
-shared **driver** (`run-conformance.sh`) executes a component-supplied
-**declarative spec** (`conformance.yaml`): apply manifests → wait for readiness →
-run assertions → report PASS/FAIL → clean up. Blueprints and infra components
-author a spec; they don't write a bespoke test script.
-
-> Seeds [#334](https://github.com/awslabs/ai-on-eks/issues/334) (generalize the
-> cleanup + conformance harnesses for cross-component reuse). The cleanup driver
-> lives alongside at `infra/base/cleanup/` and follows the same "shared driver +
-> per-component hook" shape.
+End-to-end conformance for the agent-sandbox blueprint. A single **driver**
+(`run-conformance.sh`) executes a **declarative spec** (`conformance.yaml`):
+apply manifests, wait for readiness, run assertions, report PASS/FAIL, clean
+up. Each component authors a spec instead of a bespoke test script. The
+driver is component-agnostic; if it proves useful beyond agent-sandbox it can
+be promoted for repo-wide use.
 
 ## Why a driver + spec split
 
@@ -23,7 +19,7 @@ spec, which is faster to author and consistent to run in CI.
 ## Usage
 
 ```bash
-infra/base/conformance/run-conformance.sh path/to/conformance.yaml
+blueprints/agent-sandbox/conformance/run-conformance.sh path/to/conformance.yaml
 # Region/cluster auto-resolve (tfvars > AWS_REGION > AWS_DEFAULT_REGION >
 # kubectl context > us-west-2). CLUSTER_NAME overrides the cluster.
 ```
@@ -81,9 +77,9 @@ When a `nodeExec` assertion fails (or you need to understand *why* a runtime
 didn't register / a snapshotter didn't engage), inspect the host directly:
 
 ```bash
-infra/base/conformance/node-debug.sh <node-name>            # default SOCI+kata bundle
-infra/base/conformance/node-debug.sh <node-name> "findmnt --source soci"
-infra/base/conformance/node-debug.sh --clean                # remove debug pods
+blueprints/agent-sandbox/conformance/node-debug.sh <node-name>            # default SOCI+kata bundle
+blueprints/agent-sandbox/conformance/node-debug.sh <node-name> "findmnt --source soci"
+blueprints/agent-sandbox/conformance/node-debug.sh --clean                # remove debug pods
 ```
 
 It runs a long-lived privileged `hostPID` pod in the `default` namespace and
