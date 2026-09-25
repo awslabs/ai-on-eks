@@ -846,3 +846,16 @@ variable "nodepools" {
     gpu-p6e-gb200-36xlarge = false
   }
 }
+
+# ACK service controller for AWS Lambda MicroVMs
+variable "enable_ack_lambdamicrovms" {
+  description = "Enable the ACK Lambda MicroVMs controller (Microvm / MicrovmImage CRDs and reconciler) — Kubernetes-native management of Lambda MicroVM fleets, used by agent-sandbox dispatch patterns as an off-cluster execution tier"
+  type        = bool
+  default     = false
+}
+
+variable "ack_lambdamicrovms_version" {
+  description = "ACK lambdamicrovms-chart version (public.ecr.aws/aws-controllers-k8s)"
+  type        = string
+  default     = "0.3.0"
+}
