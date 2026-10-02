@@ -437,6 +437,10 @@ Enter your prompt, and you will see the streaming results, as shown below:
 
 ![alt text](../../img/openweb-ui-nim-2.png)
 
+:::tip
+If a chat stops answering, or every new message fails with HTTP 400 and `string_too_short` at `messages[1].content`, Open WebUI's built-in tools are the likely cause. The model answers a tool call without text, Open WebUI stores that turn with empty content, and NIM rejects any request whose history contains an empty message. Turn off **Builtin Tools** for `meta/llama-3.1-8b-instruct` in Open WebUI's model settings, then start a new chat; the broken chat keeps failing.
+:::
+
 ## Performance Testing with NVIDIA GenAI-Perf Tool
 
 [GenAI-Perf](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/client/src/c%2B%2B/perf_analyzer/genai-perf/README.html) is a command line tool for measuring the throughput and latency of generative AI models as served through an inference server.
