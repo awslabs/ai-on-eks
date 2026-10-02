@@ -1,6 +1,5 @@
 name                      = "nvidia-nim-eks"
 enable_aws_efs_csi_driver = true
-enable_argocd             = true
 enable_nvidia_nim_stack   = true
 # region                    = "us-west-2"  #set to appropriate region
 # eks_cluster_version       = "1.34" #set appropriate eks cluster version
