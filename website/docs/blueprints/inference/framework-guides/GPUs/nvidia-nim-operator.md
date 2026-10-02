@@ -441,7 +441,7 @@ Enter your prompt, and you will see the streaming results, as shown below:
 
 [GenAI-Perf](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/client/src/c%2B%2B/perf_analyzer/genai-perf/README.html) is a command line tool for measuring the throughput and latency of generative AI models as served through an inference server.
 
-GenAI-Perf can be used as standard tool to benchmark with other models deployed with inference server. But this tool requires a GPU. To make it easier, we provide you a pre-configured manifest `genaiperf-deploy.yaml` to run the tool.
+GenAI-Perf can be used as standard tool to benchmark with other models deployed with inference server. It only sends requests to the model endpoint, so it runs on a CPU node and needs no GPU. To make it easier, we provide you a pre-configured manifest `genaiperf-deploy.yaml` to run the tool.
 
 ```bash
 kubectl apply -f genaiperf-deploy.yaml
