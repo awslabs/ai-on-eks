@@ -245,18 +245,19 @@ x86-cpu-karpenter   x86-cpu-karpenter   0       True    47h
 To access the NVIDIA container registry and model artifacts, you'll need to provide your NGC API key. This script creates two Kubernetes secrets: `ngc-secret` for Docker image pulls and `ngc-api-secret` for model authorization.
 
 ```bash
-cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
+# from ai-on-eks/infra/nvidia-nim, where you ran ./install.sh
+cd ../../blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
 
 NGC_API_KEY="your-real-ngc-key" ./deploy-nim-auth.sh
 ```
+
+Run the remaining commands in this guide from this `nvidia-nim-operator-llama3-8b` directory unless a step says otherwise.
 
 #### Step 2: Cache the Model to EFS using NIMCache CRD
 
 The `NIMCache` custom resource will pull the model and cache optimized engine profiles to EFS. This dramatically reduces startup time when launching the model later via `NIMService`.
 
 ```bash
-cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
-
 kubectl apply -f nim-cache-llama3-8b-instruct.yaml
 ```
 
@@ -303,8 +304,6 @@ Sample output:
 Now launch the model service using the cached engine profiles.
 
 ```bash
-cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
-
 kubectl apply -f nim-service-llama3-8b-instruct.yaml
 ```
 
@@ -407,7 +406,7 @@ exploration of the area's natural beauty and history. Feel free to modify it to 
 Deploy the [Open WebUI](https://github.com/open-webui/open-webui) by running the following command:
 
 ```sh
-kubectl apply -f ai-on-eks/blueprints/inference/gpu/nvidia-nim-operator-llama3-8b/openai-webui-deployment.yaml
+kubectl apply -f openai-webui-deployment.yaml
 ```
 
 **2. Port Forward to Access WebUI**
@@ -445,7 +444,6 @@ Enter your prompt, and you will see the streaming results, as shown below:
 GenAI-Perf can be used as standard tool to benchmark with other models deployed with inference server. But this tool requires a GPU. To make it easier, we provide you a pre-configured manifest `genaiperf-deploy.yaml` to run the tool.
 
 ```bash
-cd ai-on-eks/blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
 kubectl apply -f genaiperf-deploy.yaml
 ```
 
@@ -568,8 +566,6 @@ To tear down the deployed model and associated infrastructure:
 Delete the deployed `NIMService` and `NIMCache` objects from your cluster:
 
 ```bash
-cd blueprints/inference/gpu/nvidia-nim-operator-llama3-8b
-
 kubectl delete -f nim-service-llama3-8b-instruct.yaml
 kubectl delete -f nim-cache-llama3-8b-instruct.yaml
 ```
@@ -586,6 +582,6 @@ kubectl get nimcaches.apps.nvidia.com -n nim-service
 Navigate back to the root Terraform module and run the cleanup script. This will destroy all AWS resources created for this blueprint, including the VPC, EKS cluster, EFS, and node groups:
 
 ```bash
-cd ai-on-eks/infra/nvidia-nim
+cd ../../../../infra/nvidia-nim
 ./cleanup.sh
 ```
