@@ -17,11 +17,10 @@
 
 set -e
 
-# Step 1: Export your NGC API key
-# You can also set this in your shell before running the script
-export NGC_API_KEY="${NGC_API_KEY:-<your-ngc-api-key>}"
-
-if [ -z "$NGC_API_KEY" ]; then
+# Step 1: Read the NGC API key from the environment
+# Export it in your shell before running the script, or pass it inline:
+#   NGC_API_KEY="nvapi-..." ./deploy-nim-auth.sh
+if [ -z "${NGC_API_KEY:-}" ]; then
   echo "[ERROR] NGC_API_KEY is not set. Please export it or pass it inline."
   exit 1
 fi
