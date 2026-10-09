@@ -1,0 +1,154 @@
+# Agent Sandbox — SOCI lazy-load NodePool (AL2023, opt-in).
+#
+# Dedicated pool for the image-distribution-at-scale / sandbox fan-out use
+# case. Isolated from the shared `general-purpose` pool on purpose:
+#   • Blast radius — routing the kubelet image service through soci affects
+#     image pulls on the node, so we keep it off the pool that runs
+#     cluster-critical workloads (this was a node-stability concern in
+#     earlier testing).
+#   • Churn — `general-purpose` consolidates empty nodes after 300s; this
+#     pool uses a long consolidateAfter so sandbox nodes don't get reaped
+#     mid-debug / between bursts.
+#
+# Mechanism (per AI-on-EKS team guidance): keep the EKS-managed
+# `FastImagePull` featuregate (which installs + wires soci-snapshotter into
+# containerd via nodeadm — the tested path), then override
+# /etc/soci-snapshotter-grpc/config.toml in userData with an EXPLICIT lazy
+# config. nodeadm config generation runs before cloud-init, so this
+# shellscript's config wins.
+#
+# TWO SILENT-FAILURE GATES (both validated on a live cluster, June 2026):
+#   1. Instance size — nodeadm only wires soci into containerd at >=4 vCPU /
+#      >=7 GiB (the `UseSOCISnapshotter` gate). Below xlarge, FastImagePull
+#      silently does nothing. Hence `instance-cpu Gt 3` in requirements.
+#   2. Pull-mode config — soci's DEFAULT pull mode is NOT lazy. A
+#      cri_keychain-only override does NOT lazy-load; you must explicitly
+#      enable [pull_modes.soci_v1] + [pull_modes.soci_v2]. (Disproved the
+#      earlier "cri_keychain → default → lazy" assumption.)
+# Validated: 19 SOCI FUSE mounts on a c6a.xlarge stock-AMI node (soci 0.13.0)
+# with this exact config. The custom-AMI `SociLazyLoading` nodeadm flag is the
+# cleaner durable equivalent (no override hack); this bridge works today.
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: agent-sandbox-soci-lazy
+spec:
+  template:
+    metadata:
+      labels:
+        agent-sandbox/soci: lazy
+    spec:
+      expireAfter: 24h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: agent-sandbox-soci-lazy
+      # Tainted so only workloads that opt in (sandbox pods that tolerate
+      # this) land here — keeps the soci/image-service routing off general
+      # workloads.
+      taints:
+        - key: agent-sandbox/soci
+          value: lazy
+          effect: NoSchedule
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: kubernetes.io/os
+          operator: In
+          values: ["linux"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m", "r"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+        # soci wiring needs >=4 vCPU / >=7 GiB (nodeadm UseSOCISnapshotter
+        # gate) — below xlarge, FastImagePull silently wires nothing.
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: Gt
+          values: ["3"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+      terminationGracePeriod: 24h
+  disruption:
+    budgets:
+      - nodes: 10%
+    # Long, deliberately: lazy-load sandbox nodes shouldn't be reaped
+    # between bursts (and it removes the empty-node churn we hit testing).
+    consolidateAfter: 86400s
+    consolidationPolicy: WhenEmpty
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: agent-sandbox-soci-lazy
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: ${node_iam_role}
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+        Name: "${cluster_name}-private-secondary*"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+  # soci cache on instance-store NVMe (RAID0), matching the base nodeclass.
+  instanceStorePolicy: RAID0
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 300Gi
+        volumeType: gp3
+        encrypted: true
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+    # Replace the parallel config FastImagePull/nodeadm writes with an EXPLICIT
+    # lazy config. soci's default is NOT lazy — you must enable the pull modes.
+    # soci_v1 + soci_v2 so both index formats lazy-load; un-indexed images fall
+    # back to parallel-pull (experimental_parallel_pull_as_fallback) rather than
+    # slow sequential. nodeadm config gen runs before cloud-init, so this wins.
+    mkdir -p /etc/soci-snapshotter-grpc
+    cat > /etc/soci-snapshotter-grpc/config.toml <<'SOCI_CFG'
+    debug = false
+    [content_store]
+    type = 'containerd'
+    [cri_keychain]
+    enable_keychain = true
+    image_service_path = '/run/containerd/containerd.sock'
+    [pull_modes.soci_v1]
+    enable = true
+    [pull_modes.soci_v2]
+    enable = true
+    [pull_modes.parallel_pull_unpack]
+    enable = false
+    experimental_parallel_pull_as_fallback = true
+    concurrent_download_chunk_size = "16mb"
+    discard_unpacked_layers = true
+    max_concurrent_downloads_per_image = 20
+    max_concurrent_unpacks_per_image = 12
+    SOCI_CFG
+    # nodeadm may have already started soci with the parallel config; restart
+    # so the lazy config takes effect. Boot-time, before workloads pull.
+    systemctl restart soci-snapshotter 2>/dev/null || true
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      featureGates:
+        FastImagePull: true
+    --//
