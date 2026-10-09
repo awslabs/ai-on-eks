@@ -10,7 +10,7 @@ The Agent Sandbox on EKS solution deploys a secure, FQDN-filtered Kubernetes env
 
 Agents that execute model-generated code need two guarantees the default Kubernetes pod doesn't provide:
 
-- **Kernel boundary isolation.** Untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; Kata+Firecracker (documented as a future tier) adds hardware-virtualization boundaries.
+- **Kernel boundary isolation.** Untrusted code running inside the sandbox must not have access to the host kernel's full syscall surface. gVisor's Sentry intercepts syscalls in userspace and serves a restricted subset; the `kata-fc` (Kata + Firecracker) tier adds a hardware-virtualization boundary — a microVM with its own guest kernel per sandbox — on nested-virt-capable nodes.
 - **Egress policy enforcement.** Agents call LLM APIs, package registries, and developer tools. Without an allowlist, a compromised agent can exfiltrate data or probe internal services. FQDN filtering limits egress to a pre-approved set of destinations.
 
 This solution delivers both. A [reference blueprint](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/README.md) exercises the full chain — provisions inside a gVisor-isolated Sandbox, authenticates to AWS via IRSA, calls Amazon Bedrock for content, executes model-generated code inside the Sentry boundary, and demonstrates both enforcement layers (FQDN block at DNS proxy + L3/L4 block at eBPF).
@@ -40,6 +40,7 @@ flowchart TB
         direction LR
         C1["<b>standard</b><br/>(runc)<br/>Default K8s runtime<br/>Cold start ~1s"]:::runtime
         C2["<b>gvisor</b><br/>(runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
+        C3["<b>kata-fc</b><br/>(Kata + Firecracker)<br/>Hardware microVM (KVM)<br/>Cold start ~5s · nested-virt nodes"]:::runtime
     end
 
     subgraph D["Egress enforcement (examples/)"]
@@ -64,7 +65,7 @@ The solution deploys in layers:
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
 - **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, `SandboxWarmPool`, and `SandboxClaim` lifecycle (`v1beta1` API, agent-sandbox v1.0+).
 - **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
-- **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
+- **Runtime tiers:** `standard` (runc, default Kubernetes runtime), `gvisor` (runsc + Sentry userspace kernel), and `kata-fc` (Kata + Firecracker hardware-isolated microVM on nested-virt nodes — Standard EKS only).
 - **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the infra with [agent-egress](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/egress) — it auto-detects compute mode and applies Cilium + Hubble chaining (Standard EKS, requires `enable_cilium = true` in the base infra) or native VPC CNI `ApplicationNetworkPolicy` (EKS Auto Mode).
 
 ### Runtime tier threat model
@@ -75,14 +76,14 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 |------|----------|------------------|--------------------------|
 | `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (via network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
 | `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for most syscalls. Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); Sentry itself is a trusted computing base. |
-| Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization, which has limited compute support today (self-managed nodes only). |
+| `kata-fc` (Kata + Firecracker) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state and guest kernel — clears gVisor's structural limits (dedicated cores, custom guest kernel, privileged/nested containers). | Cold-start overhead (~5s). Requires nested-virt-capable instances (C8i/M8i/R8i) on self-managed (Karpenter) nodes with the containerd devmapper snapshotter; not available on Auto Mode. |
 
 ### Two composition paths
 
 - **SandboxWarmPool + SandboxClaim** — a pool that points at one of the SandboxTemplates and a thin claim (`sandbox-agent.yaml`) that checks out from the pool, plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the pool picks the tier. Native to the SIG-Apps Sandbox API.
 - **KRO AgentSandbox** — the same workload composed via a single `AgentSandbox` custom resource (`kro/instance.yaml` + `kro/rgd.yaml`). The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
+Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`, `kata-fc`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
 
 ## Prerequisites
 
@@ -142,6 +143,10 @@ kubectl get pods -n kro-system
 
 The platform-layer Kubernetes resources (namespace, RuntimeClass, gVisor-capable Karpenter NodePool, SandboxTemplates, IAM templates) live under `manifests/`. These are the runtime primitives required for any SandboxClaim to land on the cluster — workload-layer resources (the reference SandboxClaim, KRO composition, agent script) ship in the [blueprint](#step-5-layer-the-reference-blueprint).
 
+The runtime nodepools (gVisor, Kata+FC) are Terraform-managed: `install.sh`
+copies `nodepools/*.yaml` into the standard nodepool mechanism, so they deploy
+with the cluster and are removed by `terraform destroy`. No manual apply step.
+
 Apply the platform set that matches your cluster's compute mode:
 
 #### Standard EKS
@@ -149,22 +154,11 @@ Apply the platform set that matches your cluster's compute mode:
 ```bash
 cd manifests/
 
-# Resolve cluster name + Karpenter node role from terraform state (region-agnostic).
-export CLUSTER_NAME=$(terraform -chdir=../terraform/_LOCAL output -raw deployment_name)
-export KARPENTER_NODE_ROLE=$(kubectl get ec2nodeclass m6i-cpu -o jsonpath='{.spec.role}')
-
 # Namespace + RuntimeClass + both SandboxTemplates
 kubectl apply -f namespace.yaml
 kubectl apply -f runtimeclass-gvisor.yaml
 kubectl apply -f sandbox-runc.yaml
 kubectl apply -f sandbox-gvisor.yaml
-
-# gVisor-capable Karpenter NodePool (substitute placeholders, write to a temp file, then apply)
-sed -e "s|__CLUSTER_NAME__|$CLUSTER_NAME|g" \
-    -e "s|__KARPENTER_NODE_ROLE__|$KARPENTER_NODE_ROLE|g" \
-    karpenter-nodepool-gvisor.yaml \
-    > /tmp/karpenter-nodepool-gvisor.rendered.yaml
-kubectl apply -f /tmp/karpenter-nodepool-gvisor.rendered.yaml
 ```
 
 #### EKS Auto Mode
@@ -175,6 +169,19 @@ Auto Mode does not support gVisor (no node-level hooks for the runsc shim). Skip
 cd manifests/
 kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-runc.yaml
+```
+
+#### Kata + Firecracker tier (optional, Standard EKS)
+
+The hardware-isolation tier ships `runtimeclass-kata-fc.yaml` and
+`sandbox-kata-fc.yaml`; its nodepool (`nodepools/agent-sandbox-kata-fc.yaml`)
+deploys with the cluster. It requires nested-virt-capable instances
+(C8i/M8i/R8i). Apply the RuntimeClass and template alongside the Standard EKS
+set when you need a hardware boundary:
+
+```bash
+kubectl apply -f runtimeclass-kata-fc.yaml
+kubectl apply -f sandbox-kata-fc.yaml
 ```
 
 #### Basic Sandbox Configuration
@@ -262,15 +269,12 @@ cd infra/agent-sandbox
 ./cleanup.sh
 ```
 
-The wrapper handles teardown in five phases to avoid common Karpenter + EKS race conditions that cause cluster destroy to stall:
+Cleanup runs in two steps:
 
-1. **Egress example uninstall** — removes any installed CNPs/ANPs and the Bedrock IRSA role provisioned by the egress example's `irsa` phase.
-2. **Karpenter scale-down** — scales the Karpenter controller deployment to zero so it stops launching replacement nodes during teardown.
-3. **Finalizer drop** — patches `EC2NodeClass` and `NodePool` finalizers to empty so the controller-less cluster doesn't deadlock on them.
-4. **Base destroy** — runs `terraform destroy` with up to three retries, verifying after each attempt that the VPC and EKS cluster are actually gone (state-driven checks against AWS, not just script exit codes).
-5. **Auxiliary sweep** — cleans up resources Terraform sometimes leaves behind on partial-destroy: orphan EKS-managed cluster security groups, placement groups, KMS aliases, CloudWatch log groups.
+1. **Blueprint-created resources** — the egress example uninstall (CNPs/ANPs plus its IRSA role), then the in-cluster resources applied outside Terraform: Microvm and MicrovmImage CRs first (waiting for the ACK controller to reap the service-side Lambda resources through its finalizers), then sandbox claims, pools, templates, the `agent-sandboxes` namespace, and the RuntimeClasses.
+2. **Terraform cleanup** — the standard `terraform destroy` flow from the base copy. The runtime nodepools are Terraform-managed, so they are removed here with everything else.
 
-If Phase 4 fails after three retries, the wrapper reports "Cleanup partially complete" with manual recovery instructions and exits non-zero. IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.
+IAM roles created outside the solution (e.g., a custom Bedrock role with a non-default name) are not deleted automatically.
 
 ## Next Steps
 
