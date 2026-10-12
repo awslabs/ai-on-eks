@@ -1,0 +1,60 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ name }}
+  labels:
+    app: {{ name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ name }}
+  template:
+    metadata:
+      labels:
+        app: {{ name }}
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: {{ instance_type }}
+      containers:
+        - name: vllm
+          image: {{ container_image }}
+          args:
+            - "serve"
+            - "{{ served_repo }}"
+            - "--tensor-parallel-size"
+            - "{{ tensor_parallel }}"
+            - "--max-model-len"
+            - "{{ max_model_len }}"
+{% if tool_parser %}
+            - "--enable-auto-tool-choice"
+            - "--tool-call-parser"
+            - "{{ tool_parser }}"
+{% endif %}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+          resources:
+            limits:
+              nvidia.com/gpu: {{ tensor_parallel }}
+            requests:
+              nvidia.com/gpu: {{ tensor_parallel }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ name }}
+spec:
+  selector:
+    app: {{ name }}
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
