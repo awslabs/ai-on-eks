@@ -1,0 +1,7 @@
+aws:
+  region: ${region}
+serviceAccount:
+  create: true
+  name: ack-lambdamicrovms-controller
+  annotations:
+    eks.amazonaws.com/role-arn: ${role_arn}
