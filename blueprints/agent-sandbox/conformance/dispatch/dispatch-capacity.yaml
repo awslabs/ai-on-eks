@@ -1,0 +1,83 @@
+# Conformance workload — the dispatch capacity path, self-contained.
+#
+# A labeled SandboxTemplate + SandboxWarmPool (replicas: 0) + a
+# SandboxClaim checking out from it. replicas: 0 forces the cold-start
+# path, which makes every name deterministic: a cold-started sandbox
+# takes the claim's name, and pod name == sandbox name (v1.0 API
+# guarantee) — so the assertions can exact-match without querying.
+# The warm path's pool-derived naming is covered by the dispatcher's
+# tests (../../dispatch/tests/).
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxTemplate
+metadata:
+  name: dispatch-conformance
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/managed-by: dispatch-conformance
+spec:
+  networkPolicyManagement: Unmanaged
+  podTemplate:
+    metadata:
+      labels:
+        agent-sandbox/tier: conformance-runc
+    spec:
+      containers:
+        - name: runtime
+          image: registry.k8s.io/agent-sandbox/python-runtime-sandbox:v1.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8888
+          env:
+            - name: SANDBOX_BASE_DIR
+              value: /workspace
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxWarmPool
+metadata:
+  name: dispatch-conformance-pool
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: conformance-runc
+    agent-sandbox/managed-by: dispatch-conformance
+spec:
+  replicas: 0
+  sandboxTemplateRef:
+    name: dispatch-conformance
+---
+# The claim the dispatcher would create: warmPoolRef + session labels.
+apiVersion: extensions.agents.x-k8s.io/v1beta1
+kind: SandboxClaim
+metadata:
+  name: dispatch-conformance
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/session-id: conformance-session
+    agent-sandbox/managed-by: dispatch
+    agent-sandbox/tier: conformance-runc
+spec:
+  warmPoolRef:
+    name: dispatch-conformance-pool
