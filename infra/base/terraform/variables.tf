@@ -175,7 +175,7 @@ variable "enable_aws_neuron_device_plugin" {
 variable "aws_neuron_device_plugin_version" {
   description = "AWS Neuron Device Plugin chart version"
   type        = string
-  default     = "1.3.0"
+  default     = "1.10.0"
 }
 variable "enable_aws_neuron_monitor" {
   description = "Enable AWS Neuron Monitor"
