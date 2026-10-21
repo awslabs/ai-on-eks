@@ -140,12 +140,12 @@ Volcano의 Gang 스케줄링은 작업(또는 "Gang")의 모든 파드가 동시
     Amazon EKS 클러스터 확인
 
     ```bash
-    aws eks --region us-west-2 describe-cluster --name trainium-inferentia
+    aws eks --region us-west-2 describe-cluster --name trainium-inf
     ```
 
     ```bash
     # EKS와 인증하기 위한 k8s 설정 파일 생성
-    aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
+    aws eks --region us-west-2 update-kubeconfig --name trainium-inf
 
     kubectl get nodes # 출력은 EKS 관리형 노드 그룹 노드를 보여줍니다
     ```
@@ -194,7 +194,7 @@ Llama2 훈련을 위한 Ray 클러스터 배포 컨텍스트에서 Volcano는 Ra
 
 :::info
 
-Terraform 블루프린트가 `default` 네임스페이스에 `fsx-claim` **PVC**를 생성하기 때문에 이 배포에 default 네임스페이스를 사용합니다.
+Terraform 블루프린트가 `default` 네임스페이스에 `fsx-static-pvc` **PVC**를 생성하기 때문에 이 배포에 default 네임스페이스를 사용합니다.
 
 전용 네임스페이스에 클러스터를 배포하려면 PVC가 네임스페이스에 바인딩되므로 FSX for Lustre 파일 시스템도 동일한 네임스페이스에 생성되어야 합니다.
 

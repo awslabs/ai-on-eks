@@ -38,7 +38,7 @@ spec:
   volumes:
   - name: persistent-storage
     persistentVolumeClaim:
-      claimName: fsx-claim
+      claimName: fsx-static-pvc
   - name: dshm
     emptyDir:
       medium: Memory
