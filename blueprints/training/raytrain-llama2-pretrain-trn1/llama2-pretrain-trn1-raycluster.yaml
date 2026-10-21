@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
-# NOTE: We are using the default namespace for this deployment because the fsx-claim PVC is created under the default namespace by the Terraform blueprint.
+# NOTE: We are using the default namespace for this deployment because the fsx-static-pvc PVC is created under the default namespace by the Terraform blueprint.
 # If you want to deploy the cluster in a dedicated namespace, ensure that the FSX for Lustre file system is also created in the same namespace since PVCs are namespace-bound.
 # ----------------------------------------------------------------------
 
@@ -71,7 +71,7 @@ spec:
             emptyDir: {}
           - name: persistent-storage
             persistentVolumeClaim:
-              claimName: fsx-claim   # Reference the PVC for shared storage
+              claimName: fsx-static-pvc   # Reference the PVC for shared storage
     rayStartParams:
       dashboard-host: 0.0.0.0    # Make dashboard accessible
 
@@ -136,7 +136,7 @@ spec:
             # Persistent Volume Claim (PVC) to access the FSx for Lustre filesystem
             - name: persistent-storage
               persistentVolumeClaim:
-                claimName: fsx-claim
+                claimName: fsx-static-pvc
             - name: dshm
               emptyDir:
                 medium: Memory

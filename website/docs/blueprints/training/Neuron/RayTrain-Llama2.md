@@ -192,7 +192,7 @@ Here's an example configuration for integrating Volcano with a RayCluster for Ll
 
 :::info
 
-We are using the default namespace for this deployment because the `fsx-claim` **PVC** is created under the `default` namespace by the Terraform blueprint.
+We are using the default namespace for this deployment because the `fsx-static-pvc` **PVC** is created under the `default` namespace by the Terraform blueprint.
 
 If you want to deploy the cluster in a dedicated namespace, ensure that the FSX for Lustre file system is also created in the same namespace since PVCs are namespace-bound.
 

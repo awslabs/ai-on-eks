@@ -194,7 +194,7 @@ Llama2 훈련을 위한 Ray 클러스터 배포 컨텍스트에서 Volcano는 Ra
 
 :::info
 
-Terraform 블루프린트가 `default` 네임스페이스에 `fsx-claim` **PVC**를 생성하기 때문에 이 배포에 default 네임스페이스를 사용합니다.
+Terraform 블루프린트가 `default` 네임스페이스에 `fsx-static-pvc` **PVC**를 생성하기 때문에 이 배포에 default 네임스페이스를 사용합니다.
 
 전용 네임스페이스에 클러스터를 배포하려면 PVC가 네임스페이스에 바인딩되므로 FSX for Lustre 파일 시스템도 동일한 네임스페이스에 생성되어야 합니다.
 

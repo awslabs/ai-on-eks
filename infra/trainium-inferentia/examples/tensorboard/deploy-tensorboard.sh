@@ -100,7 +100,7 @@ spec:
       volumes:
       - name: persistent-storage
         persistentVolumeClaim:
-          claimName: fsx-claim
+          claimName: fsx-static-pvc
 EOF
 
 echo -e "\nCreating Tensorboard pod"
