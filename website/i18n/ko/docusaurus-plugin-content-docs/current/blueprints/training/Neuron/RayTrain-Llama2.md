@@ -140,12 +140,12 @@ Volcano의 Gang 스케줄링은 작업(또는 "Gang")의 모든 파드가 동시
     Amazon EKS 클러스터 확인
 
     ```bash
-    aws eks --region us-west-2 describe-cluster --name trainium-inferentia
+    aws eks --region us-west-2 describe-cluster --name trainium-inf
     ```
 
     ```bash
     # EKS와 인증하기 위한 k8s 설정 파일 생성
-    aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
+    aws eks --region us-west-2 update-kubeconfig --name trainium-inf
 
     kubectl get nodes # 출력은 EKS 관리형 노드 그룹 노드를 보여줍니다
     ```

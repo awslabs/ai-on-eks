@@ -64,10 +64,8 @@ spec:
                 name: log-volume   # Mount for Ray logs
               - name: persistent-storage # Mount shared filesystem (FSx for Lustre)
                 mountPath: /shared
-        # Node Selector for Karpenter
-        # Karpenter will provision this head pod on a node with the specified labels.
-        nodeSelector:
-          instanceType: x86-cpu-karpenter
+        # No nodeSelector: the head only needs x86 CPU capacity, so Karpenter's
+        # default general-purpose NodePool provisions a node for it.
         volumes:
           - name: log-volume
             emptyDir: {}
@@ -120,12 +118,10 @@ spec:
                   mountPath: /dev/shm   # Mount for shared memory
                 - mountPath: /tmp/ray
                   name: log-volume     # Mount for Ray logs
-          # Node Selector for Managed Node Group (with Cluster Autoscaler)
-          # These workers will run on Trn1 instances provisioned by the cluster autoscaler.
-          # This is necessary as Karpenter doesn't currently support EFA (required for Neuron distributed training).
+          # Trn1 instances are provisioned on demand by Karpenter's `neuron`
+          # NodePool, which also attaches the EFA interfaces.
           nodeSelector:
-            instance-type: trn1-32xl
-            provisioner: cluster-autoscaler
+            node.kubernetes.io/instance-type: trn1.32xlarge
 
           # Tolerations for Trn1 and Dedicated Nodes
           tolerations:

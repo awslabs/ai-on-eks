@@ -138,12 +138,12 @@ Volcano's gang scheduling ensures that all pods in a job (or "gang") are schedul
     Verify the Amazon EKS Cluster
 
     ```bash
-    aws eks --region us-west-2 describe-cluster --name trainium-inferentia
+    aws eks --region us-west-2 describe-cluster --name trainium-inf
     ```
 
     ```bash
     # Creates k8s config file to authenticate with EKS
-    aws eks --region us-west-2 update-kubeconfig --name trainium-inferentia
+    aws eks --region us-west-2 update-kubeconfig --name trainium-inf
 
     kubectl get nodes # Output shows the EKS Managed Node group nodes
     ```
