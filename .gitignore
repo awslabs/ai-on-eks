@@ -48,6 +48,15 @@ site
 
 # venv
 **/.venv/*
+.venv-tools/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
 
 # gradio
 **/gradio_cached_examples
