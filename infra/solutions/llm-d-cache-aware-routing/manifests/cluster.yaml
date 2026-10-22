@@ -1,0 +1,43 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: cache-routing-benchmark
+  region: us-west-2
+  version: "1.31"
+
+# API server endpoint: public + private (nodes communicate privately,
+# kubectl accessible from local machine or CloudShell).
+# To restrict further, disable publicAccess after setup and use CloudShell:
+# https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html
+vpc:
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+
+# Encrypt Kubernetes secrets with KMS
+secretsEncryption:
+  keyARN: ${KMS_KEY_ARN}  # Replace with your KMS key ARN or set via environment
+
+# Control-plane audit logging
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator
+      - controllerManager
+      - scheduler
+
+managedNodeGroups:
+  - name: gpu-nodes
+    instanceType: g5.2xlarge
+    desiredCapacity: 8
+    minSize: 0
+    maxSize: 8
+    volumeSize: 100
+    privateNetworking: true  # Nodes in private subnets only
+    labels:
+      nvidia.com/gpu.present: "true"
+    tags:
+      project: cache-aware-routing-benchmark
