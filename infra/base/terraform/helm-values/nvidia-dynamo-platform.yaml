@@ -1,3 +1,8 @@
+global:
+  grove:
+    enabled: ${grove}
+  kai-scheduler:
+    enabled: ${kai_scheduler}
 dynamo-operator:
   upgradeCRD: true
   dynamo:

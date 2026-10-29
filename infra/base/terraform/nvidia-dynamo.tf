@@ -1,5 +1,7 @@
 locals {
   nvidia_dynamo_values = yamldecode(templatefile("${path.module}/helm-values/nvidia-dynamo-platform.yaml", {
+    grove               = var.enable_grove
+    kai_scheduler       = var.enable_kai_scheduler
     prometheus_endpoint = var.enable_kube_prometheus_stack ? "http://kube-prometheus-stack-prometheus.${var.kube_prometheus_stack_namespace}.svc.cluster.local:9090" : ""
   }))
 }
@@ -13,6 +15,8 @@ resource "kubectl_manifest" "nvidia_dynamo_platform_yaml" {
   })
 
   depends_on = [
-    helm_release.argocd
+    helm_release.argocd,
+    kubectl_manifest.grove_yaml,
+    kubectl_manifest.kai_scheduler_yaml
   ]
 }

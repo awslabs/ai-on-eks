@@ -1,0 +1,4 @@
+kaiConfigDeployer:
+  enabled: false
+kaiConfig:
+  render: true

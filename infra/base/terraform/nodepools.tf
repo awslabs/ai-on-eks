@@ -1,8 +1,9 @@
 locals {
   default_nodepools = {
-    gpu                    = true
-    neuron                 = true
-    gpu-p6e-gb200-36xlarge = false
+    gpu                           = true
+    neuron                        = true
+    gpu-p6e-gb200-36xlarge        = false
+    gpu-p6e-gb200-36xlarge-static = false
   }
 
   nodepools     = merge(local.default_nodepools, var.nodepools)
