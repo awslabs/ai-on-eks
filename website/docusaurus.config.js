@@ -65,7 +65,7 @@ const config = {
             announcementBar: {
                 id: 'genai-workshop-banner',
                 content:
-                    'GenAI on EKS workshop series! <a target="_blank" rel="noopener noreferrer" href="https://events.eksworkshop.com/workshops/genai/" style="color: #ffffff; text-decoration: underline; font-weight: bold; margin-left: 10px;">Register now →</a>',
+                    'GenAI on EKS workshop series! <a target="_blank" rel="noopener noreferrer" href="https://awsworkshop.io/eks/genai?trk=4a9b4147-2490-4c63-bc9f-f8a84b122c8c&amp;sc_channel=el" style="color: #ffffff; text-decoration: underline; font-weight: bold; margin-left: 10px;">Register now →</a>',
                 backgroundColor: '#667eea',
                 textColor: '#ffffff',
                 isCloseable: true,
