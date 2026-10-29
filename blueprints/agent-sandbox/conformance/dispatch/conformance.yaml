@@ -1,0 +1,61 @@
+apiVersion: conformance.ai-on-eks/v1
+kind: ConformanceSpec
+metadata:
+  name: dispatch-capacity
+# Validates the dispatch pattern's capacity path end to end with
+# deterministic names (cold start from a replicas: 0 pool): a labeled
+# pool registers a tier, a session-labeled claim checks out from it,
+# the sandbox binds under the claim's name, the pod runs the
+# SDK-compatible runtime, and the session-label operational surface
+# holds. The dispatcher library itself (warm-path naming, hooks,
+# providers) is covered by ../../dispatch/tests/.
+spec:
+  namespace: agent-sandboxes
+
+  manifests:
+    - dispatch-capacity.yaml
+
+  readiness:
+    - kind: Pod
+      name: dispatch-conformance
+      timeout: 300s   # cold start: sandbox create + runtime image pull
+
+  assertions:
+    - name: claim-bound-cold-start-name
+      description: >-
+        The claim's status.sandbox.name equals the claim name — the
+        cold-start naming guarantee the dispatch pattern's
+        status-resolution relies on.
+      type: jsonpath
+      resource: sandboxclaim/dispatch-conformance
+      path: "{.status.sandbox.name}"
+      expected: dispatch-conformance
+
+    - name: worker-pod-ready
+      description: The dispatched worker pod reaches Ready on the runtime image.
+      type: podReady
+      target: dispatch-conformance
+
+    - name: runtime-serves-sdk-endpoint
+      description: >-
+        The python-runtime health endpoint (GET /) answers inside the
+        pod — the SDK/MCP-server execution path the dispatch pattern
+        hands sessions to.
+      type: podExec
+      target: dispatch-conformance
+      container: runtime
+      command: "python -c \"import urllib.request;print(urllib.request.urlopen('http://localhost:8888/', timeout=5).status)\""
+      match: contains
+      expected: "200"
+
+    - name: session-label-surface
+      description: >-
+        The session label rides the claim — the kubectl-selector
+        operational surface (get/release by session-id) holds.
+      type: jsonpath
+      resource: sandboxclaim/dispatch-conformance
+      path: "{.metadata.labels['agent-sandbox/session-id']}"
+      expected: conformance-session
+
+  cleanup:
+    deleteManifests: true
