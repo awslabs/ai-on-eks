@@ -130,6 +130,9 @@ Choosing the appropriate Amazon FSx service depends on the characteristics of yo
 This section is WIP, and will get more FSx service specific guides in the future.
 :::
 
+To accelerate reads from FSx for Lustre using EFA (RDMA) — cutting cold start for large models — see
+[Accelerating model loading with FSx for Lustre over EFA](../3-accelerate-model-load-over-efa.md).
+
 ### Using Trident CSI driver to provide access to model artifacts on Amazon FSx for NetApp ONTAP
 
 **Architecture overview**
