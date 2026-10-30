@@ -1,0 +1,128 @@
+# vLLM serving via LeaderWorkerSet + Ray (TP x PP across nodes) — mirrors the AWS-documented
+# reference (re:Post GLM-5.2 on EKS w/ vLLM DLC + FSx), adapted for Llama-3.1-405B on p5.48xlarge.
+# Leader = Ray head + vLLM API server; worker joins the Ray cluster. Rendered by main.tf.
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm-405b
+  namespace: default
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: ${size}                       # 1 leader + (size-1) workers = PP degree (nodes)
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels: { role: leader, app: vllm-405b }
+        annotations: { karpenter.sh/do-not-disrupt: "true" }   # keep the multi-node job from being consolidated under Karpenter (no-op on static MNG)
+      spec:
+        nodeSelector:
+          node.kubernetes.io/instance-type: ${gpu_instance}
+        tolerations:
+          - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+        containers:
+          - name: vllm-leader
+            image: ${image}
+            securityContext:
+              privileged: true                    # EFA/RDMA + GPUDirect (per AWS reference)
+              capabilities: { add: ["IPC_LOCK"] }
+            command: ["/bin/bash","-lc"]          # -l login shell loads the DLC env (ray/vllm on PATH)
+            args:
+              - |
+                set -euo pipefail
+                ray start --head --port=6379 --num-gpus=${gpus_per_node} \
+                  --dashboard-host=0.0.0.0 --dashboard-port=8265
+                echo "waiting for all ${total_gpus} GPUs to register across the Ray cluster..."
+                until ray status 2>/dev/null | grep -qE "/${total_gpus}\.0 GPU"; do echo "  ray not full yet"; sleep 10; done
+                echo "Ray cluster ready — launching vLLM"
+                exec vllm serve ${model_path} \
+                  --served-model-name ${served_model_name} \
+                  --tensor-parallel-size ${tp} --pipeline-parallel-size ${pp} \
+                  --distributed-executor-backend ray \
+                  --load-format runai_streamer \
+                  --model-loader-extra-config '{"concurrency":${runai_concurrency},"memory_limit":10737418240}' \
+                  --gpu-memory-utilization 0.90 \
+                  --max-model-len ${max_model_len} \
+                  --host 0.0.0.0 --port 8000
+            env:
+              - { name: FI_PROVIDER, value: "efa" }
+              - { name: FI_EFA_USE_DEVICE_RDMA, value: "1" }
+              - { name: FI_EFA_FORK_SAFE, value: "1" }
+              - { name: NCCL_DEBUG, value: "INFO" }
+              - { name: RAY_WORKER_REGISTER_TIMEOUT_SECONDS, value: "600" }
+              - { name: VLLM_PORT, value: "29500" }                   # valid rendezvous port; avoids the k8s VLLM_*_SERVICE :100 collision
+              - { name: VLLM_CACHE_ROOT, value: "${mount_path}/vllm_compile_cache/v1" } # version-stamp: bump this suffix on each image/vLLM upgrade (stale compiled-kernel guard)
+              - { name: HF_HUB_OFFLINE, value: "1" }
+              - name: VLLM_HOST_IP
+                valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            ports:
+              - { containerPort: 8000, name: http }
+              - { containerPort: 8265, name: ray-dash }
+            resources:
+              limits:   { nvidia.com/gpu: ${gpus_per_node}, vpc.amazonaws.com/efa: ${efa_per_pod}, hugepages-2Mi: ${hugepages}, memory: ${pod_memory} }
+              requests: { nvidia.com/gpu: ${gpus_per_node}, vpc.amazonaws.com/efa: ${efa_per_pod}, hugepages-2Mi: ${hugepages}, memory: ${pod_memory} }
+            readinessProbe:
+              httpGet: { path: /health, port: 8000 }
+              initialDelaySeconds: 300            # weight load (runai_streamer) + graph capture
+              periodSeconds: 15
+              failureThreshold: 80
+            volumeMounts:
+              - { name: fsx, mountPath: ${mount_path} }
+              - { name: shm, mountPath: /dev/shm }
+        volumes:
+          - name: fsx
+            persistentVolumeClaim: { claimName: ${pvc_name} }
+          - name: shm
+            emptyDir: { medium: Memory, sizeLimit: ${shm_size} }
+    workerTemplate:
+      metadata:
+        labels: { role: worker, app: vllm-405b }
+        annotations: { karpenter.sh/do-not-disrupt: "true" }   # keep the multi-node job from being consolidated under Karpenter (no-op on static MNG)
+      spec:
+        nodeSelector:
+          node.kubernetes.io/instance-type: ${gpu_instance}
+        tolerations:
+          - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+        containers:
+          - name: vllm-worker
+            image: ${image}
+            securityContext:
+              privileged: true
+              capabilities: { add: ["IPC_LOCK"] }
+            command: ["/bin/bash","-lc"]
+            args:
+              - |
+                set -euo pipefail
+                ray start --address=$(LWS_LEADER_ADDRESS):6379 --num-gpus=${gpus_per_node} --block
+            env:
+              - { name: FI_PROVIDER, value: "efa" }
+              - { name: FI_EFA_USE_DEVICE_RDMA, value: "1" }
+              - { name: FI_EFA_FORK_SAFE, value: "1" }
+              - { name: NCCL_DEBUG, value: "INFO" }
+              - { name: VLLM_PORT, value: "29500" }                   # valid rendezvous port; avoids the k8s VLLM_*_SERVICE :100 collision
+              - { name: VLLM_CACHE_ROOT, value: "${mount_path}/vllm_compile_cache/v1" } # version-stamp: bump this suffix on each image/vLLM upgrade (stale compiled-kernel guard)
+              - { name: HF_HUB_OFFLINE, value: "1" }
+              - name: VLLM_HOST_IP
+                valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            resources:
+              limits:   { nvidia.com/gpu: ${gpus_per_node}, vpc.amazonaws.com/efa: ${efa_per_pod}, hugepages-2Mi: ${hugepages}, memory: ${pod_memory} }
+              requests: { nvidia.com/gpu: ${gpus_per_node}, vpc.amazonaws.com/efa: ${efa_per_pod}, hugepages-2Mi: ${hugepages}, memory: ${pod_memory} }
+            volumeMounts:
+              - { name: fsx, mountPath: ${mount_path} }
+              - { name: shm, mountPath: /dev/shm }
+        volumes:
+          - name: fsx
+            persistentVolumeClaim: { claimName: ${pvc_name} }
+          - name: shm
+            emptyDir: { medium: Memory, sizeLimit: ${shm_size} }
+---
+# ClusterIP service exposing the leader's OpenAI-compatible endpoint on :8000
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm405b-leader
+  namespace: default
+spec:
+  selector: { role: leader, app: vllm-405b }
+  ports:
+    - { name: http, port: 8000, targetPort: 8000 }
