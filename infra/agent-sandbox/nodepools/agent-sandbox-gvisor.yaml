@@ -1,0 +1,122 @@
+# gVisor nodepool. Separate pool + taint so the runsc shim install only
+# runs on nodes that serve gvisor workloads. Runtime registration is
+# nodeadm-native (NodeConfig containerd config); the shell part only
+# installs the gVisor binaries.
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: agent-sandbox-gvisor
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: ${node_iam_role}
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 100Gi
+        volumeType: gp3
+        encrypted: true
+  tags:
+    agent-sandbox/tier: gvisor
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euxo pipefail
+
+    # Install gVisor from the pinned GitHub release tarball (GCS paths
+    # 404 since release-20260914.0). The full tarball is required:
+    # runsc's STRICT sidecar policy needs the gvisor-bin/ binaries.
+    GVISOR_RELEASE="release-20260914.0"
+    ARCH=$(uname -m)
+    dnf install -y zstd
+    mkdir -p /tmp/gvisor && cd /tmp/gvisor
+    curl -fsSL --retry 3 -o gvisor.tar.zstd \
+      "https://github.com/google/gvisor/releases/download/$${GVISOR_RELEASE}/gvisor-$${ARCH}.tar.zstd"
+    tar --use-compress-program=unzstd -xf gvisor.tar.zstd
+    chmod +x runsc containerd-shim-runsc-v1
+    mv runsc containerd-shim-runsc-v1 /usr/local/bin/
+    mv gvisor-bin /usr/local/bin/gvisor-bin
+    chmod +x /usr/local/bin/gvisor-bin/*
+
+    # runsc runtime options. platform=ptrace works on all instances;
+    # switch to kvm on nested-virt-capable nodes.
+    cat <<'EOT' > /etc/containerd/runsc.toml
+    [runsc_config]
+      platform = "ptrace"
+      network = "sandbox"
+    EOT
+
+    --//
+    Content-Type: application/node.eks.aws
+
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      kubelet:
+        config:
+          maxPods: 30
+      containerd:
+        config: |
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc]
+            runtime_type = "io.containerd.runsc.v1"
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runsc.options]
+            TypeUrl = "io.containerd.runsc.v1.options"
+            ConfigPath = "/etc/containerd/runsc.toml"
+    --//
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: agent-sandbox-gvisor
+spec:
+  template:
+    metadata:
+      labels:
+        agent-sandbox/runtime: gvisor
+        agent-sandbox/tier: gvisor
+    spec:
+      taints:
+        - key: agent-sandbox/runtime
+          value: gvisor
+          effect: NoSchedule
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: agent-sandbox-gvisor
+      requirements:
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["m", "c"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["4"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        # Also required here so the scheduler matches pod nodeSelectors
+        # against this pool, not just node labels after creation.
+        - key: agent-sandbox/runtime
+          operator: In
+          values: ["gvisor"]
+      expireAfter: 24h
+  limits:
+    cpu: 16
+    memory: 32Gi
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 10m
