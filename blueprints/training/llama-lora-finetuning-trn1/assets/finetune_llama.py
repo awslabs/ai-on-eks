@@ -27,7 +27,8 @@ def training_function(script_args, training_args):
         )
         return {
             "messages": [
-                {"role": "system", "content": system_message.format(schema=sample["context"])},
+                {"role": "system", "content": system_message.format(
+                    schema=sample["context"])},
                 {"role": "user", "content": sample["question"]},
                 {"role": "assistant", "content": sample["answer"]},
             ]
@@ -40,12 +41,14 @@ def training_function(script_args, training_args):
         create_conversation, remove_columns=eval_dataset.features, batched=False
     )
 
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Meta-Llama-3-8B-Instruct")
+    tokenizer = AutoTokenizer.from_pretrained(
+        "meta-llama/Meta-Llama-3-8B-Instruct")
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.eos_token_id = 128001
 
     with lazy_load_for_parallelism(tensor_parallel_size=training_args.tensor_parallel_size):
-        model = AutoModelForCausalLM.from_pretrained("meta-llama/Meta-Llama-3-8B")
+        model = AutoModelForCausalLM.from_pretrained(
+            "meta-llama/Meta-Llama-3-8B")
 
     config = LoraConfig(
         r=8,

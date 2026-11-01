@@ -19,15 +19,16 @@ app = FastAPI()
 # Set this to the Hugging Face model ID
 hf_token = os.getenv('HUGGING_FACE_HUB_TOKEN')
 model_id = os.getenv('MODEL_ID')
-neuron_cores = 24  # inf2.24xlarge 6 Neurons (12 Neuron cores) and inf2.48xlarge 12 Neurons (24 Neuron cores)
+# inf2.24xlarge 6 Neurons (12 Neuron cores) and inf2.48xlarge 12 Neurons (24 Neuron cores)
+neuron_cores = 24
 neuron_config = NeuronConfig(
-                    on_device_embedding=False,
-                    attention_layout='BSH',
-                    fuse_qkv=True,
-                    group_query_attention=GQA.REPLICATED_HEADS,
-                    quant=QuantizationConfig(),
-                    on_device_generation=GenerationConfig(do_sample=True)
-                )
+    on_device_embedding=False,
+    attention_layout='BSH',
+    fuse_qkv=True,
+    group_query_attention=GQA.REPLICATED_HEADS,
+    quant=QuantizationConfig(),
+    on_device_generation=GenerationConfig(do_sample=True)
+)
 
 
 # Define the APIIngress class responsible for handling inference requests
@@ -62,13 +63,13 @@ class LlamaModel:
 
         # Load and compile the Neuron-optimized Llama model
         self.neuron_model = LlamaForSampling.from_pretrained(
-                                model_id,
-                                neuron_config=neuron_config,
-                                batch_size=1,
-                                tp_degree=neuron_cores,
-                                amp='f16',
-                                n_positions=4096
-                            )
+            model_id,
+            neuron_config=neuron_config,
+            batch_size=1,
+            tp_degree=neuron_cores,
+            amp='f16',
+            n_positions=4096
+        )
         self.neuron_model.to_neuron()
 
         # Initialize tokenizer for the model
@@ -82,12 +83,12 @@ class LlamaModel:
         # Perform inference with Neuron-optimized model
         with torch.inference_mode():
             generated_sequences = self.neuron_model.sample(
-                                    input_ids,
-                                    temperature=0.5,
-                                    sequence_length=2048,
-                                    top_p=0.9,
-                                    no_repeat_ngram_size=3
-                                )
+                input_ids,
+                temperature=0.5,
+                sequence_length=2048,
+                top_p=0.9,
+                no_repeat_ngram_size=3
+            )
         # Decode the generated sequences and return the results
         return [self.tokenizer.decode(seq, skip_special_tokens=True) for seq in generated_sequences]
 

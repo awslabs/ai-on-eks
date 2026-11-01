@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 import numpy as np
 
+
 def load_events(event_file):
     accumulator = EventAccumulator(event_file)
     accumulator.Reload()
@@ -19,6 +20,7 @@ def load_events(event_file):
     for tag in tags["scalars"]:
         data[tag] = accumulator.Scalars(tag)
     return data
+
 
 class Logger:
     def __init__(self, args, world_size, model_dtype):
@@ -41,7 +43,8 @@ class Logger:
             )
         )
         self.tb.add_text(
-            "script", "```\n" + inspect.getsource(sys.modules[__name__]) + "\n```", 0
+            "script", "```\n" +
+            inspect.getsource(sys.modules[__name__]) + "\n```", 0
         )
 
     def get_instance_type(self):
@@ -63,7 +66,8 @@ class Logger:
         grad_norm_msg = f"grad-norm : {grad_norm}" if grad_norm else ""
         print(
             f"LOG {time_now} - ({epoch}, {step}) step_loss : {step_loss:.4f} "
-            f"learning_rate : {learning_rate:.2e} throughput : {throughput:.2f} "
+            f"learning_rate : {learning_rate:.2e} throughput : {
+                throughput:.2f} "
             f"{grad_norm_msg}",
             flush=True,
         )

@@ -7,8 +7,10 @@ from openai import OpenAI
 # Set up the client
 client = OpenAI(
     base_url="http://localhost:8000/v1",
-    api_key="dummy-key"  # The key doesn't matter for our custom server, but is required by the SDK
+    # The key doesn't matter for our custom server, but is required by the SDK
+    api_key="dummy-key"
 )
+
 
 def chat_completion_example(messages, model="NousResearch/Meta-Llama-3-8B-Instruct", temperature=0.7, max_tokens=100):
     try:
@@ -22,6 +24,7 @@ def chat_completion_example(messages, model="NousResearch/Meta-Llama-3-8B-Instru
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
+
 
 def streaming_chat_completion_example(messages, model="NousResearch/Meta-Llama-3-8B-Instruct", temperature=0.7, max_tokens=100):
     try:
@@ -38,6 +41,7 @@ def streaming_chat_completion_example(messages, model="NousResearch/Meta-Llama-3
         print()  # New line after streaming is complete
     except Exception as e:
         print(f"An error occurred: {e}")
+
 
 # Example usage
 if __name__ == "__main__":
@@ -60,7 +64,8 @@ if __name__ == "__main__":
     ]
 
     print("Example 2 - Chat completion with different parameters:")
-    response = chat_completion_example(messages, temperature=0.9, max_tokens=200)
+    response = chat_completion_example(
+        messages, temperature=0.9, max_tokens=200)
     if response:
         print(response.choices[0].message.content)
     print("\n")

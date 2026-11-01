@@ -34,7 +34,8 @@ copyfile(
 )
 
 # Load AutoPeftModel using the consolidated PEFT checkpoint
-peft_model = peft.AutoPeftModelForCausalLM.from_pretrained(consolidated_ckpt_dir)
+peft_model = peft.AutoPeftModelForCausalLM.from_pretrained(
+    consolidated_ckpt_dir)
 
 print("Meging adapter weights into base model and saving new pretrained model")
 merged_model = peft_model.merge_and_unload()

@@ -39,7 +39,8 @@ def get_args():
         default="results.json",
         help="training metrics results file",
     )
-    parser.add_argument("--batch_size", type=int, default=1, help="Worker batch size.")
+    parser.add_argument("--batch_size", type=int,
+                        default=1, help="Worker batch size.")
     parser.add_argument(
         "--max_steps",
         type=int,
@@ -58,7 +59,8 @@ def get_args():
         default=12349,
         help="Random seed. Worker seed is this value + worker rank.",
     )
-    parser.add_argument("--lr", type=float, default=3e-4, help="Learning rate.")
+    parser.add_argument("--lr", type=float, default=3e-4,
+                        help="Learning rate.")
     parser.add_argument(
         "--warmup_steps",
         type=int,
@@ -87,11 +89,13 @@ def get_args():
     parser.add_argument(
         "--tensor_parallel_size", default=8, type=int, help="Tensor parallel size"
     )
-    parser.add_argument("--seq_len", default=4096, type=int, help="Sequence length")
+    parser.add_argument("--seq_len", default=4096,
+                        type=int, help="Sequence length")
     parser.add_argument(
         "--use_mix_precision", action="store_true", help="Use mix precision."
     )
-    parser.add_argument("--use_zero_1", action="store_true", help="Use ZeRO-1.")
+    parser.add_argument(
+        "--use_zero_1", action="store_true", help="Use ZeRO-1.")
     parser.add_argument(
         "--num_layers",
         type=int,
