@@ -16,41 +16,60 @@ from huggingface_hub import login
 # Environment and configuration setup
 logger = logging.getLogger("ray.serve")
 
+
 @serve.deployment(name="mistral-deployment", route_prefix="/vllm",
-    ray_actor_options={"num_gpus": 1},
-    autoscaling_config={"min_replicas": 1, "max_replicas": 2},
-)
+                  ray_actor_options={"num_gpus": 1},
+                  autoscaling_config={"min_replicas": 1, "max_replicas": 2},
+                  )
 class VLLMDeployment:
     def __init__(self, **kwargs):
         hf_token = os.getenv("HUGGING_FACE_HUB_TOKEN")
         logger.info(f"token: {hf_token=}")
         if not hf_token:
-            raise ValueError("HUGGING_FACE_HUB_TOKEN environment variable is not set")
+            raise ValueError(
+                "HUGGING_FACE_HUB_TOKEN environment variable is not set")
         login(token=hf_token)
         logger.info("Successfully logged in to Hugging Face Hub")
 
         args = AsyncEngineArgs(
-            model=os.getenv("MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2"),  # Model identifier from Hugging Face Hub or local path.
-            dtype="auto",  # Automatically determine the data type (e.g., float16 or float32) for model weights and computations.
-            gpu_memory_utilization=float(os.getenv("GPU_MEMORY_UTILIZATION", "0.8")),  # Percentage of GPU memory to utilize, reserving some for overhead.
-            max_model_len=int(os.getenv("MAX_MODEL_LEN", "4096")),  # Maximum sequence length (in tokens) the model can handle, including both input and output tokens.
-            max_num_seqs=int(os.getenv("MAX_NUM_SEQ", "512")),  # Maximum number of sequences (requests) to process in parallel.
-            max_num_batched_tokens=int(os.getenv("MAX_NUM_BATCHED_TOKENS", "32768")),  # Maximum number of tokens processed in a single batch across all sequences (max_model_len * max_num_seqs).
-            trust_remote_code=True,  # Allow execution of untrusted code from the model repository (use with caution).
-            enable_chunked_prefill=False,  # Disable chunked prefill to avoid compatibility issues with prefix caching.
-            tokenizer_pool_size=4,  # Number of tokenizer instances to handle concurrent requests efficiently.
-            tokenizer_pool_type="ray",  # Pool type for tokenizers; 'ray' uses Ray for distributed processing.
-            max_parallel_loading_workers=2,  # Number of parallel workers to load the model concurrently.
-            pipeline_parallel_size=1,  # Number of pipeline parallelism stages; typically set to 1 unless using model parallelism.
-            tensor_parallel_size=1,  # Number of tensor parallelism stages; typically set to 1 unless using model parallelism.
-            enable_prefix_caching=True,  # Enable prefix caching to improve performance for similar prompt prefixes.
+            # Model identifier from Hugging Face Hub or local path.
+            model=os.getenv("MODEL_ID", "mistralai/Mistral-7B-Instruct-v0.2"),
+            # Automatically determine the data type (e.g., float16 or float32) for model weights and computations.
+            dtype="auto",
+            # Percentage of GPU memory to utilize, reserving some for overhead.
+            gpu_memory_utilization=float(
+                os.getenv("GPU_MEMORY_UTILIZATION", "0.8")),
+            # Maximum sequence length (in tokens) the model can handle, including both input and output tokens.
+            max_model_len=int(os.getenv("MAX_MODEL_LEN", "4096")),
+            # Maximum number of sequences (requests) to process in parallel.
+            max_num_seqs=int(os.getenv("MAX_NUM_SEQ", "512")),
+            # Maximum number of tokens processed in a single batch across all sequences (max_model_len * max_num_seqs).
+            max_num_batched_tokens=int(
+                os.getenv("MAX_NUM_BATCHED_TOKENS", "32768")),
+            # Allow execution of untrusted code from the model repository (use with caution).
+            trust_remote_code=True,
+            # Disable chunked prefill to avoid compatibility issues with prefix caching.
+            enable_chunked_prefill=False,
+            # Number of tokenizer instances to handle concurrent requests efficiently.
+            tokenizer_pool_size=4,
+            # Pool type for tokenizers; 'ray' uses Ray for distributed processing.
+            tokenizer_pool_type="ray",
+            # Number of parallel workers to load the model concurrently.
+            max_parallel_loading_workers=2,
+            # Number of pipeline parallelism stages; typically set to 1 unless using model parallelism.
+            pipeline_parallel_size=1,
+            # Number of tensor parallelism stages; typically set to 1 unless using model parallelism.
+            tensor_parallel_size=1,
+            # Enable prefix caching to improve performance for similar prompt prefixes.
+            enable_prefix_caching=True,
             enforce_eager=True,
             disable_log_requests=True,
         )
 
         self.engine = AsyncLLMEngine.from_engine_args(args)
         self.max_model_len = args.max_model_len
-        logger.info(f"VLLM Engine initialized with max_model_len: {self.max_model_len}")
+        logger.info(f"VLLM Engine initialized with max_model_len: {
+                    self.max_model_len}")
 
     async def stream_results(self, results_generator) -> AsyncGenerator[bytes, None]:
         num_returned = 0
@@ -71,7 +90,8 @@ class VLLMDeployment:
         except json.JSONDecodeError:
             return JSONResponse(status_code=400, content={"error": "Invalid JSON in request body"})
 
-        context_length = request_dict.pop("context_length", 8192)  # Default to 8k
+        context_length = request_dict.pop(
+            "context_length", 8192)  # Default to 8k
 
         # Ensure context length is either 8k or 32k
         if context_length not in [8192, 32768]:
@@ -85,8 +105,10 @@ class VLLMDeployment:
 
         input_token_ids = tokenizer.encode(prompt)
         input_tokens = len(input_token_ids)
-        max_possible_new_tokens = min(context_length, model_config.max_model_len) - input_tokens
-        max_new_tokens = min(request_dict.get("max_tokens", 8192), max_possible_new_tokens)
+        max_possible_new_tokens = min(
+            context_length, model_config.max_model_len) - input_tokens
+        max_new_tokens = min(request_dict.get(
+            "max_tokens", 8192), max_possible_new_tokens)
 
         sampling_params = SamplingParams(
             max_tokens=max_new_tokens,
@@ -97,9 +119,11 @@ class VLLMDeployment:
         )
 
         request_id = random_uuid()
-        logger.info(f"Processing request {request_id} with {input_tokens} input tokens")
+        logger.info(f"Processing request {request_id} with {
+                    input_tokens} input tokens")
 
-        results_generator = self.engine.generate(prompt, sampling_params, request_id)
+        results_generator = self.engine.generate(
+            prompt, sampling_params, request_id)
 
         if stream:
             background_tasks = BackgroundTasks()
@@ -122,7 +146,8 @@ class VLLMDeployment:
 
         assert final_output is not None
         prompt = final_output.prompt
-        text_outputs = [prompt + output.text for output in final_output.outputs]
+        text_outputs = [
+            prompt + output.text for output in final_output.outputs]
         ret = {"text": text_outputs}
         logger.info(f"Completed request {request_id}")
         return Response(content=json.dumps(ret))

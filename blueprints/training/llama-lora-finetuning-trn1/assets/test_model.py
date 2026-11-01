@@ -7,9 +7,12 @@ TOKENIZER_PATH = "meta-llama/Meta-Llama-3-8B-Instruct"
 BASE_MODEL = "meta-llama/Meta-Llama-3-8B"
 SAMPLE_INDICES = [94, 99, 123]
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Evaluate SQL translation models')
-    parser.add_argument('--tuned-model', required=True, help='Path to tuned model')
+    parser = argparse.ArgumentParser(
+        description='Evaluate SQL translation models')
+    parser.add_argument('--tuned-model', required=True,
+                        help='Path to tuned model')
     args = parser.parse_args()
 
     # Initialize components
@@ -20,7 +23,8 @@ def main():
     tuned_model = AutoModelForCausalLM.from_pretrained(args.tuned_model)
 
     # Prepare dataset
-    dataset = load_dataset("b-mc2/sql-create-context", split="train").shuffle(seed=23)
+    dataset = load_dataset("b-mc2/sql-create-context",
+                           split="train").shuffle(seed=23)
     eval_dataset = dataset.select(range(50000, 50500)).map(
         create_conversation,
         remove_columns=dataset.features,
@@ -28,17 +32,21 @@ def main():
     )
 
     # Run evaluation
-    evaluate_models(eval_dataset, tokenizer, base_model, tuned_model, SAMPLE_INDICES)
+    evaluate_models(eval_dataset, tokenizer, base_model,
+                    tuned_model, SAMPLE_INDICES)
+
 
 def create_conversation(sample):
     system_msg = "You are a text-to-SQL translator. Generate SQL queries based on:\nSCHEMA:\n{schema}"
     return {
         "messages": [
-            {"role": "system", "content": system_msg.format(schema=sample["context"])},
+            {"role": "system", "content": system_msg.format(
+                schema=sample["context"])},
             {"role": "user", "content": sample["question"]},
             {"role": "assistant", "content": sample["answer"]},
         ]
     }
+
 
 def evaluate_models(dataset, tokenizer, base_model, tuned_model, indices):
     for idx in indices:
@@ -64,12 +72,17 @@ def evaluate_models(dataset, tokenizer, base_model, tuned_model, indices):
         print("Generating output for the prompt using the base model and the new fine-tuned model. Please wait...\n\n")
 
         # Generate outputs
-        base_output = base_model.generate(**tokenized, max_new_tokens=50, pad_token_id=128001)
-        tuned_output = tuned_model.generate(**tokenized, max_new_tokens=50, pad_token_id=128001)
+        base_output = base_model.generate(
+            **tokenized, max_new_tokens=50, pad_token_id=128001)
+        tuned_output = tuned_model.generate(
+            **tokenized, max_new_tokens=50, pad_token_id=128001)
 
         # Display results
-        print("BASE MODEL:\n", tokenizer.decode(base_output[0][prompt_len:]), "\n")
-        print("FINE-TUNED MODEL:\n", tokenizer.decode(tuned_output[0][prompt_len:]), "\n\n")
+        print("BASE MODEL:\n", tokenizer.decode(
+            base_output[0][prompt_len:]), "\n")
+        print("FINE-TUNED MODEL:\n",
+              tokenizer.decode(tuned_output[0][prompt_len:]), "\n\n")
+
 
 if __name__ == "__main__":
     main()

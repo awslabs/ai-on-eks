@@ -10,6 +10,8 @@ import argparse
 
 
 print(os.getenv(k) for k in [''])
+
+
 def main():
     rank_id = int(os.getenv("NEURON_RANK_ID", "0"))
     if rank_id == 0:

@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 
+
 def get_gateway_url():
     """Auto-detect AI Gateway URL"""
     try:
@@ -20,11 +21,13 @@ def get_gateway_url():
         if result.stdout.strip():
             return f"http://{result.stdout.strip()}"
         else:
-            print("Gateway address not found. Make sure the Gateway is deployed and has an address.")
+            print(
+                "Gateway address not found. Make sure the Gateway is deployed and has an address.")
             return None
     except subprocess.CalledProcessError as e:
         print(f"Error getting gateway URL: {e}")
         return "http://localhost:8080"  # fallback
+
 
 def test_qwen3_model(gateway_url):
     """Test Qwen3 model via /v1/chat/completions"""
@@ -47,7 +50,8 @@ def test_qwen3_model(gateway_url):
         print(f"Status Code: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
-            content = data.get('choices', [{}])[0].get('message', {}).get('content', 'No content')
+            content = data.get('choices', [{}])[0].get(
+                'message', {}).get('content', 'No content')
             print(f"✅ SUCCESS: Qwen3 - {content[:100]}...")
             return True
         else:
@@ -56,6 +60,7 @@ def test_qwen3_model(gateway_url):
     except requests.exceptions.RequestException as e:
         print(f"❌ ERROR: Qwen3 - {e}")
         return False
+
 
 def test_gpt_model(gateway_url):
     """Test GPT model via /v1/chat/completions"""
@@ -78,7 +83,8 @@ def test_gpt_model(gateway_url):
         print(f"Status Code: {response.status_code}")
         if response.status_code == 200:
             data = response.json()
-            content = data.get('choices', [{}])[0].get('message', {}).get('content', 'No content')
+            content = data.get('choices', [{}])[0].get(
+                'message', {}).get('content', 'No content')
             print(f"✅ SUCCESS: GPT - {content[:100]}...")
             return True
         else:
@@ -87,6 +93,7 @@ def test_gpt_model(gateway_url):
     except requests.exceptions.RequestException as e:
         print(f"❌ ERROR: GPT - {e}")
         return False
+
 
 def test_bedrock_claude(gateway_url):
     """Test Bedrock Claude via /anthropic/v1/messages"""
@@ -119,6 +126,7 @@ def test_bedrock_claude(gateway_url):
     except requests.exceptions.RequestException as e:
         print(f"❌ ERROR: Bedrock Claude - {e}")
         return False
+
 
 def main():
     print("🚀 AI Gateway Multi-Model Routing Test")
@@ -153,6 +161,7 @@ def main():
     else:
         print(f"\n❌ All tests failed")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

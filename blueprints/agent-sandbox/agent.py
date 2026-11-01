@@ -77,7 +77,7 @@ def call_bedrock(prompt: str) -> str | None:
         if user_site not in _sys.path:
             _sys.path.insert(0, user_site)
         import boto3  # noqa: PLC0415 — lazy so the pip-install step can
-                     #                   succeed before boto3 is imported
+        #                   succeed before boto3 is imported
     except ImportError:
         print("BLOCKED: boto3 not yet installed — install before calling Bedrock")
         return None
@@ -185,7 +185,8 @@ def pip_install(package: str) -> bool:
         print(f"ERROR: pip install {package} failed:\n{tail}")
         return False
     except subprocess.TimeoutExpired:
-        print(f"BLOCKED: pip install {package} timed out — egress likely denied")
+        print(f"BLOCKED: pip install {
+              package} timed out — egress likely denied")
         return False
 
 
@@ -254,7 +255,7 @@ def main() -> int:
         first_newline = cleaned.find("\n")
         last_fence = cleaned.rfind("```")
         if first_newline > 0 and last_fence > first_newline:
-            cleaned = cleaned[first_newline + 1 : last_fence].strip()
+            cleaned = cleaned[first_newline + 1: last_fence].strip()
     execute_snippet(cleaned)
 
     step("Step 4: Attempt FQDN egress to a BLOCKED domain")

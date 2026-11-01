@@ -10,6 +10,7 @@ app = FastAPI()
 
 neuron_cores = 2
 
+
 @serve.deployment(name="stable-diffusion-api", num_replicas=1, route_prefix="/")
 @serve.ingress(app)
 class APIIngress:
@@ -27,13 +28,14 @@ class APIIngress:
         image.save(file_stream, "PNG")
         return Response(content=file_stream.getvalue(), media_type="image/png")
 
+
 @serve.deployment(name="stable-diffusion-v2",
-    autoscaling_config={"min_replicas": 0, "max_replicas": 6},
-    ray_actor_options={
-        "resources": {"neuron_cores": neuron_cores},
-        "runtime_env": {"env_vars": {"NEURON_CC_FLAGS": "-O1"}},
-    },
-)
+                  autoscaling_config={"min_replicas": 0, "max_replicas": 6},
+                  ray_actor_options={
+                      "resources": {"neuron_cores": neuron_cores},
+                      "runtime_env": {"env_vars": {"NEURON_CC_FLAGS": "-O1"}},
+                  },
+                  )
 class StableDiffusionV2:
     def __init__(self):
         from optimum.neuron import NeuronStableDiffusionXLPipeline
@@ -41,11 +43,13 @@ class StableDiffusionV2:
         model_id = os.getenv('MODEL_ID')
 
         # To avoid saving the model locally, we can use the pre-compiled model directly from HF
-        self.pipe = NeuronStableDiffusionXLPipeline.from_pretrained(model_id, device_ids=[0, 1])
+        self.pipe = NeuronStableDiffusionXLPipeline.from_pretrained(
+            model_id, device_ids=[0, 1])
 
     async def generate(self, prompt: str):
         assert len(prompt), "prompt parameter cannot be empty"
         image = self.pipe(prompt).images[0]
         return image
+
 
 entrypoint = APIIngress.bind(StableDiffusionV2.bind())

@@ -44,7 +44,8 @@ def filter_harmful_content(text):
 chat_interface = gr.ChatInterface(
     text_generation,
     chatbot=gr.Chatbot(line_breaks=True),
-    textbox=gr.Textbox(placeholder="Ask me a question", container=False, scale=7),
+    textbox=gr.Textbox(placeholder="Ask me a question",
+                       container=False, scale=7),
     title="Llama2/3 AI Chat",
     description="Ask me any question",
     theme="soft",

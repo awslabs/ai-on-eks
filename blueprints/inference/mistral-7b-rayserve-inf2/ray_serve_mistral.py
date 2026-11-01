@@ -14,6 +14,8 @@ app = FastAPI()
 neuron_cores = 2
 
 # Deployment settings for the API ingress using Ray Serve
+
+
 @serve.deployment(name="mistral-deployment", num_replicas=1, route_prefix="/")
 @serve.ingress(app)
 class APIIngress:
@@ -29,13 +31,15 @@ class APIIngress:
         return result
 
 # Deployment settings for the Mistral model using Ray Serve
+
+
 @serve.deployment(name="mistral-7b",
-    autoscaling_config={"min_replicas": 0, "max_replicas": 6},
-    ray_actor_options={
-        "resources": {"neuron_cores": neuron_cores},
-        "runtime_env": {"env_vars": {"NEURON_CC_FLAGS": "-O1"}},
-    },
-)
+                  autoscaling_config={"min_replicas": 0, "max_replicas": 6},
+                  ray_actor_options={
+                      "resources": {"neuron_cores": neuron_cores},
+                      "runtime_env": {"env_vars": {"NEURON_CC_FLAGS": "-O1"}},
+                  },
+                  )
 class MistralModel:
     # Constructor to initialize and load the model
     def __init__(self):
@@ -58,7 +62,8 @@ class MistralModel:
         )
 
         # Load and compile the Neuron model with specific configuration
-        self.neuron_model = MistralForSampling.from_pretrained(model_id, amp='bf16', neuron_config=neuron_config)
+        self.neuron_model = MistralForSampling.from_pretrained(
+            model_id, amp='bf16', neuron_config=neuron_config)
         self.neuron_model.to_neuron()
 
         # Initialize tokenizer for the model
@@ -74,10 +79,12 @@ class MistralModel:
 
         # Perform inference in a context that disables gradient calculation
         with torch.inference_mode():
-            generated_sequence = self.neuron_model.sample(encoded_input, sequence_length=512, start_ids=None)
+            generated_sequence = self.neuron_model.sample(
+                encoded_input, sequence_length=512, start_ids=None)
 
         # Decode the generated sequences into human-readable text and return
         return [self.tokenizer.decode(seq) for seq in generated_sequence]
+
 
 # Bind the model to the API ingress to enable endpoint functionality
 entrypoint = APIIngress.bind(MistralModel.bind())

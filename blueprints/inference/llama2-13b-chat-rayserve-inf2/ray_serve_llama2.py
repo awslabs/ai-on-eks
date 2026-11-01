@@ -10,7 +10,8 @@ from transformers_neuronx.module import save_pretrained_split
 app = FastAPI()
 
 llm_model_split = "llama-2-13b-chat-hf-split"
-neuron_cores = int(os.getenv('NEURON_CORES', 24))  # Read from environment variable, default to 24
+# Read from environment variable, default to 24
+neuron_cores = int(os.getenv('NEURON_CORES', 24))
 
 # --- Logging Setup ---
 logger = logging.getLogger("ray.serve")
@@ -51,7 +52,8 @@ class LlamaModel:
 
         # Check if the model split exists locally, and if not, download it
         if not os.path.exists(llm_model_split):
-            logger.info(f"Saving model split for {llm_model} to local path {llm_model_split}")
+            logger.info(f"Saving model split for {
+                        llm_model} to local path {llm_model_split}")
             try:
                 self.model = AutoModelForCausalLM.from_pretrained(llm_model)
                 # Set and validate generation config
@@ -65,12 +67,14 @@ class LlamaModel:
                 self.model.generation_config = generation_config
                 save_pretrained_split(self.model, llm_model_split)
             except Exception as e:
-                logger.error(f"Error during model download or split saving: {e}")
+                logger.error(
+                    f"Error during model download or split saving: {e}")
                 raise e
         else:
             logger.info(f"Using existing model split {llm_model_split}")
 
-        logger.info(f"Loading and compiling model {llm_model_split} for Neuron")
+        logger.info(f"Loading and compiling model {
+                    llm_model_split} for Neuron")
         try:
             self.neuron_model = LlamaForSampling.from_pretrained(
                 llm_model_split, batch_size=1, tp_degree=neuron_cores, amp='f16'
@@ -91,7 +95,8 @@ class LlamaModel:
                 generated_sequences = self.neuron_model.sample(
                     input_ids, sequence_length=2048, top_k=50
                 )
-                decoded_sequences = [self.tokenizer.decode(seq, skip_special_tokens=True) for seq in generated_sequences]
+                decoded_sequences = [self.tokenizer.decode(
+                    seq, skip_special_tokens=True) for seq in generated_sequences]
                 logger.info(f"Inference result: {decoded_sequences}")
                 return decoded_sequences
             except Exception as e:

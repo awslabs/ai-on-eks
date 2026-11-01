@@ -1,6 +1,7 @@
 import json
 from locust import HttpUser, task, between
 
+
 class StableDiffusionUser(HttpUser):
     wait_time = between(1, 2)  # Seconds between requests
 

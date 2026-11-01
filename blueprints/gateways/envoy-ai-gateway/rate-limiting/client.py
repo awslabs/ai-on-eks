@@ -8,6 +8,7 @@ import json
 import time
 import subprocess
 
+
 def get_gateway_url():
     """Auto-detect the Gateway URL using kubectl"""
     try:
@@ -24,6 +25,7 @@ def get_gateway_url():
     except subprocess.CalledProcessError as e:
         print(f"Error getting gateway URL: {e}")
         return None
+
 
 def test_gpt_rate_limiting(gateway_url):
     """Test rate limiting with GPT model"""
@@ -78,6 +80,7 @@ def test_gpt_rate_limiting(gateway_url):
         time.sleep(0.5)
 
     return successful_requests, rate_limited_requests
+
 
 def test_bedrock_rate_limiting(gateway_url):
     """Test rate limiting with Bedrock Claude"""
@@ -141,6 +144,7 @@ def test_bedrock_rate_limiting(gateway_url):
 
     return successful_requests, rate_limited_requests
 
+
 def main():
     """Main test function"""
     gateway_url = get_gateway_url()
@@ -162,7 +166,8 @@ def main():
     print("\n" + "=" * 50)
     print("FINAL SUMMARY:")
     print(f"GPT Model: {gpt_success} successful, {gpt_limited} rate limited")
-    print(f"Bedrock Claude: {bedrock_success} successful, {bedrock_limited} rate limited")
+    print(f"Bedrock Claude: {bedrock_success} successful, {
+          bedrock_limited} rate limited")
 
     if gpt_limited > 0 or bedrock_limited > 0:
         print("✅ Rate limiting is working!")
@@ -170,6 +175,7 @@ def main():
         print("⚠️  Rate limiting may not be active yet")
     else:
         print("❌ No successful requests - check configuration")
+
 
 if __name__ == "__main__":
     main()
