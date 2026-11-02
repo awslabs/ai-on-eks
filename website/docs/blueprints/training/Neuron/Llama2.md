@@ -26,7 +26,7 @@ We are actively enhancing this blueprint to incorporate improvements in observab
 # Training a Llama-2 Model using Trainium, Neuronx-Nemo-Megatron and MPI operator
 Welcome to the comprehensive guide on training the [Meta Llama-2-7b ](https://ai.meta.com/llama/#inside-the-model) model on Amazon Elastic Kubernetes Service (EKS) using AWS Trainium, Neuronx-Nemo-Megatron, and the MPI Operator.
 
-In this tutorial you will learn how to run multi-node training jobs using [AWS Trainium](https://aws.amazon.com/machine-learning/trainium/) accelerators in Amazon EKS. Specifically, you will pretrain Llama-2-7b on 4 AWS EC2 trn1.32xlarge instances using a [subset of the RedPajama dataset](https://huggingface.co/datasets/togethercomputer/RedPajama-Data-1T-Sample).
+In this tutorial you will learn how to run multi-node training jobs using [AWS Trainium](https://aws.amazon.com/machine-learning/trainium/) accelerators in Amazon EKS. Specifically, you will pretrain Llama-2-7b on 4 AWS EC2 trn1.32xlarge instances using a [subset of the RedPajama dataset](https://huggingface.co/datasets/ll922/RedPajama-Data-1T-Sample-Backup) (a community mirror — the original `togethercomputer/RedPajama-Data-1T-Sample` repository has been removed).
 
 ### What is Llama-2?
 Llama-2 is a large language model (LLM) trained on 2 trillion tokens of text and code. It is one of the largest and most powerful LLMs available today. Llama-2 can be used for a variety of tasks, including natural language processing, text generation, and translation.
@@ -193,14 +193,18 @@ tok.save_pretrained("/shared/llama7b_tokenizer")
 EOF
 ```
 
-Next, download the RedPajama-Data-1T-Sample dataset (a small subset of the full RedPajama dataset that contains 1B tokens).
+Next, download the RedPajama-Data-1T-Sample dataset (a small subset of the full RedPajama dataset that contains 1B tokens). The original repository has been removed from Hugging Face; the command below uses a community mirror in Parquet format and converts it to JSONL.
 
-While still connected to the CLI pod, use git to download the dataset
+While still connected to the CLI pod, install the `datasets` library and download the dataset:
 
 ```
 cd /shared
-git clone https://huggingface.co/datasets/togethercomputer/RedPajama-Data-1T-Sample \
-    data/RedPajama-Data-1T-Sample
+pip install datasets
+python3 - <<'EOF'
+from datasets import load_dataset
+ds = load_dataset("ll922/RedPajama-Data-1T-Sample-Backup", split="train")
+ds.to_json("/shared/redpajama_sample.jsonl", lines=True)
+EOF
 ```
 
 ### Tokenize the dataset
@@ -212,9 +216,6 @@ cd /shared
 
 # Clone the neuronx-nemo-megatron repo, which includes the required scripts
 git clone https://github.com/aws-neuron/neuronx-nemo-megatron.git
-
-# Combine the separate redpajama files to a single jsonl file
-cat /shared/data/RedPajama-Data-1T-Sample/*.jsonl > /shared/redpajama_sample.jsonl
 
 # Run preprocessing script using llama tokenizer
 python3 neuronx-nemo-megatron/nemo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \

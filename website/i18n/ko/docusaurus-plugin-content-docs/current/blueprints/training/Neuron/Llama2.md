@@ -26,7 +26,7 @@ EKS에서 ML 모델을 배포하려면 GPU 또는 Neuron 인스턴스에 대한 
 # Trainium, Neuronx-Nemo-Megatron 및 MPI operator를 사용한 Llama-2 모델 훈련
 AWS Trainium, Neuronx-Nemo-Megatron 및 MPI Operator를 사용하여 Amazon Elastic Kubernetes Service (EKS)에서 [Meta Llama-2-7b](https://ai.meta.com/llama/#inside-the-model) 모델을 훈련하는 종합 가이드에 오신 것을 환영합니다.
 
-이 튜토리얼에서는 Amazon EKS에서 [AWS Trainium](https://aws.amazon.com/machine-learning/trainium/) 가속기를 사용하여 다중 노드 훈련 작업을 실행하는 방법을 배웁니다. 구체적으로 [RedPajama 데이터셋의 하위 집합](https://huggingface.co/datasets/togethercomputer/RedPajama-Data-1T-Sample)을 사용하여 4개의 AWS EC2 trn1.32xlarge 인스턴스에서 Llama-2-7b를 사전 훈련합니다.
+이 튜토리얼에서는 Amazon EKS에서 [AWS Trainium](https://aws.amazon.com/machine-learning/trainium/) 가속기를 사용하여 다중 노드 훈련 작업을 실행하는 방법을 배웁니다. 구체적으로 [RedPajama 데이터셋의 하위 집합](https://huggingface.co/datasets/ll922/RedPajama-Data-1T-Sample-Backup)을 사용하여 4개의 AWS EC2 trn1.32xlarge 인스턴스에서 Llama-2-7b를 사전 훈련합니다.
 
 ### Llama-2란?
 Llama-2는 2조 개의 텍스트 및 코드 토큰으로 훈련된 대규모 언어 모델(LLM)입니다. 현재 사용 가능한 가장 크고 강력한 LLM 중 하나입니다. Llama-2는 자연어 처리, 텍스트 생성, 번역 등 다양한 작업에 사용할 수 있습니다.
@@ -196,12 +196,16 @@ EOF
 
 다음으로, RedPajama-Data-1T-Sample 데이터셋(10억 개의 토큰을 포함하는 전체 RedPajama 데이터셋의 작은 하위 집합)을 다운로드합니다.
 
-CLI 파드에 연결된 상태에서 git을 사용하여 데이터셋을 다운로드합니다
+CLI 파드에 연결된 상태에서 `datasets` 라이브러리를 설치하고 데이터셋을 다운로드합니다:
 
 ```
 cd /shared
-git clone https://huggingface.co/datasets/togethercomputer/RedPajama-Data-1T-Sample \
-    data/RedPajama-Data-1T-Sample
+pip install datasets
+python3 - <<'EOF'
+from datasets import load_dataset
+ds = load_dataset("ll922/RedPajama-Data-1T-Sample-Backup", split="train")
+ds.to_json("/shared/redpajama_sample.jsonl", lines=True)
+EOF
 ```
 
 ### 데이터셋 토큰화
@@ -213,9 +217,6 @@ cd /shared
 
 # 필요한 스크립트가 포함된 neuronx-nemo-megatron 저장소 클론
 git clone https://github.com/aws-neuron/neuronx-nemo-megatron.git
-
-# 개별 redpajama 파일을 단일 jsonl 파일로 결합
-cat /shared/data/RedPajama-Data-1T-Sample/*.jsonl > /shared/redpajama_sample.jsonl
 
 # llama 토크나이저를 사용하여 전처리 스크립트 실행
 python3 neuronx-nemo-megatron/nemo/scripts/nlp_language_modeling/preprocess_data_for_megatron.py \
