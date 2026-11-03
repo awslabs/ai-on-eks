@@ -58,7 +58,7 @@ import datasets
 from neuronx_distributed.optimizer import NeuronZero1Optimizer
 from neuronx_distributed.utils.adamw_fp32_optim_params import AdamW_FP32OptimParams
 
-from modeling_llama_nxd import CoreAttention,LlamaForCausalLM
+from modeling_llama_nxd import CoreAttention, LlamaForCausalLM
 from logger import Logger
 
 # For PT autocast.
@@ -88,6 +88,7 @@ class TrainingMetrics:
     Arguments:
         json_file: File used for logging. If no file exists, new file would be created.
     """
+
     def __init__(self, json_file):
         self.json_file = json_file
 
@@ -155,11 +156,14 @@ class Throughput:
     Used to calculate the throughput over a moving window. It records the step time
     between two calls and uses that time to calculate the throughput.
     """
+
     def __init__(
         self, batch_size, world_size, grad_accum_usteps, moving_avg_window_size=10, logging_interval=1
     ):
-        self.seqs_per_iteration = batch_size * world_size * grad_accum_usteps*logging_interval
-        self.moving_avg_window_size = math.ceil(moving_avg_window_size/logging_interval)
+        self.seqs_per_iteration = batch_size * \
+            world_size * grad_accum_usteps*logging_interval
+        self.moving_avg_window_size = math.ceil(
+            moving_avg_window_size/logging_interval)
         self.moving_avg_window = queue.Queue()
         self.window_time = 0
         self.start_time = time.time()
@@ -185,6 +189,7 @@ class WorkerInitObj(object):
     def __call__(self, id):
         set_seed(self.seed)
 
+
 def create_pretraining_dataset(
     data_dir, mini_batch_size, worker_init
 ):
@@ -208,13 +213,15 @@ def create_pretraining_dataset(
     )
     return train_dataloader
 
+
 def get_model(flags):
     model_path, seq_len = flags.model_path, flags.seq_len
     config = LlamaConfig.from_pretrained(model_path)
     config.use_cache = False
     config.kv_shared_group_size = flags.kv_replicator
     config.qkv_linear = flags.qkv_linear
-    config.max_position_embeddings = max(config.max_position_embeddings, seq_len)
+    config.max_position_embeddings = max(
+        config.max_position_embeddings, seq_len)
     if flags.num_layers > 0:
         config.num_hidden_layers = flags.num_layers
     if flags.sequence_parallel_enabled:
@@ -223,10 +230,12 @@ def get_model(flags):
         config.selective_checkpoint_enabled = True
     xm.master_print(config)
     model = LlamaForCausalLM(config)
+
     def get_sin_cos_matrix(config):
         head_dim = config.hidden_size // config.num_attention_heads
         base = 10000
-        inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2).float() / head_dim))
+        inv_freq = 1.0 / \
+            (base ** (torch.arange(0, head_dim, 2).float() / head_dim))
         t = torch.arange(config.max_position_embeddings, dtype=inv_freq.dtype)
         freqs = torch.einsum("i,j->ij", t, inv_freq)
         # Different from paper, but it uses a different permutation in order to obtain the same calculation
@@ -243,6 +252,7 @@ def get_model(flags):
     xm.master_print(model)
     return model
 
+
 def get_dtype(model) -> str:
     """
     Reference: https://pytorch.org/xla/release/1.12/index.html#xla-tensors-and-bfloat16
@@ -256,6 +266,7 @@ def get_dtype(model) -> str:
             return "torch.float32"
     return str(model.dtype)
 
+
 def allreduce_sequence_parallel_gradients(optimizer):
     """ All-reduce layernorm parameters across model parallel nodes when sequence parallelism is used.
         Modified from megatron-lm:
@@ -268,12 +279,14 @@ def allreduce_sequence_parallel_gradients(optimizer):
             if group == 'params':
                 for p in params:
                     if isinstance(p, torch.Tensor) and p.grad is not None:
-                        sequence_parallel_param = getattr(p, 'sequence_parallel_enabled', False)
+                        sequence_parallel_param = getattr(
+                            p, 'sequence_parallel_enabled', False)
                         if sequence_parallel_param:
                             grads.append(p.grad.data)
     for grad in grads:
         # sum v.s. average: sum
         reduce_from_tensor_model_parallel_region(grad)
+
 
 def train_llama(flags):
     set_seed(flags.seed)
@@ -289,7 +302,8 @@ def train_llama(flags):
     # Setting up NxD config
     nxd_config = nxd.neuronx_distributed_config(
         tensor_parallel_size=flags.tensor_parallel_size,
-        optimizer_config={"zero_one_enabled": flags.use_zero_1, "grad_clipping": True, "max_grad_norm": 1.0},
+        optimizer_config={"zero_one_enabled": flags.use_zero_1,
+                          "grad_clipping": True, "max_grad_norm": 1.0},
         sequence_parallel=flags.sequence_parallel_enabled,
         activation_checkpoint_config=CoreAttention if flags.selective_checkpoint_enabled else "full",
         model_init_config=model_init_config,
@@ -331,7 +345,8 @@ def train_llama(flags):
         optimizer_cls = AdamW
 
     # Creating NxD Optimizer
-    optimizer = nxd.initialize_parallel_optimizer(nxd_config, optimizer_cls, optimizer_grouped_parameters, lr=flags.lr)
+    optimizer = nxd.initialize_parallel_optimizer(
+        nxd_config, optimizer_cls, optimizer_grouped_parameters, lr=flags.lr)
     optimizer.zero_grad()
 
     if is_root:
@@ -395,13 +410,14 @@ def train_llama(flags):
                 running_loss_reduced = xm.all_reduce(
                     xm.REDUCE_SUM,
                     running_loss_div,
-                    groups=parallel_state.get_data_parallel_group(as_list=True),
+                    groups=parallel_state.get_data_parallel_group(
+                        as_list=True),
                 )
                 running_loss_reduced_detached = running_loss_reduced.detach()
                 running_loss.zero_()
 
                 optimizer.step()
-                total_norm = optimizer.grad_norm # Global norm before clipping
+                total_norm = optimizer.grad_norm  # Global norm before clipping
                 optimizer.zero_grad()
                 scheduler.step()
                 global_step += 1
@@ -427,22 +443,24 @@ def train_llama(flags):
                     # This is done to reduce the overhead of copying tensors to CPU.
                     # Tensor copy is expensive since it prevents the next step to start.
                     xm.add_step_closure(
-                        _print_logs, (running_loss_reduced_detached, total_norm.detach())
+                        _print_logs, (running_loss_reduced_detached,
+                                      total_norm.detach())
                     )
                 # Save checkpoint using checkpoint API
                 if (flags.checkpoint_freq > 0) and (global_step % flags.checkpoint_freq == 0):
                     xm.add_step_closure(
                         nxd.save_checkpoint,
                         (
-                            flags.checkpoint_dir, # checkpoint directory
-                            f"step_{global_step}", # tag
-                            model, # model
-                            optimizer, # optimizer
-                            scheduler, # scheduler
-                            {"epoch": epoch, "global_step": global_step, "cli_args": flags.__dict__}, # user content
-                            8, # num_workers
-                            True, # use_xser
-                            flags.num_kept_checkpoint, #num_kept_ckpts
+                            flags.checkpoint_dir,  # checkpoint directory
+                            f"step_{global_step}",  # tag
+                            model,  # model
+                            optimizer,  # optimizer
+                            scheduler,  # scheduler
+                            {"epoch": epoch, "global_step": global_step,
+                                "cli_args": flags.__dict__},  # user content
+                            8,  # num_workers
+                            True,  # use_xser
+                            flags.num_kept_checkpoint,  # num_kept_ckpts
                         )
                     )
 
@@ -457,7 +475,6 @@ def train_llama(flags):
             running_loss,
             running_loss_reduced_detached.cpu().item(),
         )
-
 
     train_start = time.time()
     training_ustep = 0
@@ -611,7 +628,8 @@ if __name__ == "__main__":
         default="results.json",
         help="training metrics results file",
     )
-    parser.add_argument("--batch_size", type=int, default=8, help="Worker batch size.")
+    parser.add_argument("--batch_size", type=int,
+                        default=8, help="Worker batch size.")
     parser.add_argument(
         "--max_steps",
         type=int,
@@ -628,7 +646,8 @@ if __name__ == "__main__":
         default=12349,
         help="Random seed. Worker seed is this value + worker rank.",
     )
-    parser.add_argument("--lr", type=float, default=4e-4, help="Learning rate.")
+    parser.add_argument("--lr", type=float, default=4e-4,
+                        help="Learning rate.")
     parser.add_argument(
         "--warmup_steps",
         type=int,
@@ -713,11 +732,14 @@ if __name__ == "__main__":
         help="KV replication number",
     )
 
-    #Checkpointing
-    parser.add_argument("--checkpoint_freq", type=int, default=100000, help="save checkpoint freq")
+    # Checkpointing
+    parser.add_argument("--checkpoint_freq", type=int,
+                        default=100000, help="save checkpoint freq")
     parser.add_argument("--checkpoint_dir", type=str, default=None)
-    parser.add_argument("--loading_step", type=int, default=-1, help="load from step, -1 means no load")
-    parser.add_argument("--num_kept_checkpoint", type=int, default=-1, help="number of checkpoints kept, old checkpoint will get deleted")
+    parser.add_argument("--loading_step", type=int, default=-1,
+                        help="load from step, -1 means no load")
+    parser.add_argument("--num_kept_checkpoint", type=int, default=-1,
+                        help="number of checkpoints kept, old checkpoint will get deleted")
 
     args = parser.parse_args(sys.argv[1:])
 
@@ -726,10 +748,9 @@ if __name__ == "__main__":
 
     os.environ["NEURON_RT_STOCHASTIC_ROUNDING_EN"] = "1"
     if args.use_mix_precision:
-        os.environ["XLA_DOWNCAST_BF16"]="1"
+        os.environ["XLA_DOWNCAST_BF16"] = "1"
     else:
-        os.environ["XLA_USE_BF16"]="1"
-
+        os.environ["XLA_USE_BF16"] = "1"
 
     # WORLD_SIZE is set by torchrun
     if os.environ.get("WORLD_SIZE"):

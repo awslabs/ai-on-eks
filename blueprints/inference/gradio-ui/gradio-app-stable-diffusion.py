@@ -9,6 +9,8 @@ model_endpoint = os.environ.get("MODEL_ENDPOINT", "/imagine")
 service_name = os.environ.get("SERVICE_NAME", "http://localhost:8000")
 
 # Function to generate image based on prompt
+
+
 def generate_image(prompt):
 
     # Create the URL for the inference
@@ -26,11 +28,12 @@ def generate_image(prompt):
         # return f"AI: Error: {str(e)}"
         return Image.new('RGB', (100, 100), color='red')
 
+
 # Define the Gradio PromptInterface
 demo = gr.Interface(fn=generate_image,
-    inputs=[gr.Textbox(label="Enter the Prompt")],
-    outputs=gr.Image(type='pil'),
-)
+                    inputs=[gr.Textbox(label="Enter the Prompt")],
+                    outputs=gr.Image(type='pil'),
+                    )
 
 # Launch
 demo.launch(server_name="0.0.0.0")

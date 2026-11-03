@@ -16,10 +16,14 @@ model_endpoint = os.getenv("MODEL_ENDPOINT", "/vllm")
 service_name = os.getenv("SERVICE_NAME", "http://localhost:8000")
 
 # Function to count tokens in a response
+
+
 def count_tokens(text):
     return len(text.split())
 
 # Function to generate text asynchronously
+
+
 async def generate_text(session, prompt):
     SYSTEM_PROMPT = """<<SYS>>\nKeep short answers of no more than 100 sentences.\n<</SYS>>\n\n"""
     payload = {
@@ -55,7 +59,8 @@ async def generate_text(session, prompt):
                     response_data = response_data.decode('utf-8')
                     response_data = json.loads(response_data)
                 else:
-                    logger.error(f"Unexpected content type: {response.content_type}")
+                    logger.error(f"Unexpected content type: {
+                                 response.content_type}")
                     return None, latency, 0
 
                 text = response_data["text"][0].strip()
@@ -63,7 +68,8 @@ async def generate_text(session, prompt):
                 return text, latency, num_tokens
             else:
                 # Print the error message
-                logger.error(f"Failed to get response from model. Status code: {response.status}")
+                logger.error(f"Failed to get response from model. Status code: {
+                             response.status}")
                 logger.error(f"Error message: {await response.text()}")
                 return None, latency, 0
     except aiohttp.ClientError as e:
@@ -72,6 +78,8 @@ async def generate_text(session, prompt):
         return None, None, 0
 
 # Function to warm up the model
+
+
 async def warmup(session):
     """Warm up the model to reduce cold start latency."""
     prompt = "Warmup"
@@ -92,17 +100,22 @@ async def warmup(session):
             if response.status == 200:
                 logger.info("Warm-up successful")
             else:
-                logger.error(f"Failed to warm up model. Status code: {response.status}")
+                logger.error(f"Failed to warm up model. Status code: {
+                             response.status}")
                 logger.error(f"Error message: {await response.text()}")
     except aiohttp.ClientError as e:
         logger.error(f"Warm-up request exception: {str(e)}")
 
 # Function to read prompts from a file
+
+
 def read_prompts(file_path):
     with open(file_path, 'r') as file:
         return [line.strip() for line in file.readlines()]
 
 # Function to write results to a file
+
+
 def write_results(file_path, results, summary):
     with open(file_path, 'w') as file:
         # Write each request and response with detailed information
@@ -117,11 +130,16 @@ def write_results(file_path, results, summary):
         # Write summary
         file.write("\nSummary of Latency:\n")
         file.write("Total Prompts: {}\n".format(len(results)))
-        file.write("Average Latency: {:.2f} seconds\n".format(summary['average_latency']))
-        file.write("Max Latency: {:.2f} seconds\n".format(summary['max_latency']))
-        file.write("Min Latency: {:.2f} seconds\n".format(summary['min_latency']))
+        file.write("Average Latency: {:.2f} seconds\n".format(
+            summary['average_latency']))
+        file.write("Max Latency: {:.2f} seconds\n".format(
+            summary['max_latency']))
+        file.write("Min Latency: {:.2f} seconds\n".format(
+            summary['min_latency']))
 
 # Main function to handle asynchronous execution
+
+
 async def main():
     prompts = read_prompts('prompts.txt')
 

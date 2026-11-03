@@ -64,8 +64,10 @@ class TritonPythonModel:
             AsyncEngineArgs(**vllm_engine_config)
         )
 
-        output_config = pb_utils.get_output_config_by_name(self.model_config, "TEXT")
-        self.output_dtype = pb_utils.triton_string_to_numpy(output_config["data_type"])
+        output_config = pb_utils.get_output_config_by_name(
+            self.model_config, "TEXT")
+        self.output_dtype = pb_utils.triton_string_to_numpy(
+            output_config["data_type"])
 
         # Counter to keep track of ongoing request counts
         self.ongoing_request_count = 0
@@ -108,7 +110,8 @@ class TritonPythonModel:
         # Wait for the ongoing_requests
         while self.ongoing_request_count > 0:
             self.logger.log_info(
-                "Awaiting remaining {} requests".format(self.ongoing_request_count)
+                "Awaiting remaining {} requests".format(
+                    self.ongoing_request_count)
             )
             await asyncio.sleep(5)
 
@@ -169,16 +172,19 @@ class TritonPythonModel:
         self.ongoing_request_count += 1
         try:
             request_id = random_uuid()
-            prompt = pb_utils.get_input_tensor_by_name(request, "PROMPT").as_numpy()[0]
+            prompt = pb_utils.get_input_tensor_by_name(
+                request, "PROMPT").as_numpy()[0]
             if isinstance(prompt, bytes):
                 prompt = prompt.decode("utf-8")
-            stream = pb_utils.get_input_tensor_by_name(request, "STREAM").as_numpy()[0]
+            stream = pb_utils.get_input_tensor_by_name(
+                request, "STREAM").as_numpy()[0]
 
             parameters_input_tensor = pb_utils.get_input_tensor_by_name(
                 request, "SAMPLING_PARAMETERS"
             )
             if parameters_input_tensor:
-                parameters = parameters_input_tensor.as_numpy()[0].decode("utf-8")
+                parameters = parameters_input_tensor.as_numpy()[
+                    0].decode("utf-8")
             else:
                 parameters = request.parameters()
 
@@ -209,7 +215,8 @@ class TritonPythonModel:
             response_sender.send(response)
             raise e
         finally:
-            response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            response_sender.send(
+                flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
             self.ongoing_request_count -= 1
 
     def execute(self, requests):

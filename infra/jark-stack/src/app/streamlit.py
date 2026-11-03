@@ -5,8 +5,8 @@ from PIL import Image
 import tempfile
 
 
-### Update Hostname before building image
-base_url=""
+# Update Hostname before building image
+base_url = ""
 
 st.title("Welcome to dogbooth! :dog:")
 st.header("_a place to create images of [v]dog  in beautiful scenes._")
@@ -30,4 +30,5 @@ if prompt:
             st.image(Image.open(f.name), caption=prompt)
             st.balloons()
         else:
-            st.error(f"Failed to download image. Status code: {response.status_code}")
+            st.error(f"Failed to download image. Status code: {
+                     response.status_code}")

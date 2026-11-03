@@ -31,7 +31,8 @@ def create_request(prompt, stream, request_id, sampling_parameters, model_name, 
         sampling_parameters_data = np.array(
             [json.dumps(sampling_parameters).encode("utf-8")], dtype=np.object_
         )
-        inputs.append(grpcclient.InferInput("SAMPLING_PARAMETERS", [1], "BYTES"))
+        inputs.append(grpcclient.InferInput(
+            "SAMPLING_PARAMETERS", [1], "BYTES"))
         inputs[-1].set_data_from_numpy(sampling_parameters_data)
 
     outputs = []
@@ -47,7 +48,8 @@ def create_request(prompt, stream, request_id, sampling_parameters, model_name, 
 
 
 async def main(FLAGS):
-    sampling_parameters = {"temperature": "0.01", "top_p": "1.0", "top_k": 20, "max_tokens": 512}
+    sampling_parameters = {"temperature": "0.01",
+                           "top_p": "1.0", "top_k": 20, "max_tokens": 512}
     stream = FLAGS.streaming_mode
     model_name = FLAGS.model_name
     with open(FLAGS.input_prompts, "r") as file:
@@ -67,7 +69,8 @@ async def main(FLAGS):
                         prompt_id = FLAGS.offset + (len(prompts) * iter) + i
                         results_dict[str(prompt_id)] = []
                         SYSTEM_PROMPT = """<<SYS>>\nKeep short answers of no more than 100 sentences.\n<</SYS>>\n\n"""
-                        prompt = "<s>[INST]" + SYSTEM_PROMPT + prompt + "[/INST]"
+                        prompt = "<s>[INST]" + \
+                            SYSTEM_PROMPT + prompt + "[/INST]"
                         yield create_request(
                             prompt, stream, prompt_id, sampling_parameters, model_name
                         )
@@ -97,9 +100,12 @@ async def main(FLAGS):
                         }
                         results_dict[result.get_response().id] = debug
 
-                    duration = (end_time - start_time)  # Calculate the duration in seconds
-                    total_time_sec += (end_time - start_time)  # Add duration to total time in seconds
-                    print(f"Model {FLAGS.model_name} - Request {result.get_response().id}: {duration:.2f} seconds")
+                    # Calculate the duration in seconds
+                    duration = (end_time - start_time)
+                    # Add duration to total time in seconds
+                    total_time_sec += (end_time - start_time)
+                    print(f"Model {
+                          FLAGS.model_name} - Request {result.get_response().id}: {duration:.2f} seconds")
 
         except InferenceServerException as error:
             print(error)
@@ -117,7 +123,8 @@ async def main(FLAGS):
         system(f"cat {FLAGS.results_file}")
 
     total_time_ms = total_time_sec  # Convert total time to milliseconds
-    print(f"Total time for all requests: {total_time_sec:.2f} seconds ({total_time_ms:.2f} seconds)")
+    print(f"Total time for all requests: {
+          total_time_sec:.2f} seconds ({total_time_ms:.2f} seconds)")
     print("PASS: vLLM example")
 
 

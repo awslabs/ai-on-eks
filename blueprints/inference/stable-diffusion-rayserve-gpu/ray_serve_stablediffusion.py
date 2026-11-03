@@ -7,7 +7,6 @@ import ray
 from ray import serve
 
 
-
 app = FastAPI()
 
 
@@ -32,9 +31,9 @@ class APIIngress:
 
 
 @serve.deployment(name="stable-diffusion-v2",
-    ray_actor_options={"num_gpus": 1},
-    autoscaling_config={"min_replicas": 1, "max_replicas": 2},
-)
+                  ray_actor_options={"num_gpus": 1},
+                  autoscaling_config={"min_replicas": 1, "max_replicas": 2},
+                  )
 class StableDiffusionV2:
     def __init__(self):
         from diffusers import EulerDiscreteScheduler, StableDiffusionPipeline
