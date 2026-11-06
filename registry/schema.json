@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://awslabs.github.io/ai-on-eks/registry/schema.json",
+  "title": "ai-on-eks model registry entry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "hf_repo",
+    "architecture",
+    "params_b",
+    "precision",
+    "tensor_parallel",
+    "max_model_len",
+    "container_image",
+    "status"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "description": "kebab-case, unique"
+    },
+    "hf_repo": { "type": "string", "minLength": 1 },
+    "hf_repo_serve": { "type": ["string", "null"] },
+    "architecture": { "type": "string", "minLength": 1 },
+    "params_b": { "type": "number", "exclusiveMinimum": 0 },
+    "tool_parser": { "type": "string", "minLength": 1 },
+    "precision": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "tensor_parallel": { "type": "integer", "minimum": 1 },
+    "max_model_len": { "type": "integer", "minimum": 1 },
+    "container_image": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["verified", "unverified", "draft"] },
+    "verified_date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "region_tested"],
+        "properties": {
+          "type": { "type": "string", "minLength": 1 },
+          "region_tested": { "type": "string", "minLength": 1 },
+          "tokens_per_sec": { "type": "number" },
+          "ttft_ms": { "type": "number" },
+          "itl_ms": { "type": "number" },
+          "concurrency": { "type": "integer", "minimum": 1 },
+          "cost_per_1m_tok_usd": { "type": "number" }
+        }
+      }
+    },
+    "guide_url": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "verified" } }
+      },
+      "then": {
+        "required": ["verified_date", "instances", "guide_url"],
+        "properties": {
+          "instances": { "minItems": 1 }
+        }
+      }
+    }
+  ]
+}
