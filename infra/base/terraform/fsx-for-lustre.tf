@@ -7,11 +7,25 @@
 #---------------------------------------------------------------
 # NOTE: FSx for Lustre file system creation can take up to 10 mins
 resource "aws_fsx_lustre_file_system" "this" {
-  count                       = var.deploy_fsx_volume ? 1 : 0
-  deployment_type             = "PERSISTENT_2"
-  storage_type                = "SSD"
-  per_unit_storage_throughput = "500" # 125, 250, 500, 1000
-  storage_capacity            = 2400
+  count           = var.deploy_fsx_volume ? 1 : 0
+  deployment_type = "PERSISTENT_2"
+  storage_type    = "SSD"
+  # EFA (RDMA) mode requires the 1000 MB/s/TiB tier; default (non-EFA) keeps 500.
+  per_unit_storage_throughput = var.fsx_efa_enabled ? "1000" : "500" # 125, 250, 500, 1000
+  # null => 4800 (EFA minimum) when EFA is on, else the original 2400. Larger EFA
+  # capacities add OSTs (e.g. 19200 = 4 OSTs) to parallelize model-weight loading.
+  storage_capacity = var.fsx_storage_capacity != null ? var.fsx_storage_capacity : (var.fsx_efa_enabled ? 4800 : 2400)
+
+  # EFA (RDMA) transport for FSx-Lustre clients. Immutable (create-only).
+  efa_enabled = var.fsx_efa_enabled
+
+  # EFA-enabled filesystems require a metadata configuration.
+  dynamic "metadata_configuration" {
+    for_each = var.fsx_efa_enabled ? [1] : []
+    content {
+      mode = "AUTOMATIC"
+    }
+  }
 
   subnet_ids         = [module.vpc.private_subnets[0]]
   security_group_ids = [aws_security_group.fsx[0].id]
@@ -66,7 +80,44 @@ resource "aws_security_group" "fsx" {
     to_port     = 988
     protocol    = "tcp"
   }
-  tags = local.tags
+
+  # EFA (RDMA) requires all-protocol self-referencing ingress/egress between the
+  # FSx ENIs and clients, plus all-protocol ingress from the client subnets.
+  # Added only when fsx_efa_enabled = true; the default path is unchanged.
+  dynamic "ingress" {
+    for_each = var.fsx_efa_enabled ? [1] : []
+    content {
+      description = "EFA all-protocol ingress from private subnets (FSx over EFA)"
+      cidr_blocks = module.vpc.private_subnets_cidr_blocks
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+    }
+  }
+  dynamic "ingress" {
+    for_each = var.fsx_efa_enabled ? [1] : []
+    content {
+      description = "EFA all-protocol self-referencing ingress (FSx over EFA)"
+      self        = true
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+    }
+  }
+  dynamic "egress" {
+    for_each = var.fsx_efa_enabled ? [1] : []
+    content {
+      description = "EFA all-protocol self-referencing egress (FSx over EFA)"
+      self        = true
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+    }
+  }
+
+  # EFA on: tag the FSx SG for Karpenter discovery so EFA GPU nodes attach it via the shared
+  # EC2NodeClass securityGroupSelectorTerms (karpenter.sh/discovery) -> node<->FSx EFA/RDMA both ways.
+  tags = merge(local.tags, var.fsx_efa_enabled ? { "karpenter.sh/discovery" = module.eks.cluster_name } : {})
 }
 
 #---------------------------------------------------------------

@@ -32,6 +32,12 @@ spec:
             - reserved
             - spot
             - on-demand
+%{ if fsx_efa_enabled ~}
+        # FSx for Lustre is single-AZ; EFA requires the GPU node in that same AZ.
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["${fsx_availability_zone}"]
+%{ endif ~}
       taints:
         - effect: NoSchedule
           key: nvidia.com/gpu
@@ -42,6 +48,6 @@ kind: EC2NodeClass
 metadata:
   name: gpu-${replace(instance_type, ".", "-")}
 spec:
-  ${indent(2, ec2nodeclass)}
+  ${indent(2, fsx_efa_enabled ? ec2nodeclass_fsx : ec2nodeclass)}
   ${indent(2, network_interfaces_yaml)}
 %{ endfor ~}
