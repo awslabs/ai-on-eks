@@ -31,4 +31,3 @@ spec:
   clusterSelector:
     ray.io/cluster: kuberay-trn1
     rayClusterNamespace: default  # Replace with the namespace where your RayCluster is deployed
-  ttlSecondsAfterFinished: 60  # Time to live for the pod after completion (in seconds)

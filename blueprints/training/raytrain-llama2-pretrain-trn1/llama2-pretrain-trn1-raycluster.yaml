@@ -6,7 +6,7 @@
 # ----------------------------------------------------------------------
 
 # ----------------------------------------------------------------------
-# NOTE: We are using the default namespace for this deployment because the fsx-claim PVC is created under the default namespace by the Terraform blueprint.
+# NOTE: We are using the default namespace for this deployment because the fsx-static-pvc PVC is created under the default namespace by the Terraform blueprint.
 # If you want to deploy the cluster in a dedicated namespace, ensure that the FSX for Lustre file system is also created in the same namespace since PVCs are namespace-bound.
 # ----------------------------------------------------------------------
 
@@ -64,16 +64,14 @@ spec:
                 name: log-volume   # Mount for Ray logs
               - name: persistent-storage # Mount shared filesystem (FSx for Lustre)
                 mountPath: /shared
-        # Node Selector for Karpenter
-        # Karpenter will provision this head pod on a node with the specified labels.
-        nodeSelector:
-          instanceType: x86-cpu-karpenter
+        # No nodeSelector: the head only needs x86 CPU capacity, so Karpenter's
+        # default general-purpose NodePool provisions a node for it.
         volumes:
           - name: log-volume
             emptyDir: {}
           - name: persistent-storage
             persistentVolumeClaim:
-              claimName: fsx-claim   # Reference the PVC for shared storage
+              claimName: fsx-static-pvc   # Reference the PVC for shared storage
     rayStartParams:
       dashboard-host: 0.0.0.0    # Make dashboard accessible
 
@@ -120,12 +118,10 @@ spec:
                   mountPath: /dev/shm   # Mount for shared memory
                 - mountPath: /tmp/ray
                   name: log-volume     # Mount for Ray logs
-          # Node Selector for Managed Node Group (with Cluster Autoscaler)
-          # These workers will run on Trn1 instances provisioned by the cluster autoscaler.
-          # This is necessary as Karpenter doesn't currently support EFA (required for Neuron distributed training).
+          # Trn1 instances are provisioned on demand by Karpenter's `neuron`
+          # NodePool, which also attaches the EFA interfaces.
           nodeSelector:
-            instance-type: trn1-32xl
-            provisioner: cluster-autoscaler
+            node.kubernetes.io/instance-type: trn1.32xlarge
 
           # Tolerations for Trn1 and Dedicated Nodes
           tolerations:
@@ -140,7 +136,7 @@ spec:
             # Persistent Volume Claim (PVC) to access the FSx for Lustre filesystem
             - name: persistent-storage
               persistentVolumeClaim:
-                claimName: fsx-claim
+                claimName: fsx-static-pvc
             - name: dshm
               emptyDir:
                 medium: Memory
