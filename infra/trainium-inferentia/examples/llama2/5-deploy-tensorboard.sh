@@ -99,7 +99,7 @@ spec:
       volumes:
       - name: persistent-storage
         persistentVolumeClaim:
-          claimName: fsx-claim
+          claimName: fsx-static-pvc
 EOF
 
 # Wait for loadbalancer to be created

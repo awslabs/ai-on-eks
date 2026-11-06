@@ -18,6 +18,8 @@ spec:
         - sleep
         - infinity
         imagePullPolicy: IfNotPresent
+        # GenAI-Perf is a client: it sends requests to the NIM endpoint and needs no GPU
         resources:
-          limits:
-            nvidia.com/gpu: "1"
+          requests:
+            cpu: "2"
+            memory: 4Gi

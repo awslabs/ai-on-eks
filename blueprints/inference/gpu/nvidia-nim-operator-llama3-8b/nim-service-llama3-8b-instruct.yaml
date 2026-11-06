@@ -37,7 +37,7 @@ spec:
       profile: ''
   replicas: 1
   nodeSelector:
-    instanceType: "g5-gpu-karpenter"
+    karpenter.k8s.aws/instance-family: "g5"
   resources:
     limits:
       cpu: 40

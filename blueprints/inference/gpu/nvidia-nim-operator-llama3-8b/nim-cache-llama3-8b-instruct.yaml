@@ -34,7 +34,7 @@ spec:
       volumeAccessMode: ReadWriteMany # You have to use EFS or NFS for ReadWriteMany
   nodeSelector:
     accelerator: "nvidia"
-    instanceType: "g5-gpu-karpenter"
+    karpenter.k8s.aws/instance-family: "g5"
   tolerations:
     - key: "nvidia.com/gpu"
       operator: "Exists"

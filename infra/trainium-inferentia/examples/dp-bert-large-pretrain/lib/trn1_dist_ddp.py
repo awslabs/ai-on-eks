@@ -128,7 +128,7 @@ def generateAppDef(script_args: str, nnodes: int, nproc_per_node: int,
                 env=env_mapping,
                 max_retries=3,
                 retry_policy=specs.RetryPolicy("APPLICATION"),
-                mounts=[specs.VolumeMount(src="fsx-claim", dst_path="/data")]
+                mounts=[specs.VolumeMount(src="fsx-static-pvc", dst_path="/data")]
             )
         ],
     )
