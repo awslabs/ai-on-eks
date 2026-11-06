@@ -1,0 +1,29 @@
+# Egress allowlist for the agent-orchestrator pod (ANP backend — Auto Mode).
+#
+# Native ApplicationNetworkPolicy equivalent of cilium-agent-allowlist.yaml.
+# Auto Mode's wildcard limitation means we enumerate common Bedrock regions.
+apiVersion: networking.k8s.aws/v1alpha1
+kind: ApplicationNetworkPolicy
+metadata:
+  name: agent-orchestrator-allowlist
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/tier: app
+    agent-sandbox/role: agent-with-tools
+spec:
+  podSelector:
+    matchLabels:
+      egress-tier: agent
+  egress:
+    - ports:
+        - port: 443
+          protocol: TCP
+      to:
+        - domainNames:
+            - "bedrock-runtime.us-east-1.amazonaws.com"
+            - "bedrock-runtime.us-west-2.amazonaws.com"
+            - "sts.us-east-1.amazonaws.com"
+            - "sts.us-west-2.amazonaws.com"
+            - "*.amazonaws.com"
+  policyTypes:
+    - Egress
