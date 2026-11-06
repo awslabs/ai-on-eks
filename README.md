@@ -57,3 +57,11 @@ This library is licensed under the Apache 2.0 License.
 We welcome all individuals who are enthusiastic about AI on Kubernetes to become a part of this open source community. Your contributions and participation are invaluable to the success of this project.
 
 Built with ❤️ at AWS.
+
+## Per-Model Guides
+
+Generated deployment guides for each verified model live under
+[`website/docs/models/`](website/docs/models/) — for example
+[Qwen3 Coder 30B](website/docs/models/qwen3-coder-30b.md). Each guide is generated from
+its `registry/models/<name>.yaml` entry (verified fields only) and links to the exact
+`aoe-capacity` / `aoe-blueprint` commands to deploy it.
