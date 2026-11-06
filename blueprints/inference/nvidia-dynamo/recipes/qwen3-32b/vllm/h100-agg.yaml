@@ -1,0 +1,112 @@
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: qwen3-32b-h100-agg-vllm
+spec:
+  backendFramework: vllm
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - qwen3-32b-h100-agg-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim:
+                claimName: model-cache
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.6.0
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              env:
+                - name: HF_HOME
+                  value: /models
+                - name: HF_HUB_OFFLINE
+                  value: "1"
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: "16Gi"
+                limits:
+                  memory: "16Gi"
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /models
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.frontend --router-mode kv
+
+    - name: VllmWorker
+      type: worker
+      replicas: 1
+      sharedMemorySize: 50Gi
+      podTemplate:
+        spec:
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - p5.48xlarge
+          volumes:
+            - name: model-cache
+              persistentVolumeClaim:
+                claimName: model-cache
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.0-efa
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              env:
+                - name: MODEL_NAME
+                  value: "Qwen/Qwen3-32B"
+                - name: HF_HOME
+                  value: /models
+                - name: HF_HUB_OFFLINE
+                  value: "1"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MODEL_NAME}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --tensor-parallel-size 4 \
+                    --gpu-memory-utilization 0.90 \
+                    --async-scheduling \
+                    --block-size 64 \
+                    --hf-overrides '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}' \
+                    --max-model-len 131072 \
+                    --kv-events-config '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
+              resources:
+                requests:
+                  nvidia.com/gpu: "4"
+                  vpc.amazonaws.com/efa: "16"
+                limits:
+                  nvidia.com/gpu: "4"
+                  vpc.amazonaws.com/efa: "16"
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /models

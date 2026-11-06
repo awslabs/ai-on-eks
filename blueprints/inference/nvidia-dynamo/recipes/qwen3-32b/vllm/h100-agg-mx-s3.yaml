@@ -1,0 +1,182 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${INFERENCE_SA}-qwen3-32b-h100-agg-mx-s3-vllm-binding
+  namespace: dynamo-system
+subjects:
+  - kind: ServiceAccount
+    name: ${INFERENCE_SA}
+    namespace: dynamo-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: qwen3-32b-h100-agg-mx-s3-vllm-k8s-service-discovery-role
+---
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: qwen3-32b-h100-agg-mx-s3-vllm
+spec:
+  backendFramework: vllm
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - qwen3-32b-h100-agg-mx-s3-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.6.0
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: "16Gi"
+                limits:
+                  memory: "16Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.frontend --router-mode kv
+
+    - name: ModelExpress
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: modelexpress
+          affinity:
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - qwen3-32b-h100-agg-mx-s3-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/modelexpress-server:0.7.0
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: "8Gi"
+                limits:
+                  memory: "8Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - exec /app/modelexpress-server --port 8000
+              env:
+                - name: MX_METADATA_BACKEND
+                  value: "kubernetes"
+                - name: MX_METADATA_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+              livenessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              readinessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+
+    - name: VllmWorker
+      type: worker
+      replicas: 1
+      sharedMemorySize: 50Gi
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - p5.48xlarge
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-graph-deployment-name
+                        operator: In
+                        values:
+                          - qwen3-32b-h100-agg-mx-s3-vllm
+                      - key: nvidia.com/dynamo-component-type
+                        operator: In
+                        values:
+                          - worker
+                  topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.0-efa
+              env:
+                - name: MODEL_NAME
+                  value: "Qwen/Qwen3-32B"
+                - name: MX_MODEL_URI
+                  value: "s3://${S3_BUCKET}/Qwen/Qwen3-32B"
+                - name: HF_HUB_OFFLINE
+                  value: "1"
+                - name: MODEL_EXPRESS_URL
+                  value: "qwen3-32b-h100-agg-mx-s3-vllm-modelexpress:8000"
+                - name: MX_ARTIFACT_TRANSFER
+                  value: "1"
+                - name: MX_ARTIFACT_READY_URL
+                  value: "http://127.0.0.1:9090/health"
+                - name: MX_NIXL_BACKEND
+                  value: "LIBFABRIC"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MX_MODEL_URI}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --load-format modelexpress \
+                    --tensor-parallel-size 4 \
+                    --gpu-memory-utilization 0.90 \
+                    --async-scheduling \
+                    --block-size 64 \
+                    --hf-overrides '{"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768},"max_position_embeddings":131072}' \
+                    --max-model-len 131072 \
+                    --kv-events-config '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
+              resources:
+                requests:
+                  nvidia.com/gpu: "4"
+                  vpc.amazonaws.com/efa: 16
+                limits:
+                  nvidia.com/gpu: "4"
+                  vpc.amazonaws.com/efa: 16
+              securityContext:
+                capabilities:
+                  add:
+                    - IPC_LOCK

@@ -1,0 +1,244 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${INFERENCE_SA}-glm53-b300-agg-mx-s3-vllm-binding
+  namespace: dynamo-system
+subjects:
+  - kind: ServiceAccount
+    name: ${INFERENCE_SA}
+    namespace: dynamo-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: glm53-b300-agg-mx-s3-vllm-k8s-service-discovery-role
+---
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: glm53-b300-agg-mx-s3-vllm
+spec:
+  backendFramework: vllm
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      runtimeVersionOverride: "1.5.1"
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                    - on-demand
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - glm53-b300-agg-mx-s3-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: ${IMAGE}
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: "16Gi"
+                limits:
+                  memory: "16Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.frontend --router-mode kv
+
+    - name: ModelExpress
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: modelexpress
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                    - on-demand
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - glm53-b300-agg-mx-s3-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/modelexpress-server:0.7.0
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: "8Gi"
+                limits:
+                  memory: "8Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - exec /app/modelexpress-server --port 8000
+              env:
+                - name: MX_METADATA_BACKEND
+                  value: "kubernetes"
+                - name: MX_METADATA_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+              livenessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              readinessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+
+    - name: VllmWorker
+      type: worker
+      replicas: 1
+      sharedMemorySize: 50Gi
+      runtimeVersionOverride: "1.5.1"
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - p6-b300.48xlarge
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-graph-deployment-name
+                        operator: In
+                        values:
+                          - glm53-b300-agg-mx-s3-vllm
+                      - key: nvidia.com/dynamo-component-type
+                        operator: In
+                        values:
+                          - worker
+                  topologyKey: topology.kubernetes.io/zone
+          volumes:
+            - name: model-cache
+              hostPath:
+                path: /mnt/k8s-disks/0/model-cache
+                type: DirectoryOrCreate
+          initContainers:
+            - name: model-download
+              image: public.ecr.aws/amazonlinux/amazonlinux:2023
+              env:
+                - name: MODEL_NAME
+                  value: "zai-org/GLM-5.3"
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /models
+              command: ["sh", "-c"]
+              args:
+                - |
+                  set -eux
+                  dnf install -y awscli-2
+                  aws configure set s3.preferred_transfer_client crt
+                  aws configure set s3.target_bandwidth 1000Gb/s
+                  aws configure set s3.direct_io true
+                  aws s3 sync s3://${S3_BUCKET}/${MODEL_NAME} /models/${MODEL_NAME}/
+          containers:
+            - name: main
+              image: ${IMAGE}
+              env:
+                - name: MODEL_NAME
+                  value: "zai-org/GLM-5.3"
+                - name: MX_MODEL_URI
+                  value: "/models/zai-org/GLM-5.3"
+                - name: HF_HUB_OFFLINE
+                  value: "1"
+                - name: MODEL_EXPRESS_URL
+                  value: "glm53-b300-agg-mx-s3-vllm-modelexpress:8000"
+                - name: MX_ARTIFACT_TRANSFER
+                  value: "1"
+                - name: MX_ARTIFACT_READY_URL
+                  value: "http://127.0.0.1:9090/health"
+                - name: MX_NIXL_BACKEND
+                  value: "LIBFABRIC"
+                - name: MX_INSTANT_TENSOR
+                  value: "1"
+                - name: VLLM_ENGINE_READY_TIMEOUT_S
+                  value: "5400"
+                - name: TORCHINDUCTOR_CACHE_DIR
+                  value: "/home/dynamo/.cache/torchinductor"
+                - name: TRITON_CACHE_DIR
+                  value: "/home/dynamo/.cache/triton"
+                - name: VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
+                  value: "/home/dynamo/.cache/flashinfer_autotune_cache"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MX_MODEL_URI}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --load-format modelexpress \
+                    --tensor-parallel-size 8 \
+                    --gpu-memory-utilization 0.90 \
+                    --kv-cache-dtype fp8_e4m3 \
+                    --dyn-tool-call-parser glm47 \
+                    --dyn-reasoning-parser glm45 \
+                    --max-num-seqs 32 \
+                    --kv-events-config '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
+              resources:
+                requests:
+                  nvidia.com/gpu: "8"
+                  vpc.amazonaws.com/efa: 16
+                limits:
+                  nvidia.com/gpu: "8"
+                  vpc.amazonaws.com/efa: 16
+              volumeMounts:
+                - name: model-cache
+                  mountPath: /models
+              securityContext:
+                capabilities:
+                  add:
+                    - IPC_LOCK
+              startupProbe:
+                httpGet:
+                  path: /health
+                  port: 9090
+                periodSeconds: 10
+                timeoutSeconds: 10
+                failureThreshold: 540

@@ -1,0 +1,120 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${INFERENCE_SA}-nemotron-35-bolt-e4b-agg-vllm-binding
+  namespace: dynamo-system
+subjects:
+  - kind: ServiceAccount
+    name: ${INFERENCE_SA}
+    namespace: dynamo-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nemotron-35-bolt-e4b-agg-vllm-k8s-service-discovery-role
+---
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: nemotron-35-bolt-e4b-agg-vllm
+spec:
+  backendFramework: vllm
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                    - on-demand
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - nemotron-35-bolt-e4b-agg-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.6.0
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: "8Gi"
+                limits:
+                  memory: "8Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.frontend --router-mode kv
+
+    - name: VllmWorker
+      type: worker
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.k8s.aws/instance-family
+                    operator: In
+                    values:
+                    - g6e
+                - matchExpressions:
+                  - key: eks.amazonaws.com/instance-family
+                    operator: In
+                    values:
+                    - g6e
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.0
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              env:
+                - name: MODEL_NAME
+                  value: "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16"
+                - name: MX_MODEL_URI
+                  value: "s3://${S3_BUCKET}/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-BF16"
+                - name: HF_HUB_OFFLINE
+                  value: "1"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MX_MODEL_URI}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --load-format modelexpress \
+                    --tensor-parallel-size 1 \
+                    --gpu-memory-utilization 0.90 \
+                    --kv-cache-dtype auto \
+                    --max-model-len 16384 \
+                    --max-num-seqs 16 \
+                    --max-num-batched-tokens 8192 \
+                    --dyn-tool-call-parser gemma4 \
+                    --dyn-reasoning-parser gemma4 \
+                    --limit-mm-per-prompt '{"image":0,"video":0,"audio":0}' \
+                    --kv-events-config '{"publisher":"zmq","topic":"kv-events","endpoint":"tcp://*:20080","enable_kv_cache_events":true}'
+              resources:
+                requests:
+                  nvidia.com/gpu: "1"
+                limits:
+                  nvidia.com/gpu: "1"

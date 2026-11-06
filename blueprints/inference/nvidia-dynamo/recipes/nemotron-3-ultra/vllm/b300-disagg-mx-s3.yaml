@@ -1,0 +1,332 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${INFERENCE_SA}-nemotron-3-ultra-b300-disagg-vllm-binding
+  namespace: dynamo-system
+subjects:
+  - kind: ServiceAccount
+    name: ${INFERENCE_SA}
+    namespace: dynamo-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nemotron-3-ultra-b300-disagg-vllm-k8s-service-discovery-role
+---
+apiVersion: nvidia.com/v1beta1
+kind: DynamoGraphDeployment
+metadata:
+  name: nemotron-3-ultra-b300-disagg-vllm
+spec:
+  backendFramework: vllm
+  components:
+    - name: Frontend
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                    - on-demand
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - nemotron-3-ultra-b300-disagg-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.6.0
+              resources:
+                requests:
+                  cpu: "8"
+                  memory: "16Gi"
+                limits:
+                  memory: "16Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.frontend --router-mode kv
+
+    - name: ModelExpress
+      type: frontend
+      replicas: 1
+      podTemplate:
+        spec:
+          serviceAccountName: modelexpress
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: karpenter.sh/capacity-type
+                    operator: In
+                    values:
+                    - on-demand
+            podAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+                - weight: 100
+                  podAffinityTerm:
+                    labelSelector:
+                      matchExpressions:
+                        - key: nvidia.com/dynamo-graph-deployment-name
+                          operator: In
+                          values:
+                            - nemotron-3-ultra-b300-disagg-vllm
+                    topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/modelexpress-server:0.7.0
+              envFrom:
+              - secretRef:
+                  name: hf-token-secret
+              resources:
+                requests:
+                  cpu: "4"
+                  memory: "8Gi"
+                limits:
+                  memory: "8Gi"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - exec /app/modelexpress-server --port 8000
+              env:
+                - name: MX_METADATA_BACKEND
+                  value: "kubernetes"
+                - name: MX_METADATA_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+              livenessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+              readinessProbe:
+                tcpSocket:
+                  port: 8000
+                initialDelaySeconds: 5
+                periodSeconds: 10
+
+    - name: DecodeWorker
+      type: decode
+      replicas: 1
+      sharedMemorySize: 100Gi
+      podTemplate:
+        metadata:
+          labels:
+            role: worker
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - p6-b300.48xlarge
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-graph-deployment-name
+                        operator: In
+                        values:
+                          - nemotron-3-ultra-b300-disagg-vllm
+                      - key: role
+                        operator: In
+                        values:
+                          - worker
+                  topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.0-efa
+              env:
+                - name: MODEL_NAME
+                  value: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"
+                - name: MX_MODEL_URI
+                  value: "s3://${S3_BUCKET}/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"
+                - name: MODEL_EXPRESS_URL
+                  value: "nemotron-3-ultra-b300-disagg-vllm-modelexpress:8000"
+                - name: MX_ARTIFACT_TRANSFER
+                  value: "1"
+                - name: MX_ARTIFACT_READY_URL
+                  value: "http://127.0.0.1:9090/health"
+                - name: MX_NIXL_BACKEND
+                  value: "LIBFABRIC"
+                - name: MX_INSTANT_TENSOR
+                  value: "0"
+                - name: VLLM_ENGINE_READY_TIMEOUT_S
+                  value: "5400"
+                - name: VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+                  value: "1"
+                - name: "VLLM_ALLOW_LONG_MAX_MODEL_LEN"
+                  value: "1"
+                - name: VLLM_SSM_CONV_STATE_LAYOUT
+                  value: "DS"
+                - name: DYN_HEALTH_CHECK_ENABLED
+                  value: "false"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MX_MODEL_URI}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --load-format modelexpress \
+                    --trust-remote-code \
+                    --tensor-parallel-size 8 \
+                    --kv-cache-dtype fp8 \
+                    --gpu-memory-utilization 0.90 \
+                    --max-model-len 1048576 \
+                    --max-num-seqs 64 \
+                    --max-num-batched-tokens 32768 \
+                    --async-scheduling \
+                    --enable-flashinfer-autotune \
+                    --mamba-backend triton \
+                    --mamba-ssm-cache-dtype float32 \
+                    --dyn-tool-call-parser qwen3_coder \
+                    --dyn-reasoning-parser nemotron_v3 \
+                    --reasoning-parser nemotron_v3 \
+                    --disaggregation-mode decode \
+                    --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both","kv_connector_extra_config": {"backends": ["LIBFABRIC"]}}'
+              resources:
+                requests:
+                  nvidia.com/gpu: 8
+                  vpc.amazonaws.com/efa: 16
+                limits:
+                  nvidia.com/gpu: 8
+                  vpc.amazonaws.com/efa: 16
+              securityContext:
+                capabilities:
+                  add:
+                    - IPC_LOCK
+              startupProbe:
+                httpGet:
+                  path: /health
+                  port: 9090
+                periodSeconds: 10
+                timeoutSeconds: 10
+                failureThreshold: 540
+
+    - name: PrefillWorker
+      type: prefill
+      replicas: 1
+      sharedMemorySize: 100Gi
+      podTemplate:
+        metadata:
+          labels:
+            role: worker
+        spec:
+          serviceAccountName: ${INFERENCE_SA}
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                - matchExpressions:
+                  - key: node.kubernetes.io/instance-type
+                    operator: In
+                    values:
+                    - p6-b300.48xlarge
+            podAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchExpressions:
+                      - key: nvidia.com/dynamo-graph-deployment-name
+                        operator: In
+                        values:
+                          - nemotron-3-ultra-b300-disagg-vllm
+                      - key: role
+                        operator: In
+                        values:
+                          - worker
+                  topologyKey: topology.kubernetes.io/zone
+          containers:
+            - name: main
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.6.0-efa
+              env:
+                - name: MODEL_NAME
+                  value: "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"
+                - name: MX_MODEL_URI
+                  value: "s3://${S3_BUCKET}/nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-BF16"
+                - name: MODEL_EXPRESS_URL
+                  value: "nemotron-3-ultra-b300-disagg-vllm-modelexpress:8000"
+                - name: MX_ARTIFACT_TRANSFER
+                  value: "1"
+                - name: MX_ARTIFACT_READY_URL
+                  value: "http://127.0.0.1:9090/health"
+                - name: MX_NIXL_BACKEND
+                  value: "LIBFABRIC"
+                - name: MX_INSTANT_TENSOR
+                  value: "0"
+                - name: VLLM_ENGINE_READY_TIMEOUT_S
+                  value: "5400"
+                - name: VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+                  value: "1"
+                - name: "VLLM_ALLOW_LONG_MAX_MODEL_LEN"
+                  value: "1"
+                - name: VLLM_SSM_CONV_STATE_LAYOUT
+                  value: "DS"
+                - name: DYN_HEALTH_CHECK_ENABLED
+                  value: "false"
+              command:
+                - /bin/sh
+                - -c
+              args:
+                - |
+                  python3 -m dynamo.vllm \
+                    --model "${MX_MODEL_URI}" \
+                    --served-model-name "${MODEL_NAME}" \
+                    --load-format modelexpress \
+                    --trust-remote-code \
+                    --tensor-parallel-size 8 \
+                    --kv-cache-dtype fp8 \
+                    --max-model-len 1048576 \
+                    --gpu-memory-utilization 0.90 \
+                    --max-num-seqs 64 \
+                    --max-num-batched-tokens 32768 \
+                    --async-scheduling \
+                    --enable-flashinfer-autotune \
+                    --mamba-backend triton \
+                    --mamba-ssm-cache-dtype float32 \
+                    --dyn-tool-call-parser qwen3_coder \
+                    --dyn-reasoning-parser nemotron_v3 \
+                    --reasoning-parser nemotron_v3 \
+                    --disaggregation-mode prefill \
+                    --kv-transfer-config '{"kv_connector":"NixlConnector","kv_role":"kv_both","kv_connector_extra_config": {"backends": ["LIBFABRIC"]}}' \
+                    --kv-events-config '{"publisher":"zmq","topic":"kv-events","enable_kv_cache_events":true,"endpoint":"tcp://*:5200"}'
+              resources:
+                requests:
+                  nvidia.com/gpu: 8
+                  vpc.amazonaws.com/efa: 16
+                limits:
+                  nvidia.com/gpu: 8
+                  vpc.amazonaws.com/efa: 16
+              securityContext:
+                capabilities:
+                  add:
+                    - IPC_LOCK
+              startupProbe:
+                httpGet:
+                  path: /health
+                  port: 9090
+                periodSeconds: 10
+                timeoutSeconds: 10
+                failureThreshold: 540

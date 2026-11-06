@@ -7,6 +7,7 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/compare-options: ServerSideDiff=true
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:
@@ -14,7 +15,6 @@ spec:
     chart: dynamo-platform
     targetRevision: ${version}
     helm:
-      # dynamo operator manage CRDs via a pre-install/pre-upgrade hook Job via server-side apply.
       skipCrds: true
       values: |
         ${user_values_yaml}
@@ -35,13 +35,21 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
   ignoreDifferences:
-    # Ignore differences in webhook configurations during upgrades
     - group: admissionregistration.k8s.io
       kind: ValidatingAdmissionWebhook
       jqPathExpressions:
         - .webhooks[]?.clientConfig.caBundle
     - group: admissionregistration.k8s.io
       kind: MutatingAdmissionWebhook
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
       jqPathExpressions:
         - .webhooks[]?.clientConfig.caBundle

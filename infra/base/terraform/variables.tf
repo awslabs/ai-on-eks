@@ -12,7 +12,7 @@ variable "region" {
 
 variable "eks_cluster_version" {
   description = "EKS Cluster version"
-  default     = "1.34"
+  default     = "1.36"
   type        = string
 }
 
@@ -385,7 +385,7 @@ variable "enable_leader_worker_set" {
 variable "leader_worker_set_version" {
   description = "LeaderWorkerSet version"
   type        = string
-  default     = "v0.9.0"
+  default     = "v1.0.0"
 }
 
 # kubernetes-sigs/agent-sandbox controller
@@ -440,6 +440,12 @@ variable "nvidia_dra_driver_version" {
   default     = "0.4.0"
 }
 
+variable "enable_mng_nvidia_gpu" {
+  description = "Enable Managed Node Group for NVIDIA GPU instances"
+  type        = bool
+  default     = false
+}
+
 variable "enable_nvidia_gpu_operator" {
   description = <<-EOF
     Enable NVIDIA GPU Operator
@@ -461,7 +467,7 @@ variable "enable_nvidia_gpu_operator" {
 variable "nvidia_gpu_operator_version" {
   description = "NVIDIA GPU Operator chart version"
   type        = string
-  default     = "26.3.0"
+  default     = "26.7.2"
 }
 variable "enable_nvidia_gpu_operator_dcgm_exporter" {
   description = "Enable DCGM Exporter within NVIDIA GPU Operator"
@@ -667,7 +673,7 @@ variable "enable_dynamo_platform" {
 variable "dynamo_platform_version" {
   description = "NVIDIA Dynamo Platform version"
   type        = string
-  default     = "1.0.0"
+  default     = "1.6.0"
 }
 variable "dynamo_platform_namespace" {
   description = "Namespace for NVIDIA Dynamo Platform"
@@ -841,8 +847,35 @@ variable "nodepools" {
   description = "Map of nodepool names to enable/disable"
   type        = map(bool)
   default = {
-    gpu                    = true
-    neuron                 = true
-    gpu-p6e-gb200-36xlarge = false
+    gpu                           = true
+    neuron                        = true
+    gpu-p6e-gb200-36xlarge        = false
+    gpu-p6e-gb200-36xlarge-static = false
   }
+}
+
+# KAI Scheduler (GitOps mode via ArgoCD)
+variable "enable_kai_scheduler" {
+  description = "Enable KAI Scheduler addon"
+  type        = bool
+  default     = false
+}
+
+variable "kai_scheduler_version" {
+  description = "KAI Scheduler Helm chart version (OCI chart at ghcr.io/kai-scheduler/kai-scheduler)"
+  type        = string
+  default     = "0.18.6"
+}
+
+# Grove (gang scheduling operator, GitOps mode via ArgoCD)
+variable "enable_grove" {
+  description = "Enable Grove addon"
+  type        = bool
+  default     = false
+}
+
+variable "grove_version" {
+  description = "Grove Helm chart version (OCI chart at ghcr.io/ai-dynamo/grove/grove-charts; the v prefix is added in the ArgoCD Application manifest)"
+  type        = string
+  default     = "0.1.0-alpha.16"
 }
