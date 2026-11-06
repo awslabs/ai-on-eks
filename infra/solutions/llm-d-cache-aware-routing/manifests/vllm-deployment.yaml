@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: inference
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-inference
+  namespace: inference
+spec:
+  replicas: 7
+  selector:
+    matchLabels:
+      app: vllm-inference
+  template:
+    metadata:
+      labels:
+        app: vllm-inference
+        llm-d.ai/guide: cache-aware-routing
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.22.0
+          command: ["vllm", "serve"]
+          args:
+            - --model
+            - mistralai/Mistral-7B-Instruct-v0.3
+            - --enable-prefix-caching
+            - --max-model-len
+            - "8192"
+            - --gpu-memory-utilization
+            - "0.90"
+            - --port
+            - "8000"
+            - --prefix-caching-hash-algo
+            - sha256_cbor
+            - --block-size
+            - "64"
+            - --kv-events-config
+            - '{"enable_kv_cache_events":true,"publisher":"zmq","endpoint":"tcp://*:5556","topic":"kv@$(POD_IP):8000@mistralai/Mistral-7B-Instruct-v0.3"}'
+          env:
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token
+                  key: token
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: PYTHONHASHSEED
+              value: "42"
+          ports:
+            - containerPort: 8000
+              name: http
+            - containerPort: 5556
+              name: zmq-kv-events
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+              nvidia.com/gpu: 1
+            limits:
+              cpu: "6"
+              memory: 20Gi
+              nvidia.com/gpu: 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 180
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-inference
+  namespace: inference
+spec:
+  selector:
+    app: vllm-inference
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+  type: ClusterIP
+---
+# NetworkPolicy: restrict ZMQ port 5556 to EPP pods only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: restrict-zmq-kv-events
+  namespace: inference
+spec:
+  podSelector:
+    matchLabels:
+      app: vllm-inference
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              llm-d-router-gateway: cache-aware-routing-epp
+      ports:
+        - protocol: TCP
+          port: 5556
+    - ports:
+        - protocol: TCP
+          port: 8000
