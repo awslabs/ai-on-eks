@@ -2,11 +2,11 @@
 #
 # Same shape as sandbox-runc plus runtimeClassName: isolated-sandbox. The pod
 # runs in its own hardware-isolated Nitro Sandbox. The RuntimeClass is present
-# on every EKS Auto Mode cluster (1.37+) and carries the scheduling constraints,
+# on every EKS Auto Mode cluster (1.36+) and carries the scheduling constraints,
 # so no toleration or node selector is needed.
 #
 # Mode compatibility:
-#   - EKS Auto Mode 1.37+: yes. Claims choose sandbox-runc or sandbox-nitro.
+#   - EKS Auto Mode 1.36+: yes. Claims choose sandbox-runc or sandbox-nitro.
 #   - Standard EKS (Karpenter): no — use sandbox-runc or sandbox-gvisor.
 #
 # Default workload is nginxinc/nginx-unprivileged:alpine, the non-root build of
