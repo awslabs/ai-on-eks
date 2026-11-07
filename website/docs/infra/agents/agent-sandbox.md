@@ -40,6 +40,7 @@ flowchart TB
         direction LR
         C1["<b>standard</b><br/>(runc)<br/>Default K8s runtime<br/>Cold start ~1s"]:::runtime
         C2["<b>gvisor</b><br/>(runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
+        C3["<b>isolated-sandbox</b><br/>(AWS Nitro Sandbox on Amazon EKS)<br/>Hardware isolation, one microVM per pod<br/>EKS Auto Mode 1.37+<br/>Cold start ~5s"]:::runtime
     end
 
     subgraph D["Egress enforcement (examples/)"]
@@ -64,25 +65,26 @@ The solution deploys in layers:
 - **Amazon EKS cluster** with Karpenter for intelligent node autoscaling. A dedicated gVisor-capable NodePool provisions nodes with the `runsc` containerd shim installed via AL2023 user-data.
 - **kubernetes-sigs/agent-sandbox controller** (deployed as an ArgoCD-managed addon) manages `Sandbox`, `SandboxTemplate`, `SandboxWarmPool`, and `SandboxClaim` lifecycle (`v1beta1` API, agent-sandbox v1.0+).
 - **KRO (Kube Resource Orchestrator)** (also ArgoCD-managed) composes multi-resource sandbox definitions behind a single `AgentSandbox` custom resource — useful when exposing a simpler surface to developer teams.
-- **Runtime tiers:** `standard` (runc, default Kubernetes runtime) and `gvisor` (runsc + Sentry userspace kernel).
+- **Runtime tiers:** `standard` (runc, default Kubernetes runtime), `gvisor` (runsc + Sentry userspace kernel), and on EKS Auto Mode `isolated-sandbox` (AWS Nitro Sandbox on Amazon EKS).
 - **Egress enforcement** ships as a separate example to keep the sandbox runtime and egress concerns independently composable. Pair the infra with [agent-egress](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/egress) — it auto-detects compute mode and applies Cilium + Hubble chaining (Standard EKS, requires `enable_cilium = true` in the base infra) or native VPC CNI `ApplicationNetworkPolicy` (EKS Auto Mode).
 
 ### Runtime tier threat model
 
 Each tier is a weaker boundary than the one below it — the choice maps to a threat model, not a "is it secure enough?" question.
 
-| Tier | Boundary | Protects against | Does not protect against |
-|------|----------|------------------|--------------------------|
-| `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (via network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes |
-| `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for most syscalls. Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); Sentry itself is a trusted computing base. |
-| Kata + Firecracker (future) | Hardware-enforced microVM (KVM) | All of the above, including hardware-level side channels. Each sandbox gets its own VM with isolated CPU state. | Not shipped in this solution — requires nested virtualization, which has limited compute support today (self-managed nodes only). |
+| Tier | Boundary | Protects against | Does not protect against | When to use |
+|------|----------|------------------|--------------------------|-------------|
+| `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (via network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes | Trusted workloads, where network policies and RBAC are the boundary you need. |
+| `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for most syscalls. Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); Sentry itself is a trusted computing base. | Untrusted code on Standard EKS, where a userspace kernel that implements the Linux syscall interface fits the workload. |
+| Kata + Firecracker (future) | Virtualization: a microVM with its own guest kernel (KVM) | All of the above. Each sandbox gets its own VM and guest kernel. | Not shipped in this solution — requires nested virtualization, which has limited compute support today (self-managed nodes only). | Workloads that need their own guest kernel in a virtual machine. |
+| `isolated-sandbox` (AWS Nitro Sandbox on Amazon EKS) | Hardware isolation based on AWS Nitro Enclaves technology. Each pod runs in its own Firecracker microVM on an EC2 Nitro Sandbox, not Linux KVM. | All of the above: the node and the other pods are protected from the pod. Supports EKS Pod Identity, `kubectl port-forward`, Amazon EBS and Amazon EFS. A new pod is Ready in about 5 seconds. | Requires EKS Auto Mode on Kubernetes 1.37 or later. | Untrusted or model-generated code where you need hardware isolation, with standard pod features. Opt in per pod with `runtimeClassName: isolated-sandbox`. |
 
 ### Two composition paths
 
 - **SandboxWarmPool + SandboxClaim** — a pool that points at one of the SandboxTemplates and a thin claim (`sandbox-agent.yaml`) that checks out from the pool, plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the pool picks the tier. Native to the SIG-Apps Sandbox API.
 - **KRO AgentSandbox** — the same workload composed via a single `AgentSandbox` custom resource (`kro/instance.yaml` + `kro/rgd.yaml`). The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
+Both paths produce equivalent running pods. Each tier (`standard`, `gvisor`, `nitro`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
 
 ## Prerequisites
 
@@ -105,7 +107,7 @@ Edit `terraform/blueprint.tfvars`:
 
 ```hcl
 name                = "agent-sandbox"
-eks_cluster_version = "1.34"
+eks_cluster_version = "1.37"
 
 # region            = "us-west-2"  # set to your preferred region
 
@@ -120,7 +122,8 @@ enable_cilium = true
 
 # Standard EKS by default. Flip to true for Auto Mode (and set
 # enable_cilium=false). Note that gVisor tier is not available
-# on Auto Mode.
+# on Auto Mode. AWS Nitro Sandbox on Amazon EKS (isolated-sandbox)
+# is available on Auto Mode with EKS 1.37 and later.
 enable_eks_auto_mode = false
 ```
 
@@ -177,6 +180,13 @@ kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-runc.yaml
 ```
 
+On EKS Auto Mode 1.37 and later you can also run sandboxes with AWS Nitro Sandbox on Amazon EKS. Every Auto Mode cluster has the `isolated-sandbox` RuntimeClass, so there is nothing to install: apply the `sandbox-nitro` SandboxTemplate next to `sandbox-runc` and choose per workload which one a SandboxWarmPool targets.
+
+```bash
+kubectl get runtimeclass isolated-sandbox
+kubectl apply -f sandbox-nitro.yaml
+```
+
 #### Basic Sandbox Configuration
 
 The smallest viable Sandbox deployment ships in [`blueprints/agent-sandbox/basic/`](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/basic). It claims one of the basic SandboxTemplates the platform installs, runs `nginx:alpine` (the canonical Kubernetes [shell-demo image](https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/)), and exits when the Pod is Ready. No IRSA, no agent script, no FQDN allowlist — the right starting point if you want to add isolation to an existing workload (the [Jupyter blueprint](../jupyterhub/), an inference server, a batch job runner) without buying into the reference agent stack.
@@ -195,6 +205,12 @@ After running `./install.sh` and applying the platform manifests above:
 cd ../../blueprints/agent-sandbox/basic
 ./install.sh                # Apply + wait for Ready
 ./install.sh smoke          # Apply + smoke test (kubectl exec → nginx -v)
+```
+
+On EKS Auto Mode the basic blueprint claims `sandbox-runc` by default. To claim the AWS Nitro Sandbox on Amazon EKS template instead, set `SANDBOX_TEMPLATE`:
+
+```bash
+SANDBOX_TEMPLATE=sandbox-nitro ./install.sh smoke
 ```
 
 See the [basic blueprint README](https://github.com/awslabs/ai-on-eks/tree/main/blueprints/agent-sandbox/basic/README.md) for customization patterns (writing your own SandboxTemplate, layering on egress / IRSA / KRO).
@@ -237,7 +253,7 @@ BEDROCK_ROLE_ARN=arn:aws:iam::<account>:role/agent-sandbox-bedrock-irsa \
 |----------|-------------|---------|
 | `name` | Cluster naming prefix | `agent-sandbox` |
 | `region` | AWS region | Base module default (`us-west-2`) |
-| `eks_cluster_version` | EKS version | `1.34` |
+| `eks_cluster_version` | EKS version | `1.37` |
 | `enable_agent_sandbox` | Deploy the kubernetes-sigs agent-sandbox controller via ArgoCD | `true` |
 | `agent_sandbox_version` | kubernetes-sigs/agent-sandbox git ref | `v1.0.1` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |

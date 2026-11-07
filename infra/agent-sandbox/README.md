@@ -272,7 +272,7 @@ See the [basic blueprint README](../../blueprints/agent-sandbox/basic/README.md)
 |----------|-------------|---------|
 | `name` | Cluster naming prefix | `agent-sandbox` |
 | `region` | AWS region | Base module default (`us-west-2`); uncomment to override |
-| `eks_cluster_version` | EKS version | `1.34` |
+| `eks_cluster_version` | EKS version | `1.37` |
 | `enable_agent_sandbox` | Deploy the SIG-Apps agent-sandbox controller via ArgoCD | `true` |
 | `agent_sandbox_version` | kubernetes-sigs/agent-sandbox ref | `v1.0.1` |
 | `enable_kro` | Deploy kro via ArgoCD | `true` |
