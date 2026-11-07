@@ -1,18 +1,20 @@
 # SandboxTemplate — AWS Nitro Sandbox on Amazon EKS tier (basic).
 #
-# Same shape as sandbox-runc plus runtimeClassName: isolated-sandbox. The pod
-# runs in its own hardware-isolated Nitro Sandbox. The RuntimeClass is present
-# on every EKS Auto Mode cluster (1.36+) and carries the scheduling constraints,
-# so no toleration or node selector is needed.
+# Same shape as sandbox-gvisor, with runtimeClassName: isolated-sandbox in place
+# of gvisor. The pod runs in its own hardware-isolated Nitro Sandbox: a guest
+# microVM with its own kernel. The RuntimeClass carries the scheduling
+# constraints, so no toleration or node selector is needed.
 #
 # Mode compatibility:
-#   - EKS Auto Mode 1.36+: yes. Claims choose sandbox-runc or sandbox-nitro.
-#   - Standard EKS (Karpenter): no — use sandbox-runc or sandbox-gvisor.
+#   - EKS Auto Mode 1.36+: yes. The RuntimeClass is built in; claims choose
+#     sandbox-runc or sandbox-nitro.
+#   - Standard EKS: yes, on nodes that run a custom AMI with Nitro Sandbox
+#     support.
 #
-# Default workload is nginxinc/nginx-unprivileged:alpine, the non-root build of
-# the nginx image used by sandbox-runc, listening on 8080: the sandbox has its
-# own kernel, and a non-root process with all capabilities dropped cannot bind
-# a port below 1024 there.
+# The pod-level sysctl lets the non-root nginx (user 101, all capabilities
+# dropped) bind port 80, as it does in sandbox-runc and sandbox-gvisor. It is
+# set in the guest kernel inside the pod's own microVM, not on the node, so it
+# affects only this pod.
 apiVersion: extensions.agents.x-k8s.io/v1beta1
 kind: SandboxTemplate
 metadata:
@@ -29,16 +31,20 @@ spec:
         agent-sandbox/tier: nitro
     spec:
       runtimeClassName: isolated-sandbox
+      securityContext:
+        sysctls:
+          - name: net.ipv4.ip_unprivileged_port_start
+            value: "0"
       containers:
         - name: workload
-          image: nginxinc/nginx-unprivileged:alpine
+          image: nginx:alpine
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 80
           resources:
             requests:
-              cpu: "500m"
-              memory: "512Mi"
+              cpu: "100m"
+              memory: "128Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"

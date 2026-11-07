@@ -13,7 +13,7 @@ These are the primitives required for **any** SandboxClaim to land on the cluste
 | `karpenter-nodepool-gvisor.yaml` | Karpenter NodePool + EC2NodeClass that supplies gVisor-capable nodes. AL2023 user-data installs `containerd-shim-runsc-v1`. |
 | `sandbox-runc.yaml` | Basic SandboxTemplate for the runc tier. Hardened Pod spec with no workload-specific assumptions; default workload is `nginx:alpine` (the K8s shell-demo image). Mode-agnostic — works on both Standard EKS and Auto Mode. |
 | `sandbox-gvisor.yaml` | Basic SandboxTemplate for the gVisor tier. Same shape as `sandbox-runc` plus `runtimeClassName: gvisor` and the gVisor NodePool toleration. Standard EKS only (Auto Mode doesn't expose hooks for the runsc shim). |
-| `sandbox-nitro.yaml` | Basic SandboxTemplate for the AWS Nitro Sandbox on Amazon EKS tier. Same shape as `sandbox-runc` plus `runtimeClassName: isolated-sandbox`, with the non-root `nginx-unprivileged` image on port 8080. EKS Auto Mode 1.36+ only; the RuntimeClass is built in, so there is nothing else to install. |
+| `sandbox-nitro.yaml` | Basic SandboxTemplate for the AWS Nitro Sandbox on Amazon EKS tier. Same shape as `sandbox-gvisor`, with `runtimeClassName: isolated-sandbox` in place of `gvisor` and a pod-level sysctl so the non-root `nginx:alpine` can bind port 80. The sysctl is set in the guest kernel of the pod's own microVM, not on the node. EKS Auto Mode 1.36+ (the RuntimeClass is built in, nothing else to install), or Standard EKS with a custom AMI. |
 
 ## Adding a new runtime tier
 
