@@ -1,5 +1,5 @@
 name                = "agent-sandbox"
-eks_cluster_version = "1.34"
+eks_cluster_version = "1.37"
 
 # region              = "us-west-2" # set to the region where your target Bedrock model is available
 

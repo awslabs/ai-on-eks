@@ -29,6 +29,8 @@ INFRA_DIR="$(cd "$SCRIPT_DIR/../../../infra/agent-sandbox" && pwd)"
 NS="agent-sandboxes"
 CLAIM_NAME="sandbox-basic"
 PHASE="${1:-apply}"
+# Optional template override on EKS Auto Mode (sandbox-runc or sandbox-nitro).
+REQUESTED_TEMPLATE="${SANDBOX_TEMPLATE:-}"
 
 # Region precedence (matches conformance.sh / cleanup.sh):
 #   tfvars > AWS_REGION env > AWS_DEFAULT_REGION env > kubectl context
@@ -60,7 +62,9 @@ detect_compute_mode() {
             --query 'cluster.computeConfig.enabled' --output text 2>/dev/null || echo "")
         if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
             COMPUTE_MODE="automode"
-            SANDBOX_TEMPLATE="sandbox-runc"
+            # sandbox-runc by default; set SANDBOX_TEMPLATE=sandbox-nitro to run
+            # in AWS Nitro Sandbox on Amazon EKS (runtimeClassName: isolated-sandbox).
+            SANDBOX_TEMPLATE="${REQUESTED_TEMPLATE:-sandbox-runc}"
             echo "=== EKS Auto Mode detected — claiming SandboxTemplate '$SANDBOX_TEMPLATE' ==="
             return 0
         fi
@@ -87,7 +91,7 @@ apply_claim() {
         exit 1
     }
     kubectl -n "$NS" get sandboxtemplate "$SANDBOX_TEMPLATE" >/dev/null 2>&1 || {
-        echo "FAIL: SandboxTemplate '$SANDBOX_TEMPLATE' missing. Apply $INFRA_DIR/manifests/sandbox-{runc,gvisor}.yaml first." >&2
+        echo "FAIL: SandboxTemplate '$SANDBOX_TEMPLATE' missing. Apply $INFRA_DIR/manifests/$SANDBOX_TEMPLATE.yaml first." >&2
         exit 1
     }
 
