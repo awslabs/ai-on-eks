@@ -40,7 +40,7 @@ flowchart TB
         direction LR
         C1["<b>standard</b><br/>(runc)<br/>Default K8s runtime<br/>Cold start ~1s"]:::runtime
         C2["<b>gvisor</b><br/>(runsc + Sentry)<br/>Userspace syscall interception<br/>Cold start ~1.5s"]:::runtime
-        C3["<b>isolated-sandbox</b><br/>(AWS Nitro Sandbox on Amazon EKS)<br/>Hardware isolation, one microVM per pod<br/>EKS Auto Mode 1.37+<br/>Cold start ~5s"]:::runtime
+        C3["<b>isolated-sandbox</b><br/>(AWS Nitro Sandbox on Amazon EKS)<br/>Hardware isolation, one microVM per pod<br/>EKS Auto Mode 1.36+<br/>Cold start ~5s"]:::runtime
     end
 
     subgraph D["Egress enforcement (examples/)"]
@@ -77,7 +77,7 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 | `standard` (runc) | Linux namespaces + seccomp | Other pods in the cluster (via network policies + RBAC) | Host kernel exploitation, syscall abuse, cgroup escapes | Trusted workloads, where network policies and RBAC are the boundary you need. |
 | `gvisor` (runsc + Sentry) | Userspace syscall interception | Host kernel exploitation for most syscalls. Malicious binaries cannot directly invoke host kernel. | Cold-start overhead (~60-90s for first pod per node); Sentry itself is a trusted computing base. | Untrusted code on Standard EKS, where a userspace kernel that implements the Linux syscall interface fits the workload. |
 | Kata + Firecracker (future) | Virtualization: a microVM with its own guest kernel (KVM) | All of the above. Each sandbox gets its own VM and guest kernel. | Not shipped in this solution — requires nested virtualization, which has limited compute support today (self-managed nodes only). | Workloads that need their own guest kernel in a virtual machine. |
-| `isolated-sandbox` (AWS Nitro Sandbox on Amazon EKS) | Hardware isolation based on AWS Nitro Enclaves technology. Each pod runs in its own Firecracker microVM on an EC2 Nitro Sandbox, not Linux KVM. | All of the above: the node and the other pods are protected from the pod. Supports EKS Pod Identity, `kubectl port-forward`, Amazon EBS and Amazon EFS. A new pod is Ready in about 5 seconds. | Requires EKS Auto Mode on Kubernetes 1.37 or later. | Untrusted or model-generated code where you need hardware isolation, with standard pod features. Opt in per pod with `runtimeClassName: isolated-sandbox`. |
+| `isolated-sandbox` (AWS Nitro Sandbox on Amazon EKS) | Hardware isolation based on AWS Nitro Enclaves technology. Each pod runs in its own Firecracker microVM on an EC2 Nitro Sandbox, not Linux KVM. | All of the above: the node and the other pods are protected from the pod. Supports EKS Pod Identity, `kubectl port-forward`, Amazon EBS and Amazon EFS. A new pod is Ready in about 5 seconds. | Requires EKS Auto Mode on Kubernetes 1.36 or later. | Untrusted or model-generated code where you need hardware isolation, with standard pod features. Opt in per pod with `runtimeClassName: isolated-sandbox`. |
 
 ### Two composition paths
 
@@ -123,7 +123,7 @@ enable_cilium = true
 # Standard EKS by default. Flip to true for Auto Mode (and set
 # enable_cilium=false). Note that gVisor tier is not available
 # on Auto Mode. AWS Nitro Sandbox on Amazon EKS (isolated-sandbox)
-# is available on Auto Mode with EKS 1.37 and later.
+# is available on Auto Mode with EKS 1.36 and later.
 enable_eks_auto_mode = false
 ```
 
@@ -180,7 +180,7 @@ kubectl apply -f namespace.yaml
 kubectl apply -f sandbox-runc.yaml
 ```
 
-On EKS Auto Mode 1.37 and later you can also run sandboxes with AWS Nitro Sandbox on Amazon EKS. Every Auto Mode cluster has the `isolated-sandbox` RuntimeClass, so there is nothing to install: apply the `sandbox-nitro` SandboxTemplate next to `sandbox-runc` and choose per workload which one a SandboxWarmPool targets.
+On EKS Auto Mode 1.36 and later you can also run sandboxes with AWS Nitro Sandbox on Amazon EKS. Every Auto Mode cluster has the `isolated-sandbox` RuntimeClass, so there is nothing to install: apply the `sandbox-nitro` SandboxTemplate next to `sandbox-runc` and choose per workload which one a SandboxWarmPool targets.
 
 ```bash
 kubectl get runtimeclass isolated-sandbox
