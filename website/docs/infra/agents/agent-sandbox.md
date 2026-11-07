@@ -84,7 +84,7 @@ Each tier is a weaker boundary than the one below it — the choice maps to a th
 - **SandboxWarmPool + SandboxClaim** — a pool that points at one of the SandboxTemplates and a thin claim (`sandbox-agent.yaml`) that checks out from the pool, plus the per-deployment glue (ServiceAccount + agent-script ConfigMap). The runtime spec lives in the template; the pool picks the tier. Native to the SIG-Apps Sandbox API.
 - **KRO AgentSandbox** — the same workload composed via a single `AgentSandbox` custom resource (`kro/instance.yaml` + `kro/rgd.yaml`). The `ResourceGraphDefinition` takes a `runtimeClass`, `iamRoleArn`, `scriptConfigMap` reference, and Bedrock region/model, and materializes the SA + Sandbox in one declarative unit. Useful when exposing a simpler surface to your team.
 
-Both composition paths produce equivalent running pods, on any of the three runtime tiers. Each tier (`standard`, `gvisor`, `nitro`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` (or the AgentSandbox's `runtimeClass`) selects which tier the pod runs on, and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
+Both composition paths produce equivalent running pods. Each of the three tiers (`standard`, `gvisor`, `nitro`) is a SandboxTemplate a SandboxWarmPool can target — the pool's `sandboxTemplateRef.name` selects which tier the pod runs on (the KRO AgentSandbox's `runtimeClass` accepts `gvisor` today), and SandboxClaims check out from the pool via `warmPoolRef.name` (v1beta1 API, agent-sandbox v1.0+).
 
 ## Prerequisites
 
