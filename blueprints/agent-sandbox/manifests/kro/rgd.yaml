@@ -8,7 +8,7 @@
 # kubernetes-sigs/agent-sandbox project.
 #
 # What this adds over the upstream example:
-#   - runtimeClass field (gvisor today; kata-fc when available) that
+#   - runtimeClass field (gvisor or kata-fc; kata-fc on Standard EKS only) that
 #     propagates to the child Sandbox's podTemplate.runtimeClassName
 #     and the matching NoSchedule toleration. The RGD couples runtimeClass
 #     into both, so it only works cleanly for tiers that have a real

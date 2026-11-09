@@ -1,0 +1,45 @@
+apiVersion: conformance.ai-on-eks/v1
+kind: ConformanceSpec
+metadata:
+  name: soci-image-distribution
+# Validates the SOCI image-distribution path and characterizes how the
+# AL2023 FastImagePull featureGate handles a SOCI-indexed image.
+#
+# FastImagePull characterization (the open question we're burning a cycle on):
+#   - If FastImagePull lazy-loads indexed images, the `soci-lazy-mounts-present`
+#     assertion PASSES (SOCI FUSE mounts exist on the node) → lazy-load mode is
+#     achievable via the managed featureGate, no custom snapshotter install.
+#   - If it only parallel-pull-unpacks, that assertion FAILS → we add the
+#     custom soci-snapshotter install on the AL2023 lazy-load path.
+# The PASS/FAIL of that single assertion is the experiment's answer.
+spec:
+  namespace: agent-sandboxes
+
+  manifests:
+    - sample-indexed-pod.yaml
+
+  readiness:
+    - kind: Pod
+      name: soci-conformance
+      timeout: 300s
+
+  assertions:
+    - name: indexed-image-pod-ready
+      description: The pre-indexed image pod reaches Ready (SOCI path functional).
+      type: podReady
+      target: soci-conformance
+
+    - name: soci-lazy-mounts-present
+      description: >-
+        SOCI FUSE mounts exist on the node hosting the pod — lazy-load engaged
+        for the indexed image rather than a full pull. This is the FastImagePull
+        characterization signal; its PASS/FAIL decides whether lazy-load works
+        via the managed featureGate or needs the custom snapshotter install.
+      type: nodeExec
+      podRef: soci-conformance
+      command: "findmnt --source soci || true"
+      match: contains
+      expected: soci
+
+  cleanup:
+    deleteManifests: true
