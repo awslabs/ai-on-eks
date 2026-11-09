@@ -120,4 +120,4 @@ The basic SandboxTemplates haven't been applied yet. Run the prerequisite kubect
 Two possible causes:
 
 - The cluster is in Auto Mode (gVisor isn't available — the claim falls back to `sandbox-runc`).
-- On Standard EKS, the gVisor Karpenter NodePool isn't applied. Check `kubectl get nodepool agent-sandbox-gvisor` and apply [`karpenter-nodepool-gvisor.yaml`](../../../infra/agent-sandbox/manifests/karpenter-nodepool-gvisor.yaml) if missing.
+- On Standard EKS, the gVisor nodepool is missing. It deploys with the cluster (`install.sh` copies [`nodepools/agent-sandbox-gvisor.yaml`](../../../infra/agent-sandbox/nodepools/agent-sandbox-gvisor.yaml) into the nodepool mechanism); check `kubectl get nodepool agent-sandbox-gvisor` and re-run the install if it is absent.
