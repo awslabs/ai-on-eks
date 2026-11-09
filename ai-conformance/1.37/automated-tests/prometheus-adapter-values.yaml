@@ -1,0 +1,18 @@
+prometheus:
+  url: http://prometheus-operated.monitoring.svc
+  port: 9090
+metricsRelistInterval: 15s
+nodeSelector:
+  karpenter.sh/nodepool: general-purpose
+rules:
+  default: false
+  custom:
+  - seriesQuery: 'ai_conformance_hpa_queue_depth{namespace!="",pod!=""}'
+    resources:
+      overrides:
+        namespace: {resource: "namespace"}
+        pod: {resource: "pod"}
+    name:
+      matches: "^ai_conformance_hpa_queue_depth$"
+      as: "ai_conformance_hpa_queue_depth"
+    metricsQuery: 'max(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)'

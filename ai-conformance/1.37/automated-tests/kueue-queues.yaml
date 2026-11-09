@@ -1,0 +1,37 @@
+# Kueue quota for the AI Conformance gang scheduling test.
+# The positive gang is 2 pods x (100m CPU, 128Mi); the negative gang is 1000 pods
+# of the same shape and must never be partially admitted. A 4 CPU / 8Gi
+# ClusterQueue admits the first all-or-nothing and leaves the second pending.
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: ClusterQueue
+metadata:
+  name: conformance-cq
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+    - coveredResources: ["cpu", "memory"]
+      flavors:
+        - name: default-flavor
+          resources:
+            - name: "cpu"
+              nominalQuota: 4
+            - name: "memory"
+              nominalQuota: 8Gi
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gang-conformance
+---
+apiVersion: kueue.x-k8s.io/v1beta1
+kind: LocalQueue
+metadata:
+  name: conformance-lq
+  namespace: gang-conformance
+spec:
+  clusterQueue: conformance-cq
