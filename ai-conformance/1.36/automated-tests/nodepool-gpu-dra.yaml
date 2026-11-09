@@ -1,0 +1,54 @@
+# EKS Auto Mode GPU NodePool that uses the NVIDIA DRA driver.
+#
+# eks.amazonaws.com/device-manager-nvidia: dra is set explicitly rather than
+# relying on EKS Auto Mode inferring the device manager from workload intent.
+# The node that holds the pool open between test phases is a CPU-only pod with
+# no device request, so there would be no DRA intent to infer and the node would
+# default to the device plugin. A node's device-manager role is fixed for its
+# whole lifetime and cannot be changed in place.
+#
+# No taint: the upstream conformance pods carry no toleration, and the suite
+# requires that test pods can schedule onto the accelerator nodes.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-dra
+spec:
+  disruption:
+    budgets:
+      - nodes: 10%
+    consolidateAfter: 5m
+    consolidationPolicy: WhenEmpty
+  template:
+    metadata:
+      labels:
+        eks.amazonaws.com/device-manager-nvidia: dra
+    spec:
+      nodeClassRef:
+        group: eks.amazonaws.com
+        kind: NodeClass
+        name: default
+      requirements:
+        - key: "karpenter.sh/capacity-type"
+          operator: In
+          values: ["on-demand", "spot"]
+        - key: "kubernetes.io/arch"
+          operator: In
+          values: ["amd64"]
+        # Several families, and spot as well as on-demand: us-west-2 returned
+        # InsufficientInstanceCapacity for g6 across three AZs. g7e is excluded
+        # deliberately -- EKS Auto Mode has no DRA device metadata for it, so
+        # dynamic provisioning will not launch g7e nodes for DRA claims.
+        - key: "eks.amazonaws.com/instance-family"
+          operator: In
+          values: ["g5", "g6", "g6e"]
+        # One GPU per node, and a small host. gpu-count alone is not enough:
+        # g6e.16xlarge carries a single L40S but 64 vCPU, so the pool picked it
+        # to satisfy a claim for one GPU. Cap the size as well.
+        - key: "eks.amazonaws.com/instance-gpu-count"
+          operator: In
+          values: ["1"]
+        - key: "eks.amazonaws.com/instance-size"
+          operator: In
+          values: ["xlarge", "2xlarge", "4xlarge"]
+      terminationGracePeriod: 24h0m0s
