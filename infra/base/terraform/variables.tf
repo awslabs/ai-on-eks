@@ -450,7 +450,7 @@ variable "nvidia_dra_driver_version" {
   default     = "0.4.0"
 }
 
-variable "enable_nvidia_gpu_mng" {
+variable "enable_eks_mng_nvidia_gpu" {
   description = "Create the NVIDIA GPU EKS managed node group (g6.4xlarge). Set false in regions/accounts without NVIDIA GPU capacity (e.g. Neuron-only clusters like ap-southeast-4)."
   type        = bool
   default     = true
