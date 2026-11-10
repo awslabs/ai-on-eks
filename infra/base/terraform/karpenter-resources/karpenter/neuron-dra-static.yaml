@@ -1,0 +1,63 @@
+# Static (pre-provisioned) NodePool for the AWS Neuron DRA driver.
+#
+# DRA on Neuron requires STATIC capacity: Karpenter does not simulate Neuron
+# ResourceClaims, so it cannot scale this pool from a pending DRA pod. The pool
+# therefore maintains a fixed node count via spec.replicas (the staticCapacity
+# feature gate is enabled on the Karpenter controller). Set replicas > 0 (here
+# or via GitOps) to pre-provision DRA-capable Neuron nodes; the DRA driver then
+# publishes ResourceSlices from them and DRA pods bind via the default
+# scheduler.
+#
+# Nodes are labelled neuron.aws/driver=dra so the Neuron DRA driver DaemonSet
+# runs here and the Neuron device plugin does NOT (the two must not manage the
+# same node). Opt in with nodepools = { neuron-dra-static = true } and
+# enable_aws_neuron_dra_driver = true.
+#
+# Reserved capacity (EC2 Capacity Blocks / ODCRs) is selected by the shared
+# EC2NodeClass via capacity_reservation_tags (default ai-on-eks=true); tag your
+# reservation accordingly and keep capacity-type "reserved".
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: neuron-dra-static
+spec:
+  replicas: 0
+  disruption:
+    budgets:
+      - nodes: 10%
+    consolidateAfter: 300s
+    consolidationPolicy: WhenEmptyOrUnderutilized
+  template:
+    metadata:
+      labels:
+        ai-on-eks.io/amiFamily: ${ami_family}
+        accelerator: neuron
+        neuron.aws/driver: dra
+    spec:
+      expireAfter: 720h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: neuron-dra-static
+      requirements:
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values:
+            - trn2
+            - trn3
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            - reserved
+            - on-demand
+      taints:
+        - effect: NoSchedule
+          key: aws.amazon.com/neuron
+      terminationGracePeriod: 24h
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: neuron-dra-static
+spec:
+  ${indent(2, ec2nodeclass)}
