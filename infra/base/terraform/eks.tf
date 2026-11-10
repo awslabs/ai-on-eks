@@ -202,7 +202,7 @@ module "eks" {
 
     # Node group for NVIDIA GPU workloads with NVIDIA K8s DRA Testing
     nvidia-gpu = {
-      create         = !var.enable_eks_auto_mode && var.enable_nvidia_gpu_mng
+      create         = !var.enable_eks_auto_mode && var.enable_eks_mng_nvidia_gpu
       ami_type       = "AL2023_x86_64_NVIDIA"
       instance_types = ["g6.4xlarge"] # Use p4d for testing MIG
       subnet_ids     = local.secondary_cidr_subnets
