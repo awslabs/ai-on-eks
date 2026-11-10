@@ -1,0 +1,16 @@
+# Values for the AWS Neuron DRA driver (neuron-helm-chart). Only the DRA driver
+# is enabled here; the Neuron device plugin, scheduler extension and NPD are
+# delivered by the separate aws-neuron-device-plugin addon. The DRA driver and
+# the device plugin MUST NOT run on the same node, so the driver DaemonSet is
+# pinned to nodes labelled neuron.aws/driver=dra (the neuron-dra-static
+# NodePool).
+devicePlugin:
+  enabled: false
+npd:
+  enabled: false
+scheduler:
+  enabled: false
+draDriver:
+  enabled: true
+  nodeSelector:
+    neuron.aws/driver: dra

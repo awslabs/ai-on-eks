@@ -177,6 +177,16 @@ variable "aws_neuron_device_plugin_version" {
   type        = string
   default     = "1.10.0"
 }
+variable "enable_aws_neuron_dra_driver" {
+  description = "Enable the AWS Neuron DRA driver (Dynamic Resource Allocation). Requires Kubernetes >= 1.34 and the neuron-dra-static NodePool. Must not share nodes with the Neuron device plugin."
+  type        = bool
+  default     = false
+}
+variable "aws_neuron_dra_driver_version" {
+  description = "AWS Neuron DRA driver (neuron-helm-chart) chart version"
+  type        = string
+  default     = "1.11.2"
+}
 variable "enable_aws_neuron_monitor" {
   description = "Enable AWS Neuron Monitor"
   type        = bool
@@ -438,6 +448,12 @@ variable "nvidia_dra_driver_version" {
   description = "NVIDIA DRA Driver version"
   type        = string
   default     = "0.4.0"
+}
+
+variable "enable_nvidia_gpu_mng" {
+  description = "Create the NVIDIA GPU EKS managed node group (g6.4xlarge). Set false in regions/accounts without NVIDIA GPU capacity (e.g. Neuron-only clusters like ap-southeast-4)."
+  type        = bool
+  default     = true
 }
 
 variable "enable_nvidia_gpu_operator" {
@@ -844,5 +860,6 @@ variable "nodepools" {
     gpu                    = true
     neuron                 = true
     gpu-p6e-gb200-36xlarge = false
+    neuron-dra-static      = false
   }
 }

@@ -20,6 +20,12 @@ spec:
         npd:
           fullnameOverride: neuron-npd
           namespaceOverride: null
+        # Keep the device plugin off DRA nodes — the device plugin and the
+        # Neuron DRA driver must not manage the same node. The `neuron` NodePool
+        # carries this label; custom neuron NodePools must set it too.
+        devicePlugin:
+          nodeSelector:
+            neuron.aws/driver: device-plugin
 
   destination:
     server: https://kubernetes.default.svc
