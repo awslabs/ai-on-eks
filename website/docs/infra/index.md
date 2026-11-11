@@ -100,6 +100,8 @@ Each stack inherits the `base` stack's components. These components include:
 | `enable_aws_fsx_csi_driver`              | Enable the FSx device plugin                        | `false`                  |
 | `deploy_fsx_volume`                      | Deploy a simple FSx volume                          | `false`                  |
 | `fsx_pvc_namespace`                      | Namespace to provision the FSx PVC                  | `default`                |
+| `fsx_efa_enabled`                        | Enable EFA (RDMA) mode on the FSx volume (forces 1000 MB/s/TiB, adds a metadata config + EFA security-group rules and pins the EFA GPU NodePool to FSx's subnet for co-location; create-only/immutable) | `false`      |
+| `fsx_storage_capacity`                   | FSx storage capacity in GiB (`null` = 4800 with EFA, else 2400; larger EFA capacities add OSTs) | `null`                   |
 | `enable_amazon_prometheus`               | Enable Amazon Managed Prometheus                    | `false`                  |
 | `enable_amazon_emr`                      | Set up Amazon EMR                                   | `false`                  |
 | `enable_kube_prometheus_stack`           | Enable the Kube Prometheus addon                    | `false`                  |
@@ -123,6 +125,11 @@ Each stack inherits the `base` stack's components. These components include:
 | `enable_ingress_nginx`                   | Enable ingress-nginx addon                          | `true`                   |
 | `enable_cert_manager`                    | Enable Cert Manager                                 | `false`                  |
 | `enable_slurm_operator`                  | Enable the Slinky Slurm Operator (with Cert Manager)|  `false`                 |
+
+> **FSx for Lustre over EFA:** `fsx_efa_enabled` and `fsx_storage_capacity` enable EFA (RDMA)
+> model-weight loading from FSx. See the
+> [FSx for Lustre over EFA guide](../guidance/fsx-lustre-efa-on-eks.md) for the same-AZ + same-/16
+> requirement, GPU node placement, and how to verify EFA is engaged.
 
 ### JupyterHub
 

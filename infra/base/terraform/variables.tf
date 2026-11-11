@@ -212,6 +212,16 @@ variable "fsx_pvc_namespace" {
   type        = string
   default     = "default"
 }
+variable "fsx_efa_enabled" {
+  description = "Enable EFA (RDMA) mode on the example FSx for Lustre filesystem. Default off = behavior unchanged. When true, forces per_unit_storage_throughput=1000, adds a metadata_configuration, and adds self-referencing EFA security-group rules. EFA mode and the throughput tier are create-only (immutable). Only applies when deploy_fsx_volume = true."
+  type        = bool
+  default     = false
+}
+variable "fsx_storage_capacity" {
+  description = "Storage capacity (GiB) for the example FSx for Lustre filesystem. null = default (4800 when fsx_efa_enabled, else 2400). Larger EFA capacities add OSTs to parallelize model-weight loading (e.g. 19200 = 4 OSTs). Must be a valid PERSISTENT_2 capacity."
+  type        = number
+  default     = null
+}
 variable "enable_amazon_prometheus" {
   description = "Enable Amazon Prometheus"
   type        = bool

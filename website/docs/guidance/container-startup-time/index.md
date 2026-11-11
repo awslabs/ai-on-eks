@@ -46,6 +46,7 @@ In this section we will focus on the following solutions:
 
 - reducing the overall size of the image
 - making the container image pull process more efficient
+- accelerating model-artifact load from shared storage (FSx for Lustre over EFA)
 
 As we explore the solutions and their tradeoffs, we will refer to various layers and components that go into creating an AI/ML inference application container as depicted in the diagram in Figure 1.
 
