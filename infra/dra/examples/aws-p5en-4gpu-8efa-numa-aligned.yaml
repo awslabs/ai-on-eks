@@ -1,0 +1,36 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: aws-p5en-4gpu-8efa-numa-aligned
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu-a
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 2
+      - name: efa-a
+        exactly:
+          deviceClassName: efa.networking.k8s.aws
+          count: 4
+      - name: gpu-b
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 2
+      - name: efa-b
+        exactly:
+          deviceClassName: efa.networking.k8s.aws
+          count: 4
+      constraints:
+      # Each GPU pair shares a PCIe switch with its EFAs
+      - requests: ["gpu-a", "efa-a"]
+        matchAttribute: resource.kubernetes.io/pcieRoot
+      - requests: ["gpu-b", "efa-b"]
+        matchAttribute: resource.kubernetes.io/pcieRoot
+      # Both PCIe switches on the same NUMA node. NUMA is matched on EFAs via
+      # dra.net/numaNode, the only NUMA attribute published consistently;
+      # some NVIDIA DRA driver versions omit resource.kubernetes.io/numaNode.
+      # GPUs follow through pcieRoot.
+      - requests: ["efa-a", "efa-b"]
+        matchAttribute: dra.net/numaNode

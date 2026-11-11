@@ -1,0 +1,10 @@
+apiVersion: resource.k8s.io/v1
+kind: DeviceClass
+metadata:
+  name: efa.networking.k8s.aws
+spec:
+  selectors:
+  - cel:
+      expression: |
+        device.driver == "dra.net" &&
+        device.attributes["dra.net"].pciDevice == 'Elastic Fabric Adapter (EFA)'

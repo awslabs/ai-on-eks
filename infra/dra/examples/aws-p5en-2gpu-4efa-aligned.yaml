@@ -1,0 +1,19 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: aws-p5en-2gpu-4efa-aligned
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 2
+      - name: efa
+        exactly:
+          deviceClassName: efa.networking.k8s.aws
+          count: 4
+      constraints:
+      - requests: ["gpu", "efa"]
+        matchAttribute: resource.kubernetes.io/pcieRoot

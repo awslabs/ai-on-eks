@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-gpu-l40s-dynamic-cel
+spec:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  resourceClaims:
+    - name: gpu-0
+      resourceClaimTemplateName: aws-gpu-l40s-dynamic-cel
+    - name: gpu-1
+      resourceClaimTemplateName: aws-gpu-l40s-dynamic-cel
+    - name: gpu-2
+      resourceClaimTemplateName: aws-gpu-l40s-dynamic-cel
+    - name: gpu-3
+      resourceClaimTemplateName: aws-gpu-l40s-dynamic-cel
+    - name: efa-0
+      resourceClaimTemplateName: efa
+  containers:
+    - name: main
+      image: nvidia/cuda:13.0.2-devel-amzn2023
+      command: ["bash", "-c", "sleep infinity"]
+      resources:
+        claims:
+          - name: gpu-0
+          - name: gpu-1
+          - name: gpu-2
+          - name: gpu-3
+          - name: efa-0

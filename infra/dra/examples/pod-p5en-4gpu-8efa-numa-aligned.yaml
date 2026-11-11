@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-p5en-4gpu-8efa-numa-aligned
+spec:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  nodeSelector:
+    node.kubernetes.io/instance-type: p5en.48xlarge
+  resourceClaims:
+    - name: numa
+      resourceClaimTemplateName: aws-p5en-4gpu-8efa-numa-aligned
+  containers:
+    - name: main
+      image: nvidia/cuda:13.0.2-devel-amzn2023
+      command: ["bash", "-c", "sleep infinity"]
+      resources:
+        claims:
+          - name: numa

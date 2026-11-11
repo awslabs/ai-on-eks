@@ -9,6 +9,8 @@ resource "helm_release" "argocd" {
   version          = "8.6.4"
   namespace        = "argocd"
   create_namespace = true
+  atomic           = true
+  cleanup_on_fail  = true
 
   values = [
     <<-EOT
