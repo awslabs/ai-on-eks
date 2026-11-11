@@ -1,3 +1,9 @@
+clusterPolicy:
+  deployCR: ${enable_cluster_policy}
+
+gpuCluster:
+  deployCR: ${enable_gpu_cluster}
+
 # Node feature discovery
 nfd:
   enabled: true
@@ -80,12 +86,21 @@ devicePlugin:
       value: "true"
 
 # DCGM service (nv-hostengine)
+# EKS Auto Mode nodes already run nv-hostengine on localhost:5555
 dcgm:
-  enabled: true
+  enabled: ${!enable_eks_auto_mode}
 
 # DCGM exporter for monitoring
 dcgmExporter:
   enabled: ${enable_dcgm_exporter}
+  enablePodLabels: true
+  enablePodUID: true
+%{ if enable_eks_auto_mode ~}
+  hostNetwork: true
+  env:
+    - name: DCGM_REMOTE_HOSTENGINE_INFO
+      value: "localhost:5555"
+%{ endif ~}
   serviceMonitor:
     enabled: ${dcgm_exporter_service_monitor_enabled}
     interval: 15s

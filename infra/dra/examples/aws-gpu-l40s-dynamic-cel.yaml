@@ -1,0 +1,17 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: aws-gpu-l40s-dynamic-cel
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 1
+          selectors:
+          - cel:
+              expression: |
+                device.attributes["gpu.nvidia.com"].architecture == "Ada Lovelace" &&
+                device.attributes["gpu.nvidia.com"].productName.contains("NVIDIA L40S")

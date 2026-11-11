@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: aws-1gpu-4efa-aligned-dynamic-cel
+spec:
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+  resourceClaims:
+    - name: 1g4e-0
+      resourceClaimTemplateName: aws-1gpu-4efa-aligned-dynamic-cel
+    - name: 1g4e-1
+      resourceClaimTemplateName: aws-1gpu-4efa-aligned-dynamic-cel
+  containers:
+    - name: main
+      image: nvidia/cuda:13.0.2-devel-amzn2023
+      command: ["bash", "-c", "sleep infinity"]
+      resources:
+        claims:
+          - name: 1g4e-0
+          - name: 1g4e-1

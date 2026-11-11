@@ -1,0 +1,4 @@
+crdInstaller:
+  enabled: true
+webhookServerSecret:
+  enabled: false

@@ -37,6 +37,7 @@ terraform.rc
 # Locals
 kubeconfig*
 kube-config*
+.kubeconfig.yaml
 local_tf_state/
 .vscode
 .gitallowed

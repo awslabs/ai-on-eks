@@ -61,3 +61,7 @@ userData: |
   [settings.kernel.sysctl]
   "user.max_user_namespaces" = "${max_user_namespaces}"
 %{ endif ~}
+%{ if enable_nvidia_dra_driver ~}
+  [settings.kubelet-device-plugins.nvidia]
+  enabled = false
+%{ endif ~}

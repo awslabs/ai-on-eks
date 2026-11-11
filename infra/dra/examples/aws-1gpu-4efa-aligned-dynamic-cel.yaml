@@ -1,0 +1,24 @@
+apiVersion: resource.k8s.io/v1
+kind: ResourceClaimTemplate
+metadata:
+  name: aws-1gpu-4efa-aligned-dynamic-cel
+spec:
+  spec:
+    devices:
+      requests:
+      - name: gpu
+        exactly:
+          deviceClassName: gpu.nvidia.com
+          count: 1
+          selectors:
+          - cel:
+              expression: |
+                device.attributes["gpu.nvidia.com"].architecture == "Hopper" &&
+                device.attributes["gpu.nvidia.com"].productName.contains("H100")
+      - name: efa
+        exactly:
+          deviceClassName: efa.networking.k8s.aws
+          count: 4
+      constraints:
+      - requests: ["gpu", "efa"]
+        matchAttribute: resource.kubernetes.io/pcieRoot

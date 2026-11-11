@@ -8,9 +8,9 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/kubernetes-sigs/lws.git
+    repoURL: registry.k8s.io/lws/charts
+    chart: lws
     targetRevision: ${version}
-    path: config/default
   destination:
     server: https://kubernetes.default.svc
     namespace: lws-system
