@@ -1,0 +1,145 @@
+# Multi-node Llama-3.1-405B inference on EKS — vLLM (vLLM-OpenAI image) over LeaderWorkerSet + Ray,
+# loading weights from FSx for Lustre over EFA (RDMA). 2 nodes x 8 GPUs = TP8 x PP2.
+#
+# Apply with:  kubectl apply -f vllm-405b-lws-gpu-fsx.yaml
+# Requires the base to be deployed with the FSx-EFA options on (see infra wrapper blueprint.tfvars):
+#   deploy_fsx_volume=true, fsx_efa_enabled=true, FSx CSI driver, and an EFA GPU node pool.
+# Model weights must already be staged on the FSx filesystem at the model path below.
+#
+# IMAGE: build + push your own (base vllm/vllm-openai + Ray + Run:AI streamer) — see image/README.md,
+#        then replace <YOUR_ECR_IMAGE> below. The vLLM-OpenAI base runs inter-node NCCL on TCP
+#        (no aws-ofi-nccl); FSx weight-LOAD still rides EFA (a node/LNet property, not the image).
+#
+# STORAGE: mounts the base's static FSx PVC `fsx-static-pvc` (namespace must match fsx_pvc_namespace;
+#          default is "default"). No separate PV/PVC is created here.
+#
+# GOTCHAS baked in (see GOTCHAS.md):
+#   #1 VLLM_CACHE_ROOT = node-local /tmp (NOT the FSx mount) — vLLM hangs on a Lustre cache atomic-write.
+#   #2 karpenter.sh/do-not-disrupt — protects the group from consolidation when run under Karpenter.
+#   #3 NO hugepages-2Mi request — vllm-openai runs NCCL-on-TCP; hugepages aren't configured on al2023.
+#   #5 Service named off the vllm-* prefix (llm405b-leader) + VLLM_PORT — avoids the k8s VLLM_*_SERVICE env collision.
+apiVersion: leaderworkerset.x-k8s.io/v1
+kind: LeaderWorkerSet
+metadata:
+  name: vllm-405b
+  namespace: default
+spec:
+  replicas: 1
+  leaderWorkerTemplate:
+    size: 2                              # 1 leader + 1 worker = PP degree (nodes)
+    restartPolicy: RecreateGroupOnPodRestart
+    leaderTemplate:
+      metadata:
+        labels: { role: leader, app: vllm-405b }
+        annotations: { karpenter.sh/do-not-disrupt: "true" }   # GOTCHA #2
+      spec:
+        nodeSelector:
+          node.kubernetes.io/instance-type: p5.48xlarge
+        tolerations:
+          - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+        containers:
+          - name: vllm-leader
+            image: <YOUR_ECR_IMAGE>       # <-- replace: your built vllm-openai + Ray + Run:AI streamer image
+            securityContext:
+              privileged: true                    # EFA/RDMA + GPUDirect
+              capabilities: { add: ["IPC_LOCK"] }
+            command: ["/bin/bash","-lc"]
+            args:
+              - |
+                set -euo pipefail
+                ray start --head --port=6379 --num-gpus=8 \
+                  --dashboard-host=0.0.0.0 --dashboard-port=8265
+                echo "waiting for all 16 GPUs to register across the Ray cluster..."
+                until ray status 2>/dev/null | grep -qE "/16\.0 GPU"; do echo "  ray not full yet"; sleep 10; done
+                echo "Ray cluster ready — launching vLLM"
+                exec vllm serve /mnt/fsx/models/Llama-3.1-405B-Instruct \
+                  --served-model-name llama-3.1-405b \
+                  --tensor-parallel-size 8 --pipeline-parallel-size 2 \
+                  --distributed-executor-backend ray \
+                  --load-format runai_streamer \
+                  --model-loader-extra-config '{"concurrency":32,"memory_limit":10737418240}' \
+                  --gpu-memory-utilization 0.90 \
+                  --max-model-len 8192 \
+                  --host 0.0.0.0 --port 8000
+            env:
+              - { name: VLLM_CACHE_ROOT, value: "/tmp/vllm_cache" }   # GOTCHA #1 — node-local, NOT the FSx mount
+              - { name: VLLM_PORT, value: "29500" }                   # GOTCHA #5 — explicit internal port
+              - { name: FI_PROVIDER, value: "efa" }                   # harmless; NCCL still TCP (no aws-ofi-nccl)
+              - { name: FI_EFA_USE_DEVICE_RDMA, value: "1" }
+              - { name: FI_EFA_FORK_SAFE, value: "1" }
+              - { name: NCCL_DEBUG, value: "INFO" }
+              - { name: RAY_WORKER_REGISTER_TIMEOUT_SECONDS, value: "600" }
+              - { name: HF_HUB_OFFLINE, value: "1" }
+              - name: VLLM_HOST_IP
+                valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            ports:
+              - { containerPort: 8000, name: http }
+              - { containerPort: 8265, name: ray-dash }
+            resources:
+              limits:   { nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32, memory: 1024Gi }   # GOTCHA #3 — no hugepages-2Mi
+              requests: { nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32, memory: 1024Gi }
+            readinessProbe:
+              httpGet: { path: /health, port: 8000 }
+              initialDelaySeconds: 300            # weight load (runai_streamer) + graph capture
+              periodSeconds: 15
+              failureThreshold: 80
+            volumeMounts:
+              - { name: fsx, mountPath: /mnt/fsx }
+              - { name: shm, mountPath: /dev/shm }
+        volumes:
+          - name: fsx
+            persistentVolumeClaim: { claimName: fsx-static-pvc }   # base static FSx PVC
+          - name: shm
+            emptyDir: { medium: Memory, sizeLimit: 512Gi }
+    workerTemplate:
+      metadata:
+        labels: { role: worker, app: vllm-405b }
+        annotations: { karpenter.sh/do-not-disrupt: "true" }   # GOTCHA #2
+      spec:
+        nodeSelector:
+          node.kubernetes.io/instance-type: p5.48xlarge
+        tolerations:
+          - { key: nvidia.com/gpu, operator: Exists, effect: NoSchedule }
+        containers:
+          - name: vllm-worker
+            image: <YOUR_ECR_IMAGE>       # <-- same image as the leader
+            securityContext:
+              privileged: true
+              capabilities: { add: ["IPC_LOCK"] }
+            command: ["/bin/bash","-lc"]
+            args:
+              - |
+                set -euo pipefail
+                ray start --address=$(LWS_LEADER_ADDRESS):6379 --num-gpus=8 --block
+            env:
+              - { name: VLLM_CACHE_ROOT, value: "/tmp/vllm_cache" }   # GOTCHA #1
+              - { name: VLLM_PORT, value: "29500" }                   # GOTCHA #5
+              - { name: FI_PROVIDER, value: "efa" }
+              - { name: FI_EFA_USE_DEVICE_RDMA, value: "1" }
+              - { name: FI_EFA_FORK_SAFE, value: "1" }
+              - { name: NCCL_DEBUG, value: "INFO" }
+              - { name: HF_HUB_OFFLINE, value: "1" }
+              - name: VLLM_HOST_IP
+                valueFrom: { fieldRef: { fieldPath: status.podIP } }
+            resources:
+              limits:   { nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32, memory: 1024Gi }   # GOTCHA #3 — no hugepages-2Mi
+              requests: { nvidia.com/gpu: 8, vpc.amazonaws.com/efa: 32, memory: 1024Gi }
+            volumeMounts:
+              - { name: fsx, mountPath: /mnt/fsx }
+              - { name: shm, mountPath: /dev/shm }
+        volumes:
+          - name: fsx
+            persistentVolumeClaim: { claimName: fsx-static-pvc }   # base static FSx PVC
+          - name: shm
+            emptyDir: { medium: Memory, sizeLimit: 512Gi }
+---
+# ClusterIP service — named OFF the vllm-* prefix (GOTCHA #5) so k8s does not inject VLLM_*_SERVICE env.
+apiVersion: v1
+kind: Service
+metadata:
+  name: llm405b-leader
+  namespace: default
+spec:
+  selector: { role: leader, app: vllm-405b }
+  ports:
+    - { name: http, port: 8000, targetPort: 8000 }
