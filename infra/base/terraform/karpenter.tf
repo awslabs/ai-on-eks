@@ -60,6 +60,9 @@ resource "helm_release" "karpenter" {
         spotToSpotConsolidation: true
         staticCapacity: true
         capacityBuffer: true
+      awsFeatureGates:
+        draNVIDIAGPU: ${var.enable_nvidia_dra_driver}
+        draEFA: ${var.enable_aws_dranet}
     tolerations:
       - key: CriticalAddonsOnly
         operator: Exists

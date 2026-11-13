@@ -147,15 +147,24 @@ terraform_destroy() {
 
   echo "Destroying Terraform $DEPLOYMENT_NAME"
 
+  # Use a dedicated kubeconfig so kubectl can only reach this deployment's
+  # cluster, regardless of the user's current context.
+  local kubectl_configured=false
   TMPFILE=$(mktemp)
-  if terraform output -raw configure_kubectl > "$TMPFILE" 2>/dev/null && [[ ! $(cat "$TMPFILE") == *"No outputs found"* ]]; then
-    source "$TMPFILE"
-    kubectl delete rayjob -A --all || true
-    kubectl delete rayservice -A --all || true
+  TMP_KUBECONFIG=$(mktemp)
+  trap 'rm -f "$TMPFILE" "$TMP_KUBECONFIG"' EXIT
+  local kctl=(kubectl --kubeconfig "$TMP_KUBECONFIG")
+
+  if terraform output -raw configure_kubectl > "$TMPFILE" 2>/dev/null \
+    && [[ ! $(cat "$TMPFILE") == *"No outputs found"* ]] \
+    && KUBECONFIG="$TMP_KUBECONFIG" bash "$TMPFILE"; then
+    kubectl_configured=true
+    "${kctl[@]}" delete rayjob -A --all || true
+    "${kctl[@]}" delete rayservice -A --all || true
     # Remove PDBs to unblock nodepools draining & deletion
-    kubectl delete pdb -A --all || true
+    "${kctl[@]}" delete pdb -A --all || true
   else
-    echo "No outputs found, skipping kubectl delete"
+    echo "Could not configure kubectl for this cluster, skipping kubectl delete"
   fi
 
   targets=($(terraform state list | grep "kubectl_manifest\.\|helm_release.argocd" | grep -v "kubectl_manifest.aws_load_balancer_controller" || true))
@@ -176,12 +185,12 @@ terraform_destroy() {
     fi
   fi
 
-  if [[ ! $(cat $TMPFILE) == *"No outputs found"* ]]; then
+  if [[ "$kubectl_configured" == "true" ]]; then
     # Delete all nodepools (covers both Karpenter and any remaining Auto Mode pools)
     echo "Deleting all nodepools..."
-    kubectl delete nodepool --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No nodepools found or delete failed"
-    kubectl delete nodeclass --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No nodeclasses found or delete failed"
-    kubectl delete ec2nodeclass --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No ec2nodeclasses found or delete failed"
+    "${kctl[@]}" delete nodepool --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No nodepools found or delete failed"
+    "${kctl[@]}" delete nodeclass --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No nodeclasses found or delete failed"
+    "${kctl[@]}" delete ec2nodeclass --all --wait=true --timeout=300s 2>/dev/null || echo "WARNING: No ec2nodeclasses found or delete failed"
     echo "Node drain complete"
   fi
 
@@ -194,7 +203,8 @@ terraform_destroy() {
     exit 1
   fi
 
-  rm -f "$TMPFILE"
+  rm -f "$TMPFILE" "$TMP_KUBECONFIG"
+  trap - EXIT
   echo "Cleaning up PVCs and EBS volumes for deployment: $DEPLOYMENT_NAME"
   # Get the list of EBS volumes with the Blueprint tag
   VOLUME_IDS=$(aws ec2 describe-volumes --region "$AWS_REGION" --filters "Name=tag:kubernetes.io/cluster/${DEPLOYMENT_NAME},Values=owned" --query "Volumes[].VolumeId" --output text | tr '\t' '\n')

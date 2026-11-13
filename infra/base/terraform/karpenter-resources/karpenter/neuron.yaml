@@ -7,13 +7,14 @@ spec:
   disruption:
     budgets:
       - nodes: 10%
-    consolidateAfter: 300s
+    consolidateAfter: 3600s
     consolidationPolicy: WhenEmptyOrUnderutilized
   template:
     metadata:
       labels:
         ai-on-eks.io/amiFamily: ${ami_family}
         accelerator: neuron
+        neuron.aws/driver: device-plugin
     spec:
       expireAfter: 720h
       nodeClassRef:

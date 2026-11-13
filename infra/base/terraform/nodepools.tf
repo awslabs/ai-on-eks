@@ -1,8 +1,10 @@
 locals {
   default_nodepools = {
-    gpu                    = true
-    neuron                 = true
-    gpu-p6e-gb200-36xlarge = false
+    gpu                           = true
+    neuron                        = true
+    gpu-p6e-gb200-36xlarge        = false
+    gpu-p6e-gb200-36xlarge-static = false
+    neuron-dra-static             = false
   }
 
   nodepools     = merge(local.default_nodepools, var.nodepools)
@@ -20,6 +22,7 @@ locals {
       data_disk_snapshot_id               = var.bottlerocket_data_disk_snapshot_id
       max_user_namespaces                 = var.max_user_namespaces
       capacity_reservation_tags           = jsonencode(var.capacity_reservation_tags)
+      enable_nvidia_dra_driver            = var.enable_nvidia_dra_driver
     }
   )
 }
@@ -79,6 +82,7 @@ resource "kubectl_manifest" "nodepools_manifests" {
   wait      = true
 
   depends_on = [
-    terraform_data.karpenter
+    terraform_data.karpenter,
+    aws_eks_access_policy_association.automode_node
   ]
 }

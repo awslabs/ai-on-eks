@@ -13,13 +13,7 @@ spec:
     targetRevision: ${version}
     helm:
       values: |
-        scheduler:
-          enabled: true
-          customScheduler:
-            fullnameOverride: neuron-scheduler
-        npd:
-          fullnameOverride: neuron-npd
-          namespaceOverride: null
+        ${user_values_yaml}
 
   destination:
     server: https://kubernetes.default.svc

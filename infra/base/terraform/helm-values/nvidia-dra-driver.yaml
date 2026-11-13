@@ -1,3 +1,6 @@
+# kubectl api-resources | grep resource.k8s.io
+resourceApiVersion: "resource.k8s.io/v1"
+
 gpuResourcesEnabledOverride: true
 
 controller:
@@ -26,7 +29,3 @@ kubeletPlugin:
             operator: NotIn
             values:
             - "auto"
-          - key: feature.node.kubernetes.io/system-os_release.ID
-            operator: NotIn
-            values:
-            - "bottlerocket"

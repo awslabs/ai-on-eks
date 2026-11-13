@@ -11,8 +11,19 @@ serviceMonitor:
   additionalLabels:
     release: kube-prometheus-stack
 
+%{ if enable_eks_auto_mode ~}
+# EKS Auto Mode nodes already run nv-hostengine on localhost:5555
+hostNetwork: true
+extraEnv:
+  - name: DCGM_REMOTE_HOSTENGINE_INFO
+    value: "localhost:5555"
+
+nodeSelector:
+  eks.amazonaws.com/instance-gpu-manufacturer: nvidia
+%{ else ~}
 nodeSelector:
   karpenter.k8s.aws/instance-gpu-manufacturer: nvidia
+%{ endif ~}
 
 tolerations:
   - key: "nvidia.com/gpu"
