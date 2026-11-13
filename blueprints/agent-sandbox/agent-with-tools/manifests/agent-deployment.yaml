@@ -1,0 +1,178 @@
+# Agent process — Deployment + Service + RBAC.
+#
+# The agent runs unsandboxed as a normal pod. It talks to Bedrock for
+# reasoning and uses kubectl exec to dispatch tool calls into sandbox
+# pods. IRSA provides Bedrock credentials; a ClusterRole binding gives
+# it pod exec + sandboxclaim create permissions in the agent-sandboxes
+# namespace.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agent-orchestrator-sa
+  namespace: agent-sandboxes
+  # IRSA annotation added at install time:
+  #   eks.amazonaws.com/role-arn: <BEDROCK_ROLE_ARN>
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-orchestrator-role
+  namespace: agent-sandboxes
+rules:
+  # Create/get/delete SandboxClaims for tool invocations
+  - apiGroups: ["extensions.agents.x-k8s.io"]
+    resources: ["sandboxclaims"]
+    verbs: ["create", "get", "list", "delete"]
+  # Exec into sandbox pods for code execution
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  # Get pod status to check readiness
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-orchestrator-binding
+  namespace: agent-sandboxes
+subjects:
+  - kind: ServiceAccount
+    name: agent-orchestrator-sa
+    namespace: agent-sandboxes
+roleRef:
+  kind: Role
+  name: agent-orchestrator-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-server-code
+  namespace: agent-sandboxes
+  labels:
+    agent-sandbox/role: agent-with-tools
+data:
+  # Populated by install.sh from the agent/ directory
+  agent_server.py: "# populated by install.sh"
+  tools.py: "# populated by install.sh"
+  requirements.txt: "# populated by install.sh"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-orchestrator
+  namespace: agent-sandboxes
+  labels:
+    app: agent-orchestrator
+    agent-sandbox/role: agent-with-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agent-orchestrator
+  template:
+    metadata:
+      labels:
+        app: agent-orchestrator
+        egress-tier: agent
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "false"
+        instrumentation.opentelemetry.io/inject-java: "false"
+        instrumentation.opentelemetry.io/inject-nodejs: "false"
+        instrumentation.opentelemetry.io/inject-dotnet: "false"
+    spec:
+      serviceAccountName: agent-orchestrator-sa
+      containers:
+        - name: agent
+          image: python:3.12-slim
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -c
+            - |
+              cp /config/*.py /workspace/
+              cp /config/requirements.txt /workspace/
+              # Download kubectl (best-effort — tool calls degrade gracefully without it)
+              python /workspace/tools.py --download-kubectl || echo "WARN: kubectl download failed, tool calls will not work"
+              export PATH="/workspace:$PATH"
+              pip install --no-cache-dir --disable-pip-version-check --user \
+                -r /workspace/requirements.txt
+              cd /workspace
+              exec python agent_server.py
+          env:
+            - name: AWS_REGION
+              value: __AWS_REGION__
+            - name: BEDROCK_MODEL_ID
+              value: __BEDROCK_MODEL_ID__
+            - name: SANDBOX_NAMESPACE
+              value: agent-sandboxes
+            - name: SANDBOX_TIER
+              value: __SANDBOX_TIER__
+            - name: AGENT_PORT
+              value: "8000"
+            - name: HOME
+              value: /workspace
+          ports:
+            - containerPort: 8000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+            - name: agent-code
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: agent-code
+          configMap:
+            name: agent-server-code
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-orchestrator
+  namespace: agent-sandboxes
+  labels:
+    app: agent-orchestrator
+spec:
+  selector:
+    app: agent-orchestrator
+  ports:
+    - port: 8000
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  type: ClusterIP
