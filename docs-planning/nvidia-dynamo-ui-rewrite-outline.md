@@ -109,53 +109,72 @@ UI:
 
 ---
 
-## 5. Production-ready blueprints by model size and instance 🧾
+## 5. Serving patterns: aggregated and disaggregated 🧾
 
-- 5.1 Blueprint picker, one row per manifest **[ERZ]**:
+- 5.1 **Choosing a serving mode**
+  - Each mode defined in two sentences, with a side-by-side topology diagram.
+  - Decision table: traffic or operational signal → recommended mode.
+  - Tip `Admonition`: "Start with aggregated. Move to disaggregated when profiling shows a prefill bottleneck."
+- 5.2 **Aggregated serving**
+  - 5.2.1 What it is: one worker handles prefill and decode; frontend plus N identical workers.
+  - 5.2.2 When to use it: the default, and simpler to run.
+  - 5.2.3 What you need: the base cluster from earlier sections, with no extra system configuration.
+  - 5.2.4 Example recipes **[ERZ]**:
 
-  | Size | Model | Instance | Manifests | Mode |
-  |---|---|---|---|---|
-  | Small | Nemotron-3.5-Bolt-E4B | g6e | (upstream only, see open items) | agg |
-  | Medium | Qwen3-32B | p5.48xlarge H100, TP4 | `h100-agg`, `h100-agg-mx-s3`, `h100-disagg` | agg + disagg |
-  | Medium | GLM-5.3-Flash | g7e.48xlarge, TP8 | `g7e-agg-mx-s3`, `g7e-agg-mx-s3-local` | agg |
-  | Large | GLM-5.3 | p6-b300.48xlarge, TP8 | `b300-agg-mx-s3`, `b300-agg-mx-s3-local` | agg |
-  | Large | Nemotron-3-Ultra 550B | 1P + 1D × p6-b300, TP8 each | `b300-disagg-mx-s3` | disagg |
+    | Size | Model | Instance | Manifests |
+    |---|---|---|---|
+    | Small | Nemotron-3.5-Bolt-E4B | g6e | (upstream only, see open items) |
+    | Medium | Qwen3-32B | p5.48xlarge H100, TP4 | `h100-agg`, `h100-agg-mx-s3` |
+    | Medium | GLM-5.3-Flash | g7e.48xlarge, TP8 | `g7e-agg-mx-s3`, `g7e-agg-mx-s3-local` |
+    | Large | GLM-5.3 | p6-b300.48xlarge, TP8 | `b300-agg-mx-s3`, `b300-agg-mx-s3-local` |
 
-  - **[NEW][ERZ]** Image and version matrix:
+    - Callout on reading manifest names: instance, topology, `mx` (ModelExpress), source (`s3`, `s3-local`, or PVC by default).
+  - 5.2.5 Walkthrough: Qwen3-32B `h100-agg-mx-s3`.
+    - Tabs: Deploy · Manifest · Smoke test · Scale out (ModelExpress P2P) · Remove.
+    - **[ERZ]** Extra tab for GLM-5.3: watch source vs target worker logs using the `grove.io/podclique-pod-index` selectors.
+- 5.3 **Disaggregated serving**
+  - 5.3.1 What it is: separate prefill and decode workers, with the KV cache transferred between them over NIXL.
+  - 5.3.2 When to use it: long prompts, prefill-heavy traffic, scaling prefill and decode independently.
+  - 5.3.3 **What changes at the system level**, as a table of deltas from aggregated:
+
+    | Area | Change |
+    |---|---|
+    | Networking | EFA-enabled nodes; 16 EFA interfaces per worker on p6-b300 |
+    | Placement | Workers in the same AZ (required zone podAffinity) |
+    | KV transfer | `NixlConnector` with the LIBFABRIC backend |
+    | Runtime image | EFA build (`vllm-runtime:1.6.0-efa`) |
+    | Routing | KV events from the prefill worker |
+    | Sizing | Prefill vs decode worker ratio |
+
+  - 5.3.4 Example recipes **[ERZ]**:
+
+    | Size | Model | Instance | Manifest | Storage |
+    |---|---|---|---|---|
+    | Medium | Qwen3-32B | p5.48xlarge H100, TP4 | `h100-disagg` | EFS PVC |
+    | Large | Nemotron-3-Ultra 550B | 1P + 1D × p6-b300, TP8 each | `b300-disagg-mx-s3` | S3 + ModelExpress |
+
+  - 5.3.5 Walkthrough 1, the delta from aggregated: Qwen3-32B `h100-disagg`, the same model as 5.2.5.
+  - 5.3.6 Walkthrough 2, production scale **[ERZ]**: Nemotron-3-Ultra `b300-disagg-mx-s3`.
+    - 1M context, FP8 KV cache, 8 GPUs + 16 EFA per worker.
+    - Tabs for both walkthroughs: Deploy · Manifest · Verify KV transfer · Smoke test · Remove.
+- 5.4 **Common to both modes**
+  - 5.4.1 **[NEW][ERZ]** Reasoning and tool-call parsers per model (`qwen3_coder`, `nemotron_v3`, `glm47`, `glm45`), plus a tool-calling smoke-test tab.
+  - 5.4.2 **[NEW][ERZ]** Production settings checklist:
+    - Frontend and ModelExpress on on-demand capacity
+    - `IPC_LOCK`
+    - `sharedMemorySize` of 50–100 Gi
+    - `startupProbe` `failureThreshold: 540` (~90 min) and `VLLM_ENGINE_READY_TIMEOUT_S=5400`, to set expectations for large-model startup
+  - 5.4.3 **[NEW][ERZ]** Image and version matrix:
     - Frontend: `dynamo-frontend:1.6.0`
     - Nemotron worker: `vllm-runtime:1.6.0-efa`
     - `modelexpress-server:0.7.0`
     - GLM recipes: custom `${IMAGE}`, plus `runtimeVersionOverride: 1.5.1`
-- 5.2 How to read manifest names: instance, topology, `mx` (ModelExpress), source (`s3`, `s3-local`, or PVC by default).
-- 5.3 **Aggregated serving**
-  - When to use it: the default, and simpler to run.
-  - Walkthrough: Qwen3-32B `h100-agg-mx-s3`.
-  - **[ERZ]** Extra tab for GLM-5.3: watch source vs target worker logs using the `grove.io/podclique-pod-index` selectors.
-  - Tabs: Deploy · Manifest · Smoke test · Scale out (ModelExpress P2P) · Remove.
-- 5.4 **Disaggregated serving**
-  - When to use it: long prompts, prefill-heavy traffic, scaling prefill and decode independently.
-  - Requirements: EFA, workers in the same AZ (required zone podAffinity), NIXL with LIBFABRIC, sizing prefill vs decode.
-  - **[ERZ]** Main walkthrough: Nemotron-3-Ultra `b300-disagg-mx-s3`:
-    - 1M context, FP8 KV cache
-    - `NixlConnector` (LIBFABRIC)
-    - KV events from the prefill worker
-    - 8 GPUs + 16 EFA per worker
-  - Smaller alternative: Qwen3-32B `h100-disagg` (EFS PVC).
-  - Tabs: Deploy · Manifest · Verify KV transfer · Smoke test · Remove.
-- 5.5 **[NEW][ERZ]** Reasoning and tool-call parsers per model (`qwen3_coder`, `nemotron_v3`, `glm47`, `glm45`), plus a tool-calling smoke-test tab.
-- 5.6 **[NEW][ERZ]** Production settings checklist:
-  - Frontend and ModelExpress on on-demand capacity
-  - Workers required to share a zone
-  - `IPC_LOCK`
-  - `sharedMemorySize` of 50–100 Gi
-  - `startupProbe` `failureThreshold: 540` (~90 min) and `VLLM_ENGINE_READY_TIMEOUT_S=5400`, to set expectations for large-model startup
-- 5.7 Links to the per-model recipe READMEs.
+  - 5.4.4 Links to the per-model recipe READMEs.
 
 UI:
-- 5.1 is grouped into `Tabs` (Small / Medium / Large).
-- 5.3 and 5.4 use the same `Tabs` layout so they're easy to compare.
-- A tip `Admonition` at the top of 5.4: "Start with aggregated. Move to disaggregated when profiling shows a prefill bottleneck."
-- 5.6 goes in a `<details>` checklist.
+- 5.2 and 5.3 mirror each other (what it is, when to use it, requirements, recipes, walkthrough) and use the same `Tabs` layout so they're easy to compare.
+- The tip `Admonition` sits in 5.1 and is repeated at the top of 5.3.
+- 5.4.2 goes in a `<details>` checklist.
 
 ---
 
