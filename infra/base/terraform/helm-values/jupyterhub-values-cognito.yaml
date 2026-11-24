@@ -87,15 +87,11 @@ singleuser:
         image:
           display_name: "Image"
           choices:
-            pyspark350:
-              display_name: "PySpark 3.5.0 + Python 3.11"
+            pyspark430:
+              display_name: "PySpark 4.3.0"
               default: true
               kubespawner_override:
-                image: jupyter/pyspark-notebook:spark-3.5.0
-            pyspark341:
-              display_name: "PySpark 3.4.1 + Python 3.11"
-              kubespawner_override:
-                image: jupyter/pyspark-notebook:spark-3.4.1
+                image: quay.io/jupyter/pyspark-notebook:2026-11-23
         cpu_guarantee: 2
         mem_guarantee: 8G
         cpu_limit: 4
