@@ -1,0 +1,33 @@
+# Rendered by scripts/create-fsx-storage.sh (envsubst). Do not apply without substituting the variables.
+# Dynamic provisioning with the FSx CSI driver:
+# https://github.com/kubernetes-sigs/aws-fsx-csi-driver/tree/master/examples/kubernetes/efa
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ${STORAGE_NAME}
+provisioner: fsx.csi.aws.com
+parameters:
+  subnetId: ${SUBNET_ID}
+  securityGroupIds: ${SG_ID}
+  deploymentType: PERSISTENT_2
+  perUnitStorageThroughput: "${THROUGHPUT}"
+  metadataConfigurationMode: AUTOMATIC
+  efaEnabled: "true"
+  fileSystemTypeVersion: "2.15"
+  automaticBackupRetentionDays: "0"
+  extraTags: "Name=${CLUSTER_NAME}-${STORAGE_NAME}"
+reclaimPolicy: ${RECLAIM_POLICY}
+volumeBindingMode: Immediate
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ${STORAGE_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ${STORAGE_NAME}
+  resources:
+    requests:
+      storage: ${CAPACITY_GIB}Gi

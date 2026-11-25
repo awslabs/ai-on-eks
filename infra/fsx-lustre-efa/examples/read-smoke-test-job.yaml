@@ -1,0 +1,61 @@
+# Smoke test: writes and reads files on the FSx PVC from a pod on a node in the fsx-efa node pool.
+# It checks that the mount works and gives a rough read rate. It is NOT a benchmark: use a purpose
+# built tool and your own model files for performance numbers.
+#
+# AZ=us-west-2a STORAGE_NAME=fsx-lustre-efa-us-west-2a NAMESPACE=default envsubst '${AZ} ${STORAGE_NAME} ${NAMESPACE}' < read-smoke-test-job.yaml | kubectl apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fsx-efa-smoke-test
+  namespace: ${NAMESPACE}
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        workload-type: fsx-efa
+        topology.kubernetes.io/zone: ${AZ}
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: test
+          image: public.ecr.aws/amazonlinux/amazonlinux:2023
+          env:
+            - name: FILES
+              value: "16"
+            - name: SIZE_MIB
+              value: "4096"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              dir=/data/smoke-test
+              mkdir -p "$dir"
+              i=1
+              while [ "$i" -le "$FILES" ]; do
+                dd if=/dev/zero of="$dir/f$i" bs=16M count=$((SIZE_MIB / 16)) oflag=direct status=none &
+                i=$((i + 1))
+              done
+              wait
+              start=$(date +%s)
+              i=1
+              while [ "$i" -le "$FILES" ]; do
+                dd if="$dir/f$i" of=/dev/null bs=16M iflag=direct status=none &
+                i=$((i + 1))
+              done
+              wait
+              end=$(date +%s)
+              secs=$((end - start))
+              [ "$secs" -gt 0 ] || secs=1
+              echo "read $((FILES * SIZE_MIB)) MiB with $FILES parallel readers in ${secs}s: $((FILES * SIZE_MIB / secs)) MiB/s"
+              rm -rf "$dir"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ${STORAGE_NAME}
