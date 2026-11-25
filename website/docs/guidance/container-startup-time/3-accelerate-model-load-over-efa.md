@@ -155,6 +155,9 @@ With `PERSISTENT_2` and EFA, storage per file server depends on the throughput t
 [file system documentation](https://docs.aws.amazon.com/fsx/latest/LustreGuide/using-fsx-lustre.html)). Capacity
 therefore affects both cost and how many servers your data and throughput are spread across.
 
+A runnable reference that implements this pattern (node pools, security group, helper script) is in the
+[`infra/fsx-lustre-efa`](https://github.com/awslabs/ai-on-eks/tree/main/infra/fsx-lustre-efa) blueprint.
+
 ## Prepare the nodes
 
 The node must have the Lustre client with EFA support configured before a pod can mount the file system over EFA.

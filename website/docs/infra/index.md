@@ -38,6 +38,7 @@ Infrastructure solutions optimized for AI/ML model training workloads:
 Infrastructure solutions optimized for AI/ML model inference workloads:
 
 - **[Inference-Ready Cluster](./inference/inference-ready-cluster.md)** - Pre-configured EKS cluster for inference workloads
+- **[FSx for Lustre over EFA](./inference/fsx-lustre-efa.md)** - GPU nodes that mount FSx for Lustre over EFA, with the file system created from Kubernetes
 - **[Nvidia NIM on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-nim-llama3.md)** - Nvidia NIM deployment sample
 - **[Nvidia Dynamo on EKS](../blueprints/inference/framework-guides/GPUs/nvidia-dynamo.md)** - Nvidia Dyanmo deployment sample
 
