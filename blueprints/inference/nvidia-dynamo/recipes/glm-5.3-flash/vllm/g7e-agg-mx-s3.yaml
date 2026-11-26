@@ -48,7 +48,7 @@ spec:
                     topologyKey: topology.kubernetes.io/zone
           containers:
             - name: main
-              image: ${IMAGE}
+              image: nvcr.io/nvidia/ai-dynamo/dynamo-frontend:1.7.0
               resources:
                 requests:
                   cpu: "8"
@@ -90,7 +90,7 @@ spec:
                     topologyKey: topology.kubernetes.io/zone
           containers:
             - name: main
-              image: nvcr.io/nvidia/ai-dynamo/modelexpress-server:0.7.0
+              image: nvcr.io/nvidia/ai-dynamo/modelexpress-server:0.8.0
               envFrom:
               - secretRef:
                   name: hf-token-secret
@@ -154,7 +154,7 @@ spec:
                   topologyKey: topology.kubernetes.io/zone
           containers:
             - name: main
-              image: ${IMAGE}
+              image: nvcr.io/nvidia/ai-dynamo/vllm-runtime:1.7.0-efa
               env:
                 - name: MODEL_NAME
                   value: "zai-org/GLM-5.3-Flash"

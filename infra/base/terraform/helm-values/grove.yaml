@@ -1,4 +1,4 @@
 crdInstaller:
-  enabled: true
+  upgradeCRDs: true
 webhookServerSecret:
   enabled: false

@@ -64,7 +64,7 @@ locals {
             ]
           },
           "nodeAgent" : var.enable_nvidia_gpu_operator ? {
-            "dcgmAddress" : "nvidia-dcgm.gpu-operator.svc.cluster.local:5555",
+            "dcgmAddress" : "${var.enable_nvidia_dra_driver && !var.enable_eks_auto_mode ? "nvidia-dcgm-dra" : "nvidia-dcgm"}.gpu-operator.svc.cluster.local:5555",
             "dnsPolicy" : "ClusterFirstWithHostNet"
           } : {}
         })
@@ -329,7 +329,7 @@ module "eks" {
           "nvidia.com/gpu.present"        = "true"
           "accelerator"                   = "nvidia"
           "nvidia.com/gpu.product"        = "A100-SXM4-80GB"
-          "nvidia.com/mig.config"         = "p4de-half-balanced" # References GPU Operator embedded MIG profile
+          "nvidia.com/mig.config"         = "all-balanced"
           "node-type"                     = "p4de"
           "vpc.amazonaws.com/efa.present" = "true"
           "amiFamily"                     = "al2023"

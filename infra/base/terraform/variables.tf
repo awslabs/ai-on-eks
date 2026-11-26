@@ -688,7 +688,7 @@ variable "enable_dynamo_platform" {
 variable "dynamo_platform_version" {
   description = "NVIDIA Dynamo Platform version"
   type        = string
-  default     = "1.6.1"
+  default     = "1.7.0"
 }
 variable "dynamo_platform_namespace" {
   description = "Namespace for NVIDIA Dynamo Platform"
@@ -735,7 +735,7 @@ variable "ami_family" {
 variable "karpenter_version" {
   description = "Karpenter version"
   type        = string
-  default     = "1.15.0"
+  default     = "1.15.3"
 }
 
 # S3 Model Storage Variables
@@ -880,7 +880,7 @@ variable "enable_kai_scheduler" {
 variable "kai_scheduler_version" {
   description = "KAI Scheduler Helm chart version (OCI chart at ghcr.io/kai-scheduler/kai-scheduler)"
   type        = string
-  default     = "0.18.7"
+  default     = "0.18.9"
 }
 
 # Grove (gang scheduling operator, GitOps mode via ArgoCD)
@@ -893,5 +893,5 @@ variable "enable_grove" {
 variable "grove_version" {
   description = "Grove Helm chart version (OCI chart at ghcr.io/ai-dynamo/grove/grove-charts; the v prefix is added in the ArgoCD Application manifest)"
   type        = string
-  default     = "0.1.0-alpha.17"
+  default     = "0.2.1-beta1"
 }

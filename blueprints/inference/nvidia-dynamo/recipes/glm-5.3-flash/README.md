@@ -46,8 +46,7 @@ EOF
 ## Deploy Model - vLLM
 
 ```bash
-export IMAGE="public.ecr.aws/ai-on-eks/ai-dynamo/vllm-runtime:1.7.0-27f6052cd5-mx0.8.0-6b7d4188-efa"
-envsubst '${IMAGE} ${S3_BUCKET} ${INFERENCE_SA}' < vllm/g7e-agg-mx-s3.yaml | kubectl apply -n dynamo-system -f -
+envsubst '${S3_BUCKET} ${INFERENCE_SA}' < vllm/g7e-agg-mx-s3.yaml | kubectl apply -n dynamo-system -f -
 
 # Watch all logs
 kubectl -n dynamo-system logs -l nvidia.com/dynamo-graph-deployment-name=glm53f-g7e-agg-mx-s3-vllm --all-containers=true --max-log-requests=20 --prefix=true --timestamps -f
@@ -173,5 +172,5 @@ Once both workers are Ready, the Frontend routes requests across them, so you ca
 ## Cleanup
 
 ```bash
-envsubst '${IMAGE} ${S3_BUCKET} ${INFERENCE_SA}' < vllm/g7e-agg-mx-s3.yaml | kubectl delete -n dynamo-system -f -
+envsubst '${S3_BUCKET} ${INFERENCE_SA}' < vllm/g7e-agg-mx-s3.yaml | kubectl delete -n dynamo-system -f -
 ```
