@@ -1,0 +1,113 @@
+# GPU nodes that can mount FSx for Lustre over EFA.
+#
+# One NodePool + EC2NodeClass per x86 EFA-capable P-family instance type. The EC2NodeClass is inline
+# (not the shared ec2nodeclass template variable) because these nodes need custom userData that installs and
+# configures the Lustre client for EFA.
+#
+# Availability Zone: the pool is not pinned to an AZ or subnet. Select the AZ in the workload with
+# a topology.kubernetes.io/zone nodeSelector, and create the FSx file system in the secondary
+# subnet of that same AZ (see scripts/create-fsx-storage.sh). Nodes use the same subnets, so the
+# client and file system share the AZ and the /16 CIDR range that EFA requires.
+#
+# Capacity types match the base GPU pools (reserved, spot, on-demand); Karpenter picks the cheapest that is
+# available. Remove spot below for workloads that cannot tolerate interruption.
+#
+# p6e-gb200.36xlarge is excluded: it is arm64 and this blueprint has not been validated on it.
+%{ for instance_type, network_interfaces_yaml in jsondecode(efa_network_interfaces) ~}
+%{ if instance_type != "p6e-gb200.36xlarge" ~}
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: fsx-efa-${replace(instance_type, ".", "-")}
+spec:
+  disruption:
+    budgets:
+      - nodes: 10%
+    consolidateAfter: 3600s
+    consolidationPolicy: WhenEmptyOrUnderutilized
+  template:
+    metadata:
+      labels:
+        ai-on-eks.io/amiFamily: ${ami_family}
+        accelerator: nvidia
+        workload-type: fsx-efa
+    spec:
+      expireAfter: 720h
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: fsx-efa-${replace(instance_type, ".", "-")}
+      requirements:
+        - key: node.kubernetes.io/instance-type
+          operator: In
+          values: ["${instance_type}"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values:
+            - reserved
+            - spot
+            - on-demand
+      taints:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+      terminationGracePeriod: 24h
+---
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: fsx-efa-${replace(instance_type, ".", "-")}
+spec:
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: ${node_iam_role}
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+        Name: "${cluster_name}-private-secondary*" # secondary CIDR subnets, one per AZ
+  securityGroupSelectorTerms:
+    # Cluster security group. It carries the self-referencing all-traffic rules that EFA requires.
+    # The file system uses the same group (see scripts/create-fsx-storage.sh).
+    - tags:
+        karpenter.sh/discovery: "${cluster_name}"
+  capacityReservationSelectorTerms:
+    - tags:
+%{ for tag_key, tag_value in jsondecode(capacity_reservation_tags) ~}
+        ${tag_key}: "${tag_value}"
+%{ endfor ~}
+  instanceStorePolicy: RAID0
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 300Gi
+        volumeType: gp3
+        encrypted: true
+  # Installs the Lustre userspace tools and configures the Lustre client for EFA.
+  # The EKS-optimized AL2023 AMI already has the EFA driver and the Lustre and EFA kernel modules, so the
+  # AWS installation script (and its EFA option) is not needed. Without this bootstrap the file system still
+  # mounts, but only over TCP. The configuration script is from the FSx for Lustre documentation:
+  # https://docs.aws.amazon.com/fsx/latest/LustreGuide/configure-efa-clients.html
+  # It is downloaded at node boot, which adds start-up time and a runtime dependency. For production,
+  # bake both steps into your node image instead.
+  # If a step fails the node still joins the cluster, and the volume mounts over TCP only. Verify every
+  # node (see the README) and check /var/log/fsx-efa-client-setup.log.
+  userData: |
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="//"
+
+    --//
+    Content-Type: text/x-shellscript; charset="us-ascii"
+
+    #!/bin/bash
+    set -euo pipefail
+    exec > >(tee -a /var/log/fsx-efa-client-setup.log) 2>&1
+    workdir=$(mktemp -d)
+    cd "$workdir"
+    dnf install -y lustre-client
+    curl -fsSL --retry 5 -O https://docs.aws.amazon.com/fsx/latest/LustreGuide/samples/configure-efa-fsx-lustre-client.zip
+    unzip -q configure-efa-fsx-lustre-client.zip
+    (cd configure-efa-fsx-lustre-client && ./setup.sh)
+    --//--
+  ${indent(2, network_interfaces_yaml)}
+%{ endif ~}
+%{ endfor ~}
