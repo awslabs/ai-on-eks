@@ -241,7 +241,7 @@ kubectl -n rayserve-vllm port-forward svc/vllm-serve-svc 8000:8000
 cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 python3 -m venv .venv
 source .venv/bin/activate
-pip install requests
+pip install aiohttp
 python3 client.py
 ```
 

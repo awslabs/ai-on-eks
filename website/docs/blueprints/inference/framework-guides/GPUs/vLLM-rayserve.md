@@ -238,7 +238,7 @@ To run the Python client application in a virtual environment, follow these step
 cd ai-on-eks/blueprints/inference/vllm-rayserve-gpu
 python3 -m venv .venv
 source .venv/bin/activate
-pip install requests,aiohttp
+pip install aiohttp
 python3 client.py
 ```
 
